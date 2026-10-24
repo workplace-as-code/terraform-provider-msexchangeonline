@@ -2,8 +2,9 @@
 
 Manage Exchange Online configuration as code with Terraform: mail flow, anti-spam, anti-phishing, anti-malware, Defender for Office 365, client access policies and organization settings.
 
+[![CI](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/actions/workflows/ci.yml)
+[![Terraform Registry](https://img.shields.io/github/v/release/workplace-as-code/terraform-provider-msexchangeonline?label=registry&logo=terraform&color=7B42BC)](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Terraform Registry](https://img.shields.io/badge/registry-workplace--as--code%2Fmsexchangeonline-7B42BC?logo=terraform)](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline)
 
 - Review every change with `terraform plan` before it reaches the tenant
 - Detect configuration drift made in the admin center
@@ -113,6 +114,7 @@ The PowerShell bridge scripts are embedded in the provider binary: nothing else 
 - [Import an existing tenant](docs/guides/import_existing.md)
 - [Detect drift in CI](docs/guides/drift_detection.md)
 - [Resources and availability](docs/guides/availability.md)
+- [Troubleshooting](docs/guides/troubleshooting.md)
 - [All Resources](docs/resources/)
 - [All Data Sources](docs/data-sources/)
 
