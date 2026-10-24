@@ -13,6 +13,8 @@ The provider drives the ExchangeOnlineManagement PowerShell module through scrip
 - PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module: `Install-Module ExchangeOnlineManagement -Scope CurrentUser`
 - An Entra ID app registration with certificate-based authentication, the `Exchange.ManageAsApp` permission, and either a least-privilege Exchange role group (recommended) or the Exchange Administrator role. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
+When something fails, start with the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).
+
 ## Example Usage
 
 {{ tffile "examples/provider/provider.tf" }}

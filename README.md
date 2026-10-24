@@ -113,6 +113,7 @@ The PowerShell bridge scripts are embedded in the provider binary: nothing else 
 - [Import an existing tenant](docs/guides/import_existing.md)
 - [Detect drift in CI](docs/guides/drift_detection.md)
 - [Resources and availability](docs/guides/availability.md)
+- [Troubleshooting](docs/guides/troubleshooting.md)
 - [All Resources](docs/resources/)
 - [All Data Sources](docs/data-sources/)
 
