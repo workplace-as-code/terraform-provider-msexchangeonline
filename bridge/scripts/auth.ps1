@@ -70,11 +70,16 @@ $ErrorActionPreference = "Stop"
                 -ExchangeEnvironmentName $envName `
                 -ShowBanner:$false
         } else {
-            # PFX file — works on Linux/macOS; EphemeralKeySet avoids writing to key store
+            # PFX file. EphemeralKeySet keeps the private key out of the key store, but macOS
+            # does not support it: there the default loads the key into a temporary keychain.
             if (-not $CertificatePath) {
                 throw "Either certificate_path or certificate_thumbprint is required"
             }
-            $certFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            $certFlags = if ($IsMacOS) {
+                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+            } else {
+                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            }
             $cert      = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
                 $CertificatePath,
                 $CertificatePassword,
