@@ -5,6 +5,7 @@
 ### Bug fixes
 
 - Certificate authentication with a `.pfx` file works on macOS: loading the certificate failed with "This platform does not support loading with EphemeralKeySet".
+- On a machine whose language is not English, a missing object is recognized again: Exchange Online now always answers in English, so `terraform query` no longer fails on a tenant without application access policies and objects deleted outside Terraform are removed from the state.
 
 ## 0.1.0 (October 24, 2026)
 

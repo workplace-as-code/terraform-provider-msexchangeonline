@@ -17,6 +17,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Exchange Online answers in the language of the machine. The scripts recognize
+# errors by their English text ("couldn't be found", ...): on a French machine a
+# missing object would be reported as a failure. Ask for English, whatever the OS.
+[System.Globalization.CultureInfo]::CurrentCulture   = [System.Globalization.CultureInfo]::GetCultureInfo("en-US")
+[System.Globalization.CultureInfo]::CurrentUICulture = [System.Globalization.CultureInfo]::GetCultureInfo("en-US")
+
 # The connection runs in a child scope. This file is dot-sourced into every
 # bridge script: a variable assigned here would overwrite the script's own
 # parameter of the same name, without regard to case (msexchangeserver once
