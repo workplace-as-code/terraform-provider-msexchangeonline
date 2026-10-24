@@ -108,4 +108,5 @@ terraform apply   # Apply to your tenant
 
 - [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication): permissions, certificates, production setup
 - [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing): generate the configuration of the objects already in place
+- [Detect drift in CI](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/drift_detection): run `terraform plan` on a schedule to detect changes made outside Terraform
 - [Resources and availability](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/availability): every resource, the Exchange edition it works with and the license it needs
