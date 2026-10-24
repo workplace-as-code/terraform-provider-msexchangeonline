@@ -1,0 +1,9 @@
+# Copy this file to terraform.tfvars and fill in your values.
+# Auth credentials are NOT needed here — they are read from EXCHANGE_* env vars.
+# See .env at the repo root.
+
+# Your tenant's primary .onmicrosoft.com domain (or any accepted domain)
+primary_domain = "yourcompany.onmicrosoft.com"
+
+# Optional: an existing mailbox to test the mailbox data source
+# test_mailbox = "user@yourcompany.com"

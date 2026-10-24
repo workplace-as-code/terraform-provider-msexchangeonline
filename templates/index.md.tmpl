@@ -1,0 +1,38 @@
+---
+page_title: "Provider: Microsoft Exchange Online"
+description: |-
+  Manage Exchange Online configuration as code: mail flow, anti-spam, anti-phishing, anti-malware, Defender for Office 365, client access policies and organization settings.
+---
+
+# Microsoft Exchange Online Provider
+
+The Microsoft Exchange Online provider manages Exchange Online configuration as code: mail flow, anti-spam, anti-phishing, anti-malware, Defender for Office 365, client access policies and organization settings. Exchange Server is managed by a separate provider, [workplace-as-code/msexchangeserver](https://registry.terraform.io/providers/workplace-as-code/msexchangeserver/latest).
+
+The provider drives the ExchangeOnlineManagement PowerShell module through scripts embedded in the provider binary. The machine running Terraform needs:
+
+- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module: `Install-Module ExchangeOnlineManagement -Scope CurrentUser`
+- An Entra ID app registration with certificate-based authentication, the `Exchange.ManageAsApp` permission, and either a least-privilege Exchange role group (recommended) or the Exchange Administrator role. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Example Usage
+
+{{ tffile "examples/provider/provider.tf" }}
+
+Every argument can also come from an `EXCHANGE_*` environment variable, for example `EXCHANGE_TENANT_ID`. A value set in the provider block takes precedence over the environment.
+
+## Attributes left out of the configuration
+
+Every resource only manages the attributes set in its configuration. An attribute left out is never written: a new object gets the Exchange default, and an existing object keeps its current value, which is recorded in the state. Importing or adopting an object therefore never changes it until you set an attribute. The exception is the conditions and actions of `msexchangeonline_transport_rule`, which define the rule: a condition left out means the rule has none.
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Performance tuning
+
+The provider keeps a few PowerShell processes open during a run and reuses their Exchange connection. These environment variables tune that behavior:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `EXCHANGE_MAX_CONCURRENCY` | `4` | Maximum number of PowerShell processes running at once |
+| `EXCHANGE_SCRIPT_TIMEOUT` | `10m` | Maximum duration of one bridge call |
+| `EXCHANGE_BRIDGE_MODE` | `persistent` | `oneshot` starts a new PowerShell process for every call |
+| `EXCHANGE_WORKER_MAX_REQUESTS` | `200` | Requests served by a PowerShell process before it is replaced |
+| `EXCHANGE_BRIDGE_DIR` | unset | Run the bridge scripts from this folder instead of the embedded copy (script development only) |

@@ -1,0 +1,43 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Organization"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Organization Configuration** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-ApplicationAccessPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-applicationaccesspolicy?view=exchange-ps)
+- [`Get-ApplicationAccessPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-applicationaccesspolicy?view=exchange-ps)
+- [`Set-ApplicationAccessPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-applicationaccesspolicy?view=exchange-ps)
+- [`Remove-ApplicationAccessPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-applicationaccesspolicy?view=exchange-ps)
+
+## Import
+
+Import using the policy identity shown by `Get-ApplicationAccessPolicy` (`<tenant id>\\<policy id>`). Set `policy_scope_group_id` in the configuration: Exchange does not return it in the form it was given.
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

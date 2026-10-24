@@ -1,0 +1,43 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Anti-spam"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Transport Hygiene** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-TenantAllowBlockListItems`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-tenantallowblocklistitems?view=exchange-ps)
+- [`Get-TenantAllowBlockListItems`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-tenantallowblocklistitems?view=exchange-ps)
+- [`Set-TenantAllowBlockListItems`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-tenantallowblocklistitems?view=exchange-ps)
+- [`Remove-TenantAllowBlockListItems`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-tenantallowblocklistitems?view=exchange-ps)
+
+## Import
+
+Import using `<list_type>:<entry>`:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

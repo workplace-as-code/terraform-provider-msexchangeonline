@@ -1,0 +1,1 @@
+terraform import msexchangeonline_hosted_outbound_spam_filter_rule.example "Bulk senders"

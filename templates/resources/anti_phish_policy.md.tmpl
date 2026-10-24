@@ -1,0 +1,49 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Anti-malware and anti-phishing"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Transport Hygiene** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-AntiPhishPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-antiphishpolicy?view=exchange-ps)
+- [`Get-AntiPhishPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-antiphishpolicy?view=exchange-ps)
+- [`Set-AntiPhishPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-antiphishpolicy?view=exchange-ps)
+- [`Remove-AntiPhishPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-antiphishpolicy?view=exchange-ps)
+- [`New-AntiPhishRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-antiphishrule?view=exchange-ps)
+- [`Get-AntiPhishRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-antiphishrule?view=exchange-ps)
+- [`Set-AntiPhishRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-antiphishrule?view=exchange-ps)
+- [`Remove-AntiPhishRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-antiphishrule?view=exchange-ps)
+- [`Enable-AntiPhishRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/enable-antiphishrule?view=exchange-ps)
+- [`Disable-AntiPhishRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/disable-antiphishrule?view=exchange-ps)
+
+## Import
+
+Import using the exact policy name as it appears in Exchange Online:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

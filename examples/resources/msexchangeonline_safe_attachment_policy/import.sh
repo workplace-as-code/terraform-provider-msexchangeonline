@@ -1,0 +1,1 @@
+terraform import msexchangeonline_safe_attachment_policy.example "Policy Name"

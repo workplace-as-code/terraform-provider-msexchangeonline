@@ -1,0 +1,1 @@
+terraform import msexchangeonline_external_in_outlook.this "default"

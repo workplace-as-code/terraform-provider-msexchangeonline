@@ -1,0 +1,49 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Defender for Office 365"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Transport Hygiene** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. The tenant needs a Microsoft Defender for Office 365 (Plan 1 or 2) license. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-SafeAttachmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-safeattachmentpolicy?view=exchange-ps)
+- [`Get-SafeAttachmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-safeattachmentpolicy?view=exchange-ps)
+- [`Set-SafeAttachmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-safeattachmentpolicy?view=exchange-ps)
+- [`Remove-SafeAttachmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-safeattachmentpolicy?view=exchange-ps)
+- [`New-SafeAttachmentRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-safeattachmentrule?view=exchange-ps)
+- [`Get-SafeAttachmentRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-safeattachmentrule?view=exchange-ps)
+- [`Set-SafeAttachmentRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-safeattachmentrule?view=exchange-ps)
+- [`Remove-SafeAttachmentRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-safeattachmentrule?view=exchange-ps)
+- [`Enable-SafeAttachmentRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/enable-safeattachmentrule?view=exchange-ps)
+- [`Disable-SafeAttachmentRule`](https://learn.microsoft.com/powershell/module/exchangepowershell/disable-safeattachmentrule?view=exchange-ps)
+
+## Import
+
+Import using the exact policy name as it appears in Exchange Online:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

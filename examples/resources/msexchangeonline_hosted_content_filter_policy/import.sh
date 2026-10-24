@@ -1,0 +1,1 @@
+terraform import msexchangeonline_hosted_content_filter_policy.example "Strict Spam Filter"

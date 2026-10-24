@@ -1,0 +1,1 @@
+terraform import msexchangeonline_outbound_spam_filter_policy.example "Outbound Spam Policy"

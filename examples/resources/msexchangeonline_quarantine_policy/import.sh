@@ -1,0 +1,1 @@
+terraform import msexchangeonline_quarantine_policy.example "UserRequestRelease"

@@ -1,0 +1,43 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Clients and devices"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Recipient Policies** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-MobileDeviceMailboxPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-mobiledevicemailboxpolicy?view=exchange-ps)
+- [`Get-MobileDeviceMailboxPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-mobiledevicemailboxpolicy?view=exchange-ps)
+- [`Set-MobileDeviceMailboxPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-mobiledevicemailboxpolicy?view=exchange-ps)
+- [`Remove-MobileDeviceMailboxPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-mobiledevicemailboxpolicy?view=exchange-ps)
+
+## Import
+
+Import using the policy name:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).
