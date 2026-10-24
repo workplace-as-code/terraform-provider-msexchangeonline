@@ -196,6 +196,28 @@ import_orphans() {
   done
 }
 
+# leftover_app_policies prints the ID of every application access policy of the
+# test app. Such a policy has no name, so import_orphans cannot find it: a run that
+# stopped early leaves it behind and the next apply cannot create it again.
+leftover_app_policies() {
+  local dir out
+  dir="$(mktemp -d)"
+  printf 'terraform {\n  required_providers {\n    msexchangeonline = { source = "workplace-as-code/msexchangeonline" }\n  }\n}\nprovider "msexchangeonline" {}\n' > "$dir/main.tf"
+  printf 'list "msexchangeonline_application_access_policy" "all" {\n  provider = msexchangeonline\n}\n' > "$dir/aap.tfquery.hcl"
+  if ! (cd "$dir" && terraform query -no-color -generate-config-out=generated.tf > query.log 2>&1); then
+    cat "$dir/query.log" >&2
+    rm -rf "$dir"
+    return 1
+  fi
+  # HCL doubles the backslash of "<tenant>\<app id>:<group>": undo it for terraform import.
+  out=""
+  # Only the "id" key: "app_id" also holds the app ID.
+  [[ -f "$dir/generated.tf" ]] && out="$(grep -oE '(^|[[:space:]{])id *= *"[^"]*"' "$dir/generated.tf" |
+    sed -E 's/^[[:space:]{]*id *= *"(.*)"$/\1/; s/\\\\/\\/g' | grep -iF "$TF_VAR_test_app_id" || true)"
+  rm -rf "$dir"
+  [[ -z "$out" ]] || echo "$out"
+}
+
 reset_state() { rm -f terraform.tfstate terraform.tfstate.*; }
 
 # state_value <address> <attribute> prints an attribute from the state.
@@ -255,6 +277,19 @@ else
   pass "No orphaned objects found"
 fi
 reset_state
+if [[ -n "${APP_POLICY:-}" ]]; then
+  leftover="$(leftover_app_policies)" || fail "Listing the application access policies failed"
+  if [[ -n "$leftover" ]]; then
+    while IFS= read -r id; do
+      terraform import -no-color "$APP_POLICY" "$id" > /dev/null
+      terraform destroy -auto-approve -no-color -target="$APP_POLICY" | tail -1
+      reset_state
+    done <<< "$leftover"
+    pass "Orphaned application access policy of the test app destroyed"
+  else
+    pass "No orphaned application access policy"
+  fi
+fi
 
 # ---------------------------------------------------------------------------
 # 7. Apply: create every test object and import the tenant-wide ones

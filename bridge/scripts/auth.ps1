@@ -17,6 +17,12 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+# Exchange Online answers in the language of the machine. The scripts recognize
+# errors by their English text ("couldn't be found", ...): on a French machine a
+# missing object would be reported as a failure. Ask for English, whatever the OS.
+[System.Globalization.CultureInfo]::CurrentCulture   = [System.Globalization.CultureInfo]::GetCultureInfo("en-US")
+[System.Globalization.CultureInfo]::CurrentUICulture = [System.Globalization.CultureInfo]::GetCultureInfo("en-US")
+
 # The connection runs in a child scope. This file is dot-sourced into every
 # bridge script: a variable assigned here would overwrite the script's own
 # parameter of the same name, without regard to case (msexchangeserver once
@@ -70,11 +76,16 @@ $ErrorActionPreference = "Stop"
                 -ExchangeEnvironmentName $envName `
                 -ShowBanner:$false
         } else {
-            # PFX file — works on Linux/macOS; EphemeralKeySet avoids writing to key store
+            # PFX file. EphemeralKeySet keeps the private key out of the key store, but macOS
+            # does not support it: there the default loads the key into a temporary keychain.
             if (-not $CertificatePath) {
                 throw "Either certificate_path or certificate_thumbprint is required"
             }
-            $certFlags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            $certFlags = if ($IsMacOS) {
+                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+            } else {
+                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+            }
             $cert      = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
                 $CertificatePath,
                 $CertificatePassword,
