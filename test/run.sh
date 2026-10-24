@@ -28,13 +28,16 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   TF_DEV_PROVIDER_DIR     folder written in a new ~/.terraformrc (default /tmp). When
+#                           ~/.terraformrc already has a dev override for this provider, the
+#                           provider is built into the folder it names.
 
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TESTDIR="$ROOT/test/integration"
-BINARY="/tmp/terraform-provider-msexchangeonline"
 TERRAFORMRC="$HOME/.terraformrc"
+PROVIDER_ADDR="workplace-as-code/msexchangeonline"
 
 # Colours
 GREEN='\033[0;32m'
@@ -80,22 +83,27 @@ pass "Primary domain: $TF_VAR_primary_domain"
 # ---------------------------------------------------------------------------
 # 3. Check ~/.terraformrc dev_overrides
 # ---------------------------------------------------------------------------
-if grep -q '"workplace-as-code/msexchangeonline"' "$TERRAFORMRC" 2>/dev/null; then
-  pass "~/.terraformrc already configured"
+# The provider is built into the folder of its dev override, so Terraform
+# always runs the binary built here.
+DEV_DIR="$(sed -n "s#^ *\"$PROVIDER_ADDR\" *= *\"\([^\"]*\)\".*#\1#p" "$TERRAFORMRC" 2>/dev/null | head -1 || true)"
+if [[ -n "$DEV_DIR" ]]; then
+  pass "~/.terraformrc already configured ($DEV_DIR)"
 elif grep -q 'dev_overrides' "$TERRAFORMRC" 2>/dev/null; then
-  fail "~/.terraformrc has dev_overrides but not \"workplace-as-code/msexchangeonline\" = \"/tmp\". Add that line."
+  fail "~/.terraformrc has dev_overrides but no \"$PROVIDER_ADDR\" entry. Add one, for example \"$PROVIDER_ADDR\" = \"/tmp\"."
 else
+  DEV_DIR="${TF_DEV_PROVIDER_DIR:-/tmp}"
   step "Configuring ~/.terraformrc dev_overrides"
   cat > "$TERRAFORMRC" <<EOF
 provider_installation {
   dev_overrides {
-    "workplace-as-code/msexchangeonline" = "/tmp"
+    "$PROVIDER_ADDR" = "$DEV_DIR"
   }
   direct {}
 }
 EOF
-  pass "~/.terraformrc created"
+  pass "~/.terraformrc created ($DEV_DIR)"
 fi
+BINARY="$DEV_DIR/terraform-provider-msexchangeonline"
 
 # ---------------------------------------------------------------------------
 # 4. Build provider binary
