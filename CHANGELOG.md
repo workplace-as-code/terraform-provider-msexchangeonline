@@ -1,12 +1,6 @@
 # Changelog
 
-## Unreleased
-
-### Documentation
-
-- New guides: troubleshooting (installation, PowerShell module and its dependencies, `AADSTS` connection errors, roles and licenses, timeouts, running a bridge script by hand) and drift detection in CI.
-- The provider page lists the Terraform, PowerShell and ExchangeOnlineManagement module versions each release was tested with.
-- The README and the provider page state that the provider is a community project, provided as is and tested by hand before each release.
+From the next version on, the release notes are generated from the pull request titles: see the [GitHub releases](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/releases). This file keeps the history up to version 0.1.1.
 
 ## 0.1.1 (October 24, 2026)
 
