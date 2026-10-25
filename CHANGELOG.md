@@ -6,6 +6,7 @@
 
 - New guides: troubleshooting (installation, PowerShell module and its dependencies, `AADSTS` connection errors, roles and licenses, timeouts, running a bridge script by hand) and drift detection in CI.
 - The provider page lists the Terraform, PowerShell and ExchangeOnlineManagement module versions each release was tested with.
+- The README and the provider page state that the provider is a community project, provided as is and tested by hand before each release.
 
 ## 0.1.1 (October 24, 2026)
 
