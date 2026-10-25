@@ -6,6 +6,9 @@ Manage Exchange Online configuration as code with Terraform: mail flow, anti-spa
 [![Terraform Registry](https://img.shields.io/github/v/release/workplace-as-code/terraform-provider-msexchangeonline?label=registry&logo=terraform&color=7B42BC)](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+> [!WARNING]
+> **Use at your own risk.** This is a community project, maintained on a best-effort basis and provided as is, without warranty (MIT license). Each release is tested by hand on a test tenant before it is published; nothing is tested continuously against Microsoft 365. Run `terraform plan` and try your configuration on a non-production tenant before applying it to production.
+
 - Review every change with `terraform plan` before it reaches the tenant
 - Detect configuration drift made in the admin center
 - Adopt existing objects safely: attributes left out of the configuration are never written

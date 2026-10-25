@@ -6,6 +6,8 @@ description: |-
 
 # Microsoft Exchange Online Provider
 
+~> **Use at your own risk.** This is a community project, maintained on a best-effort basis and provided as is, without warranty (MIT license). Each release is tested by hand on a test tenant before it is published; nothing is tested continuously against Microsoft 365. Run `terraform plan` and try your configuration on a non-production tenant before applying it to production.
+
 The Microsoft Exchange Online provider manages Exchange Online configuration as code: mail flow, anti-spam, anti-phishing, anti-malware, Defender for Office 365, client access policies and organization settings. Exchange Server is managed by a separate provider, [workplace-as-code/msexchangeserver](https://registry.terraform.io/providers/workplace-as-code/msexchangeserver/latest).
 
 The provider drives the ExchangeOnlineManagement PowerShell module through scripts embedded in the provider binary. The machine running Terraform needs:
@@ -79,6 +81,6 @@ Before each release, the integration tests create, update, import and destroy ev
 |---|---|---|---|---|
 | 0.1.1 | 1.17.0 | 7.6.8 | 3.10.1 | Linux (Debian 13) |
 
-The Defender for Office 365 resources were tested by the weekly run on GitHub Actions (Ubuntu 24.04, ExchangeOnlineManagement 3.10.1), on a tenant licensed for Defender for Office 365 Plan 1.
+The Defender for Office 365 resources were tested on GitHub Actions (Ubuntu 24.04, ExchangeOnlineManagement 3.10.1), on a tenant licensed for Defender for Office 365 Plan 1.
 
 Other versions that meet the requirements (Terraform 1.5 or later, PowerShell 7 or later, ExchangeOnlineManagement 3 or later) should work but are not tested. `terraform query` needs Terraform 1.14 or later.
