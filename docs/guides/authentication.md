@@ -5,20 +5,27 @@ subcategory: "Guides"
 
 # Authentication Guide
 
-The Microsoft Exchange Online provider uses **certificate-based app-only authentication**. Client secrets are not supported for app-only access (`Connect-ExchangeOnline` requires a certificate).
+The provider connects to Exchange Online with **app-only authentication**: an Entra ID app registration, not a user account. This page helps you choose how the provider proves it is that app, then covers the setup every method shares: the app registration and its Exchange permissions.
 
+## Choose a Method
+
+| Method | `auth_method` | Works from | Secret stored where Terraform runs | Renewal |
+|---|---|---|---|---|
+| Certificate: `.pfx` file, base64 content or Windows certificate store | `client_certificate` (default) | Anywhere: workstations, internal CI runners, servers | The `.pfx` and its password | Upload a new certificate before the old one expires (1 to 2 years) |
+| OIDC from GitHub Actions | `oidc_github` | GitHub Actions jobs | Nothing | None: GitHub issues a token for each job |
+| OIDC from another platform | `oidc` | A CI platform or cluster whose OIDC issuer Entra ID can reach over the internet | Nothing | None: the platform issues the token |
+
+- **Internal CI (an on-premises GitLab or Jenkins), workstations, servers**: use a certificate. OIDC needs Entra ID to download the signing keys of the platform that issues the token, over public HTTPS: an internal platform cannot be reached. See [Certificate authentication](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_client_certificate).
+- **GitHub Actions**: use `oidc_github`. Nothing to store in GitHub, nothing to renew, and Entra ID only accepts tokens from the repository and environment you declare. See [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github).
+- **gitlab.com, Kubernetes, another platform with a public OIDC issuer**: use `oidc`. See [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc).
+
+Client secrets are not supported: Exchange Online PowerShell does not accept them for app-only access.
 
 ---
 
-## Exchange Online — Certificate-Based Auth (CBA)
+## Step 1 — Create an App Registration in Entra ID
 
-### Why a certificate?
-
-Microsoft requires app-only (unattended) connections to Exchange Online PowerShell to use a certificate rather than a client secret. This is enforced by the `ExchangeOnlineManagement` PowerShell module.
-
-The names below (`terraform-msexchangeonline`) are suggestions: any name works.
-
-### Step 1 — Create an App Registration in Entra ID
+Every method uses the same app registration. The names below (`terraform-msexchangeonline`) are suggestions: any name works.
 
 1. Go to **Entra admin center → App registrations → New registration**
 2. Name: `terraform-msexchangeonline`, supported account types: **Single tenant**, then **Register**
@@ -30,7 +37,7 @@ The names below (`terraform-msexchangeonline`) are suggestions: any name works.
 
 Do not add `Exchange.ManageAsAppV2` or `Exchange.AdminAPI.ManageAsApp`: they are for the Exchange Online Admin REST API, which the provider does not use.
 
-### Step 2 — Grant Exchange Permissions
+## Step 2 — Grant Exchange Permissions
 
 Choose one option.
 
@@ -61,82 +68,32 @@ Simpler, but broader: the app can run every Exchange Online cmdlet, including ma
 
 Role assignments can take up to 30 minutes to apply.
 
-### Step 3 — Generate a Certificate
+## Step 3 — Give the App Its Credential
 
-**Option A — Self-signed, with PowerShell on Windows**
+Follow the guide of the method you chose:
 
-```powershell
-$cert = New-SelfSignedCertificate `
-    -Subject "CN=terraform-msexchangeonline" `
-    -CertStoreLocation "Cert:\CurrentUser\My" `
-    -KeyExportPolicy Exportable `
-    -KeySpec KeyExchange `
-    -KeyLength 2048 `
-    -KeyAlgorithm RSA `
-    -HashAlgorithm SHA256 `
-    -NotAfter (Get-Date).AddYears(2)
+- [Certificate authentication](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_client_certificate): generate a certificate, upload its public key to the app, give the `.pfx` to the provider.
+- [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github): declare which repository and environment the app trusts.
+- [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc): declare which issuer and subject the app trusts.
 
-# Public key (.cer): upload it to the app registration
-Export-Certificate -Cert $cert -FilePath "terraform-msexchangeonline.cer"
+---
 
-# Private key (.pfx): used by the provider
-$password = Read-Host -AsSecureString "PFX password"
-Export-PfxCertificate -Cert $cert -FilePath "terraform-msexchangeonline.pfx" -Password $password
-```
-
-**Option B — OpenSSL (Linux, macOS, CI)**
-
-```bash
-openssl req -x509 -newkey rsa:2048 -keyout terraform-msexchangeonline.key \
-    -out terraform-msexchangeonline.cer -days 730 -nodes -subj "/CN=terraform-msexchangeonline"
-
-openssl pkcs12 -export -out terraform-msexchangeonline.pfx \
-    -inkey terraform-msexchangeonline.key -in terraform-msexchangeonline.cer
-
-rm terraform-msexchangeonline.key   # the private key now lives only in the .pfx
-```
-
-### Step 4 — Upload the Certificate to the App Registration
-
-1. Open the app registration in Entra ID
-2. Go to **Certificates & secrets → Certificates → Upload certificate**
-3. Upload `terraform-msexchangeonline.cer` and note its expiry date
-
-### Step 5 — Configure the Provider
-
-**Using certificate file (.pfx):**
-
-```hcl
-provider "msexchangeonline" {
-  tenant_id            = var.tenant_id
-  client_id            = var.client_id
-  certificate_path     = "/path/to/terraform-msexchangeonline.pfx"
-  certificate_password = var.certificate_password
-}
-```
-
-**Using thumbprint (Windows — certificate in local store):**
-
-```hcl
-provider "msexchangeonline" {
-  tenant_id              = var.tenant_id
-  client_id              = var.client_id
-  certificate_thumbprint = "AABBCCDDEEFF..."
-}
-```
-
-**Via environment variables (recommended for CI/CD):**
-
-```bash
-export EXCHANGE_TENANT_ID="contoso.onmicrosoft.com"
-export EXCHANGE_CLIENT_ID="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-export EXCHANGE_CERTIFICATE_PATH="/secrets/terraform-msexchangeonline.pfx"
-export EXCHANGE_CERTIFICATE_PASSWORD="your-pfx-password"
-```
+## Provider Settings
 
 Values set in the `provider` block take precedence over environment variables. Environment variables are only used for attributes left unset in HCL.
 
-The provider never passes secrets on the PowerShell command line. The certificate password and the on-premises password reach the bridge scripts through the child process environment.
+| Attribute | Environment variable | Methods |
+|---|---|---|
+| `tenant_id` | `EXCHANGE_TENANT_ID` | All (required) |
+| `client_id` | `EXCHANGE_CLIENT_ID` | All (required) |
+| `auth_method` | `EXCHANGE_AUTH_METHOD` | All (default `client_certificate`) |
+| `certificate_path`, `certificate_base64`, `certificate_thumbprint`, `certificate_password` | `EXCHANGE_CERTIFICATE_PATH`, `EXCHANGE_CERTIFICATE_BASE64`, `EXCHANGE_CERTIFICATE_THUMBPRINT`, `EXCHANGE_CERTIFICATE_PASSWORD` | `client_certificate` |
+| `oidc_token`, `oidc_token_file_path` | `EXCHANGE_OIDC_TOKEN`, `EXCHANGE_OIDC_TOKEN_FILE_PATH` | `oidc` |
+| `environment` | `EXCHANGE_ENVIRONMENT` | All |
+
+The provider checks these settings at plan time: an attribute that does not belong to the chosen method, or two certificate sources at once, fails with a message that says what to change. Without `auth_method`, `EXCHANGE_OIDC_*` variables left in the environment are ignored, so an existing certificate configuration keeps working.
+
+The provider never passes secrets on the PowerShell command line. The certificate, its password and the access token reach the bridge scripts through the child process environment.
 
 ### Cloud Environments
 
@@ -151,7 +108,7 @@ provider "msexchangeonline" {
 
 Or via env var: `export EXCHANGE_ENVIRONMENT="gcchigh"`
 
----
+OIDC is only supported in the `global` and `gcc` environments for now. Use a certificate in the other clouds.
 
 ---
 
@@ -164,20 +121,9 @@ Or via env var: `export EXCHANGE_ENVIRONMENT="gcchigh"`
 | `terraform-msexchangeonline-read` | `terraform plan` on pull requests, scheduled drift detection | `Exchange.ManageAsApp` + the **View-Only Organization Management** role group, assigned like Option A (`New-ServicePrincipal`, then `Add-RoleGroupMember`). The **Global Reader** Entra role also works but reads the whole tenant, not only Exchange. |
 | `terraform-msexchangeonline` | `terraform apply`, only from the protected branch after approval | `Exchange.ManageAsApp` + the least-privilege role group (Option A) |
 
-If the read certificate leaks from a CI job, the configuration can be read but not changed. Keep the write certificate in a secret scoped to the deployment environment (for example a GitHub Actions environment with required reviewers).
+If the read credential leaks from a CI job, the configuration can be read but not changed. With a certificate, keep the write certificate in a secret scoped to the deployment environment (for example a GitHub Actions environment with required reviewers). With OIDC, make the write app trust only that protected environment.
 
 For a single administrator testing on one tenant, one write app is enough.
-
----
-
-## Storing Secrets Safely
-
-Never commit credentials to version control. Recommended approaches:
-
-- **HashiCorp Vault** — inject secrets as environment variables in CI
-- **GitHub Actions secrets** — store the `.pfx` base64-encoded (`base64 -w0 terraform-msexchangeonline.pfx`), write it to a temporary file in the job, and pass its password via `${{ secrets.EXCHANGE_CERTIFICATE_PASSWORD }}`
-- **Azure Key Vault** — retrieve the PFX at pipeline runtime
-- **Terraform Cloud** — store sensitive variables in workspace settings
 
 ---
 
@@ -193,10 +139,10 @@ These optional environment variables control how the provider runs PowerShell:
 | `EXCHANGE_BRIDGE_MODE` | `persistent` | `persistent` keeps up to `EXCHANGE_MAX_CONCURRENCY` PowerShell processes alive and reuses their Exchange connection. `oneshot` starts a new process, and a new connection, for every operation. Use it only for troubleshooting. |
 | `EXCHANGE_WORKER_MAX_REQUESTS` | `200` | Number of operations a persistent PowerShell process serves before it is replaced. |
 
-In persistent mode, a process that hits an error, a timeout or a crash is discarded and the next operation starts a fresh one. The processes disconnect from Exchange when Terraform finishes.
+In persistent mode, a process that hits an error, a timeout or a crash is discarded and the next operation starts a fresh one. With OIDC, a process is also replaced a few minutes before its access token expires, so runs longer than an hour keep working. The processes disconnect from Exchange when Terraform finishes.
 
 ---
 
 ## Troubleshooting
 
-Connection errors (`AADSTS` codes), certificate, role and license problems are covered in the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).
+Connection errors (`AADSTS` codes), certificate, OIDC, role and license problems are covered in the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).
