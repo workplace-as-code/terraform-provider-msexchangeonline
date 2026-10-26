@@ -67,6 +67,8 @@ az vm identity assign --resource-group <resource-group> --name <vm> --identities
 az identity show --resource-group <resource-group> --name terraform-msexchangeonline --query "{clientId: clientId, objectId: principalId}"
 ```
 
+`--identities` accepts a name when the identity is in the VM's resource group. For an identity in another resource group, give its resource ID (`az identity show ... --query id`).
+
 ### Azure Arc-enabled Server
 
 Connecting the server to Azure Arc creates its system-assigned identity, named after the server. Azure Arc protects the token with a file that only privileged accounts can read: add the account that runs Terraform to the group that may read it, and never make that account an administrator for this purpose.
@@ -146,6 +148,8 @@ export EXCHANGE_CLIENT_ID=<client-id-of-the-identity>   # user-assigned identity
 terraform plan
 ```
 
+For the system-assigned identity, make sure `EXCHANGE_CLIENT_ID` is not set, for example left over from a certificate configuration on the same runner: the provider would ask for a user-assigned identity with that ID.
+
 `tenant_id` stays required: it is the tenant's `.onmicrosoft.com` domain that `Connect-ExchangeOnline` connects to. Managed identities are supported in the `global` and `gcc` environments; use a certificate in the other clouds.
 
 ## Security Best Practices
@@ -162,8 +166,9 @@ Every error from the identity endpoint starts with `obtaining an Exchange Online
 | Error or symptom | Cause | Fix |
 |---|---|---|
 | The error comes after less than a minute: `Get "http://169.254.169.254/...": context deadline exceeded` | Terraform does not run on an Azure resource with a managed identity | Run it on an Azure resource or an Arc-enabled server, or use a certificate |
-| `Identity not found`, or an HTTP 400 that names the client ID | The user-assigned identity is not attached to this resource, or `client_id` holds another ID | Attach the identity to the resource, and set its **client ID** (not its Object ID or resource ID) |
+| `Identity not found`, or an HTTP 400 that names the client ID | The user-assigned identity is not attached to this resource, `client_id` holds another ID, or a leftover `EXCHANGE_CLIENT_ID` (an app registration's ID) is set | Attach the identity to the resource and set its **client ID** (not its Object ID or resource ID), or unset `EXCHANGE_CLIENT_ID` to use the system-assigned identity |
 | Azure Arc: an error about reading a file under `/var/opt/azcmagent/tokens` or `C:\ProgramData\AzureConnectedMachineAgent\Tokens` | The account running Terraform is not in the `himds` group (Linux) or Hybrid agent extension applications group (Windows) | Add it, then restart the runner service or open a new session |
+| Azure VM: an HTTP 410 from `169.254.169.254` | The instance metadata service is being updated, which Microsoft says can take up to 70 seconds | Run Terraform again |
 | Azure Arc with `client_id` set | Arc may offer only the system-assigned identity | Remove `client_id` |
 | `Invalid client_id ... is not a GUID` at plan time | `client_id` holds a name or a resource ID | Use the identity's client ID |
 | `Unknown client_id` at plan time | `client_id` comes from a resource that is not created yet, for example a user-assigned identity created in the same configuration | Create the identity and attach it to the runner first, then pass its client ID as a variable or read it with a data source |
