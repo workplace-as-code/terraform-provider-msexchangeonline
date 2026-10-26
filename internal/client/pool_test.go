@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -56,6 +57,8 @@ func TestHelperFakeHost(t *testing.T) {
 			send(hostResponse{ID: req.ID, Stdout: `{"ok":true}`})
 		case "secret.ps1":
 			send(hostResponse{ID: req.ID, Stdout: os.Getenv(EnvBridgeCertificatePassword)})
+		case "token.ps1":
+			send(hostResponse{ID: req.ID, Stdout: fmt.Sprintf("%d %s", os.Getpid(), os.Getenv(EnvBridgeAccessToken))})
 		default: // echo: report the process id so tests can check reuse
 			send(hostResponse{ID: req.ID, Stdout: fmt.Sprintf("%d %s", os.Getpid(), req.Params["Action"])})
 		}
@@ -199,6 +202,58 @@ func TestPoolPassesSecretsThroughEnvironment(t *testing.T) {
 	_, args := c.hostArgs()
 	if strings.Contains(strings.Join(args, " "), "pfx-secret") {
 		t.Fatal("secret leaked into the host command line")
+	}
+}
+
+func TestPoolRecyclesWorkerBeforeTokenExpiry(t *testing.T) {
+	c := fakeHostClient(t, 1, 100, time.Minute)
+	c.config.TokenSource = &fakeTokenSource{tokens: []AccessToken{
+		{Value: "at-1", ExpiresOn: time.Now().Add(2 * time.Minute)}, // inside the recycle margin
+		{Value: "at-2", ExpiresOn: time.Now().Add(time.Hour)},
+	}}
+	first, err := run(t, c, "token.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := run(t, c, "token.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pidOf(t, first) == pidOf(t, second) {
+		t.Fatal("the worker whose token expires soon was reused")
+	}
+	if !strings.HasSuffix(second, " at-2") {
+		t.Fatalf("the new worker did not get the new token: %q", second)
+	}
+}
+
+func TestPoolKeepsWorkerWhileTokenIsValid(t *testing.T) {
+	c := fakeHostClient(t, 1, 100, time.Minute)
+	c.config.TokenSource = &fakeTokenSource{tokens: []AccessToken{{Value: "at-1", ExpiresOn: time.Now().Add(time.Hour)}}}
+	first, _ := run(t, c, "token.ps1")
+	for i := 0; i < 3; i++ {
+		out, err := run(t, c, "token.ps1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pidOf(t, out) != pidOf(t, first) {
+			t.Fatalf("request %d ran in a new process", i)
+		}
+	}
+}
+
+func TestPoolTokenErrorIsReported(t *testing.T) {
+	c := fakeHostClient(t, 1, 100, time.Minute)
+	source := &fakeTokenSource{err: errors.New("AADSTS70021: no matching federated identity record")}
+	c.config.TokenSource = source
+	_, err := run(t, c, "token.ps1")
+	if err == nil || !strings.Contains(err.Error(), "AADSTS70021") {
+		t.Fatalf("err = %v", err)
+	}
+	select {
+	case <-c.pool.idle:
+		t.Fatal("a worker was started without a token")
+	default:
 	}
 }
 

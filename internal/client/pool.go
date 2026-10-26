@@ -20,6 +20,12 @@ import (
 // hostScript is the persistent host started by the pool (bridge/scripts/bridge_host.ps1).
 const hostScript = "bridge_host.ps1"
 
+// tokenRecycleMargin is how long before its access token expires a worker
+// stops taking requests. The library that provides the tokens renews a cached
+// token 5 minutes before it expires, so a new worker always starts with a
+// token that has more than this margin left.
+const tokenRecycleMargin = 3 * time.Minute
+
 // workerStartTimeout bounds how long a new PowerShell process may take to
 // report ready. Connecting to Exchange happens later, on the first request.
 const workerStartTimeout = 2 * time.Minute
@@ -103,14 +109,24 @@ func (p *pool) tryRun(ctx context.Context, script string, params map[string]stri
 }
 
 // acquire returns a live idle worker, or starts a new one.
+//
+// A worker connected with an access token that expires soon is retired here,
+// just before it would take a request: Exchange would refuse the request once
+// the token expires, and the PowerShell session cannot renew the token by
+// itself. Its replacement starts with a fresh token.
 func (p *pool) acquire(ctx context.Context) (*worker, error) {
 	for {
 		select {
 		case w := <-p.idle:
-			if w.alive() {
-				return w, nil
+			if !w.alive() {
+				w.kill()
+				continue
 			}
-			w.kill()
+			if !w.tokenExpiresOn.IsZero() && time.Until(w.tokenExpiresOn) < tokenRecycleMargin {
+				w.shutdown()
+				continue
+			}
+			return w, nil
 		default:
 			return p.client.startWorker(ctx)
 		}
@@ -135,6 +151,10 @@ type worker struct {
 	nextID    int
 	served    int
 	closeOnce sync.Once
+
+	// tokenExpiresOn is when the access token the process connected with
+	// expires; zero with certificate authentication.
+	tokenExpiresOn time.Time
 }
 
 // startWorker launches a new PowerShell host process and waits until it is ready.
@@ -145,9 +165,13 @@ func (c *Client) startWorker(ctx context.Context) (*worker, error) {
 	}
 	nonce := hex.EncodeToString(nonceBytes)
 
+	env, tokenExpiresOn, err := c.buildEnv(ctx)
+	if err != nil {
+		return nil, err
+	}
 	binary, args := c.hostArgs()
 	cmd := exec.Command(binary, args...)
-	cmd.Env = append(c.buildEnv(), "EXCHANGE_BRIDGE_NONCE="+nonce)
+	cmd.Env = append(env, "EXCHANGE_BRIDGE_NONCE="+nonce)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -164,7 +188,7 @@ func (c *Client) startWorker(ctx context.Context) (*worker, error) {
 		return nil, fmt.Errorf("%w: starting %s: %v", errWorkerUnavailable, binary, err)
 	}
 
-	w := &worker{cmd: cmd, stdin: stdin, responses: make(chan hostResponse, 1), stderr: stderr, nonce: nonce}
+	w := &worker{cmd: cmd, stdin: stdin, responses: make(chan hostResponse, 1), stderr: stderr, nonce: nonce, tokenExpiresOn: tokenExpiresOn}
 	go w.readLoop(stdout)
 
 	// Wait for the {"id":0,"ready":true} handshake.
