@@ -3,12 +3,16 @@ package client
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -167,5 +171,156 @@ func TestOIDCTokenSourceIgnoresAuthorityHostVariable(t *testing.T) {
 		if !strings.HasPrefix(u, "https://login.microsoftonline.com/") || strings.Contains(u, "example.invalid") {
 			t.Errorf("request for another authority: %s", u)
 		}
+	}
+}
+
+// clearManagedIdentityEnv empties the variables that select another managed
+// identity API (App Service, Azure Arc, Cloud Shell, Service Fabric), so
+// azidentity uses IMDS, the endpoint of an Azure VM, and the fake below.
+func clearManagedIdentityEnv(t *testing.T) {
+	t.Helper()
+	for _, k := range []string{"IDENTITY_ENDPOINT", "IDENTITY_HEADER", "IMDS_ENDPOINT", "MSI_ENDPOINT", "MSI_SECRET", "IDENTITY_SERVER_THUMBPRINT"} {
+		t.Setenv(k, "")
+	}
+}
+
+// imdsTransport answers every request like IMDS and keeps its URL.
+//
+// MSAL caches managed identity tokens for the whole process, across
+// credentials. The token it returns expires in 2 minutes: MSAL never serves
+// from its cache a token that expires within 5 minutes, so every test sends
+// its own request whatever ran before.
+type imdsTransport struct {
+	requests []*url.URL
+}
+
+// imdsTokenLifetime is the lifetime of the tokens imdsTransport returns.
+const imdsTokenLifetime = 2 * time.Minute
+
+func (f *imdsTransport) Do(req *http.Request) (*http.Response, error) {
+	f.requests = append(f.requests, req.URL)
+	body := fmt.Sprintf(`{"access_token":"at-mi","expires_on":"%d","expires_in":"120","resource":"https://outlook.office365.com","token_type":"Bearer"}`, time.Now().Add(imdsTokenLifetime).Unix())
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Request:    req,
+	}, nil
+}
+
+// useManagedIdentityTransport makes the managed identity credential send its
+// requests to transport, without retries.
+func useManagedIdentityTransport(t *testing.T, transport policy.Transporter) {
+	t.Helper()
+	previous := managedIdentityCredentialOptions
+	managedIdentityCredentialOptions = &azidentity.ManagedIdentityCredentialOptions{ClientOptions: azcore.ClientOptions{
+		Transport: transport,
+		Retry:     policy.RetryOptions{MaxRetries: -1},
+	}}
+	t.Cleanup(func() { managedIdentityCredentialOptions = previous })
+}
+
+func TestManagedIdentityTokenSourceSystemAssigned(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	transport := &imdsTransport{}
+	useManagedIdentityTransport(t, transport)
+
+	source, err := NewManagedIdentityTokenSource("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	token, err := source.Token(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if token.Value != "at-mi" {
+		t.Errorf("token = %q", token.Value)
+	}
+	if d := time.Until(token.ExpiresOn); d < imdsTokenLifetime-time.Minute || d > imdsTokenLifetime {
+		t.Errorf("token expires in %v, want the %v returned by IMDS", d, imdsTokenLifetime)
+	}
+	if len(transport.requests) != 1 {
+		t.Fatalf("%d requests, want 1", len(transport.requests))
+	}
+	u := transport.requests[0]
+	if u.Host != "169.254.169.254" || u.Query().Get("resource") != "https://outlook.office365.com" || u.Query().Has("client_id") {
+		t.Errorf("request = %s, want IMDS for Exchange Online without client_id", u)
+	}
+}
+
+func TestManagedIdentityTokenSourceUserAssigned(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	transport := &imdsTransport{}
+	useManagedIdentityTransport(t, transport)
+
+	source, err := NewManagedIdentityTokenSource("11111111-2222-3333-4444-555555555555")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.Token(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := transport.requests[0].Query().Get("client_id"); got != "11111111-2222-3333-4444-555555555555" {
+		t.Errorf("client_id = %q", got)
+	}
+}
+
+// AZURE_CLIENT_ID left in a runner (for another tool) must not turn the
+// system-assigned identity into a user-assigned one.
+func TestManagedIdentityIgnoresAzureClientID(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	t.Setenv("AZURE_CLIENT_ID", "99999999-9999-9999-9999-999999999999")
+	transport := &imdsTransport{}
+	useManagedIdentityTransport(t, transport)
+
+	source, err := NewManagedIdentityTokenSource("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := source.Token(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if u := transport.requests[0]; u.Query().Has("client_id") {
+		t.Errorf("request = %s, want no client_id", u)
+	}
+}
+
+func TestManagedIdentityErrorCarriesHint(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	useManagedIdentityTransport(t, offlineTransport{})
+
+	for _, clientID := range []string{"", "11111111-2222-3333-4444-555555555555"} {
+		source, err := NewManagedIdentityTokenSource(clientID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = source.Token(context.Background())
+		if err == nil {
+			t.Fatal("expected an error")
+		}
+		msg := err.Error()
+		for _, want := range []string{"with the managed identity failed", "Azure Arc", "Hybrid agent extension applications"} {
+			if !strings.Contains(msg, want) {
+				t.Errorf("client_id %q: error lacks %q: %s", clientID, want, msg)
+			}
+		}
+		if got := strings.Contains(msg, "attached"); got != (clientID != "") {
+			t.Errorf("client_id %q: user-assigned hint present = %v: %s", clientID, got, msg)
+		}
+	}
+}
+
+// Outside Azure nothing answers on the IMDS address: azidentity's defaults
+// (6 retries, 1-minute tries) would keep the run waiting for minutes.
+func TestManagedIdentityRetryIsBounded(t *testing.T) {
+	o := managedIdentityOptions("")
+	if o.Retry.MaxRetries != 3 || o.Retry.TryTimeout != 5*time.Second {
+		t.Errorf("retry = %+v, want 3 retries of 5s", o.Retry)
+	}
+	if o.ID != nil {
+		t.Errorf("ID = %v, want nil (system-assigned)", o.ID)
+	}
+	if o := managedIdentityOptions("x"); o.ID != azidentity.ClientID("x") {
+		t.Errorf("ID = %v, want ClientID(x)", o.ID)
 	}
 }

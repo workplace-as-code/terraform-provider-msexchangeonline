@@ -88,7 +88,7 @@ type Config struct {
 	Environment           string
 
 	// TokenSource provides the access token when the provider authenticates
-	// with OIDC. nil means certificate authentication.
+	// with OIDC or a managed identity. nil means certificate authentication.
 	TokenSource TokenSource
 }
 

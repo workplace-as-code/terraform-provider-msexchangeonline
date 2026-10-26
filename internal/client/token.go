@@ -37,7 +37,7 @@ type AccessToken struct {
 //
 // An interface is a set of methods: any type that has a Token method with this
 // signature is a TokenSource. The tests use a fake one, OIDC uses
-// oidcTokenSource, and the managed identity will add another.
+// oidcTokenSource and the managed identity managedIdentityTokenSource.
 type TokenSource interface {
 	Token(ctx context.Context) (AccessToken, error)
 }
@@ -144,6 +144,83 @@ func (s *oidcTokenSource) Token(ctx context.Context) (AccessToken, error) {
 			msg += ". " + s.hint
 		}
 		return AccessToken{}, errors.New(msg)
+	}
+	return AccessToken{Value: token.Token, ExpiresOn: token.ExpiresOn}, nil
+}
+
+// Retry bounds of the managed identity credential. IMDS, the identity endpoint
+// of an Azure VM, answers in milliseconds; azidentity's defaults (6 retries of
+// up to a minute each) are meant for a VM that is still starting, and keep a
+// run outside Azure waiting for minutes before it reports the problem.
+const (
+	managedIdentityMaxRetries = 3
+	managedIdentityTryTimeout = 5 * time.Second
+)
+
+// managedIdentityCredentialOptions configures the managed identity credential.
+// nil keeps the defaults below; tests replace it to answer without the network.
+var managedIdentityCredentialOptions *azidentity.ManagedIdentityCredentialOptions
+
+// managedIdentityHint lists what to check when no token can be obtained: the
+// SDK's own message names the endpoint it tried, not what the user can fix.
+const managedIdentityHint = "check that Terraform runs on an Azure resource with a managed identity, or on an Azure Arc-enabled server where the account running Terraform is in the himds group (Linux) or the Hybrid agent extension applications group (Windows)"
+
+// managedIdentityUserAssignedHint is added when client_id selects a
+// user-assigned identity.
+const managedIdentityUserAssignedHint = "; with client_id, check that this user-assigned identity is attached to the resource (Azure Arc may offer only the system-assigned identity: remove client_id)"
+
+// managedIdentityOptions returns the credential options: the bounded retries
+// and, when clientID is not empty, the user-assigned identity to use.
+func managedIdentityOptions(clientID string) azidentity.ManagedIdentityCredentialOptions {
+	var options azidentity.ManagedIdentityCredentialOptions
+	if managedIdentityCredentialOptions != nil {
+		options = *managedIdentityCredentialOptions
+	}
+	// Zero means "not set": a test can still disable retries with -1.
+	if options.Retry.MaxRetries == 0 {
+		options.Retry.MaxRetries = managedIdentityMaxRetries
+	}
+	if options.Retry.TryTimeout == 0 {
+		options.Retry.TryTimeout = managedIdentityTryTimeout
+	}
+	if clientID != "" {
+		options.ID = azidentity.ClientID(clientID)
+	}
+	return options
+}
+
+// managedIdentityTokenSource gets an Exchange Online access token for the
+// managed identity of the Azure resource or Azure Arc-enabled server running
+// Terraform.
+type managedIdentityTokenSource struct {
+	credential *azidentity.ManagedIdentityCredential
+	hint       string
+}
+
+// NewManagedIdentityTokenSource returns a TokenSource for the system-assigned
+// managed identity, or for the user-assigned one whose client ID is clientID.
+//
+// azidentity finds the identity endpoint of the host (IMDS on a VM, the local
+// agent on Azure Arc, App Service...) and caches the token. It does not read
+// AZURE_CLIENT_ID: only clientID selects a user-assigned identity, so a
+// variable left in a runner for another tool cannot change the identity.
+func NewManagedIdentityTokenSource(clientID string) (TokenSource, error) {
+	options := managedIdentityOptions(clientID)
+	credential, err := azidentity.NewManagedIdentityCredential(&options)
+	if err != nil {
+		return nil, err
+	}
+	hint := managedIdentityHint
+	if clientID != "" {
+		hint += managedIdentityUserAssignedHint
+	}
+	return &managedIdentityTokenSource{credential: credential, hint: hint}, nil
+}
+
+func (s *managedIdentityTokenSource) Token(ctx context.Context) (AccessToken, error) {
+	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
+	if err != nil {
+		return AccessToken{}, errors.New("obtaining an Exchange Online access token with the managed identity failed: " + err.Error() + ". " + s.hint)
 	}
 	return AccessToken{Value: token.Token, ExpiresOn: token.ExpiresOn}, nil
 }
