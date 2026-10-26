@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 )
@@ -46,9 +47,11 @@ type TokenSource interface {
 // renews its token (GitHub, a Kubernetes token file) is read again.
 type AssertionFunc func(ctx context.Context) (string, error)
 
-// StaticAssertion returns a token passed as a fixed value. It cannot be
-// renewed: once it expires, no new access token can be obtained.
+// StaticAssertion returns a token passed as a fixed value, without the blanks
+// around it (HCL file() keeps the final newline). It cannot be renewed: once
+// it expires, no new access token can be obtained.
 func StaticAssertion(token string) AssertionFunc {
+	token = strings.TrimSpace(token)
 	// The returned function "captures" token: it keeps a reference to it after
 	// StaticAssertion has returned (a closure).
 	return func(context.Context) (string, error) { return token, nil }
@@ -119,7 +122,14 @@ type oidcTokenSource struct {
 // azidentity, Microsoft's library, does the exchange: it caches the access
 // token and calls assertion again when it needs a new one.
 func NewOIDCTokenSource(organization, clientID string, assertion AssertionFunc, hint string) (TokenSource, error) {
-	credential, err := azidentity.NewClientAssertionCredential(organization, clientID, assertion, oidcCredentialOptions)
+	var options azidentity.ClientAssertionCredentialOptions
+	if oidcCredentialOptions != nil {
+		options = *oidcCredentialOptions
+	}
+	// An explicit cloud makes azidentity ignore AZURE_AUTHORITY_HOST: a
+	// variable left in a CI runner cannot send the request to another cloud.
+	options.Cloud = cloud.AzurePublic
+	credential, err := azidentity.NewClientAssertionCredential(organization, clientID, assertion, &options)
 	if err != nil {
 		return nil, err
 	}

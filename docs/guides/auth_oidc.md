@@ -67,23 +67,22 @@ The file is read again each time the provider needs a new access token, so a pla
 
 ```yaml
 apply:
-  image: mcr.microsoft.com/powershell:latest
+  image: registry.example.com/terraform-pwsh:latest # an image with Terraform and PowerShell 7
   id_tokens:
     EXCHANGE_OIDC_TOKEN:
       aud: api://AzureADTokenExchange
   variables:
     EXCHANGE_AUTH_METHOD: oidc
     EXCHANGE_TENANT_ID: contoso.onmicrosoft.com
-    EXCHANGE_CLIENT_ID: $EXCHANGE_CLIENT_ID
   script:
     - pwsh -c "Install-PSResource -Name ExchangeOnlineManagement -Scope CurrentUser -TrustRepository -Quiet"
     - terraform init
     - terraform apply -auto-approve
 ```
 
-The GitLab subject has the form `project_path:<group>/<project>:ref_type:branch:ref:<branch>`. Restrict the job to protected branches.
+Set `EXCHANGE_CLIENT_ID` as a CI/CD variable of the project. The GitLab subject has the form `project_path:<group>/<project>:ref_type:branch:ref:<branch>`. Restrict the job to protected branches.
 
-GitLab ID tokens live as long as the job's timeout: for a long run, write the token to a file and use `EXCHANGE_OIDC_TOKEN_FILE_PATH`, or keep the job timeout above the run's duration.
+A GitLab ID token stays valid for the job's timeout, so a token passed as a value is enough on GitLab: keep the job timeout above the run's duration.
 
 ### Kubernetes (AKS workload identity)
 

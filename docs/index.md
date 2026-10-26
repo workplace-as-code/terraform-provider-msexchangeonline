@@ -45,6 +45,18 @@ resource "msexchangeonline_remote_domain" "partner" {
 
 Every argument can also come from an `EXCHANGE_*` environment variable, for example `EXCHANGE_TENANT_ID`. A value set in the provider block takes precedence over the environment.
 
+In a GitHub Actions job that has `permissions: id-token: write`, the provider can authenticate with OIDC, without any stored credential:
+
+```terraform
+provider "msexchangeonline" {
+  auth_method = "oidc_github"
+  tenant_id   = "contoso.onmicrosoft.com"
+  client_id   = var.client_id
+}
+```
+
+The certificate, OIDC with GitHub Actions and OIDC with other platforms are described in the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
 ## Attributes left out of the configuration
 
 Every resource only manages the attributes set in its configuration. An attribute left out is never written: a new object gets the Exchange default, and an existing object keeps its current value, which is recorded in the state. Importing or adopting an object therefore never changes it until you set an attribute. The exception is the conditions and actions of `msexchangeonline_transport_rule`, which define the rule: a condition left out means the rule has none.

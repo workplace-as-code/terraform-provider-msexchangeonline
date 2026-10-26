@@ -19,7 +19,7 @@ The provider connects to Exchange Online with **app-only authentication**: an En
 - **GitHub Actions**: use `oidc_github`. Nothing to store in GitHub, nothing to renew, and Entra ID only accepts tokens from the repository and environment you declare. See [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github).
 - **gitlab.com, Kubernetes, another platform with a public OIDC issuer**: use `oidc`. See [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc).
 
-Client secrets are not supported: Exchange Online PowerShell does not accept them for app-only access.
+The provider does not offer client secrets: a certificate or OIDC avoids storing a password-like credential.
 
 ---
 

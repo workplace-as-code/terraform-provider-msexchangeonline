@@ -40,7 +40,7 @@ func TestAuthConnects(t *testing.T) {
 			t.Errorf("Connect-ExchangeOnline got %+v", r.Connected)
 		}
 	})
-	for _, name := range []string{"base64", "base64-wrapped"} {
+	for _, name := range []string{"base64", "base64-wrapped", "base64-nopassword"} {
 		t.Run(name, func(t *testing.T) {
 			r := connect(t, name)
 			if r.ExpectedThumbprint == "" || r.Connected.Thumbprint != r.ExpectedThumbprint || r.Connected.AccessToken != "" {

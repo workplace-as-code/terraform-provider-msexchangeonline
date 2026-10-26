@@ -117,18 +117,18 @@ openssl base64 -A -in terraform-msexchangeonline.pfx
 - The provider decodes it in memory and passes it to PowerShell through the process environment. No file is written.
 - **Base64 is not encryption.** Store the value as a secret: a masked and protected CI variable, a vault, a sensitive Terraform variable. Upload only the public certificate (`.cer`) to Entra ID.
 
-From Azure Key Vault, the `azurerm_key_vault_certificate` data source exposes the same value:
+From Azure Key Vault, read the certificate **as a secret**: the secret that Key Vault keeps under the certificate's name holds the whole `.pfx`, private key included, in base64 and without a password, when the certificate's content type is `application/x-pkcs12` (the default; with PEM the value is PEM text, which the provider does not accept). The `azurerm_key_vault_certificate` data source does not fit: its `certificate_data_base64` is the public certificate only.
 
 ```hcl
-data "azurerm_key_vault_certificate" "exchange" {
-  name         = "terraform-msexchangeonline"
+data "azurerm_key_vault_secret" "exchange" {
+  name         = "terraform-msexchangeonline" # the certificate's name
   key_vault_id = var.key_vault_id
 }
 
 provider "msexchangeonline" {
   tenant_id          = var.tenant_id
   client_id          = var.client_id
-  certificate_base64 = data.azurerm_key_vault_certificate.exchange.certificate_data_base64
+  certificate_base64 = data.azurerm_key_vault_secret.exchange.value
 }
 ```
 

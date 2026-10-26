@@ -22,6 +22,15 @@ func TestStaticAssertion(t *testing.T) {
 	}
 }
 
+// HCL file() and pasted CI secrets keep the trailing newline: Entra ID would
+// reject the token with an error that does not point at the cause.
+func TestStaticAssertionTrims(t *testing.T) {
+	got, err := StaticAssertion("  jwt-static\n")(context.Background())
+	if err != nil || got != "jwt-static" {
+		t.Fatalf("got %q, %v", got, err)
+	}
+}
+
 func TestFileAssertionTrimsAndRereads(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "token.jwt")
 	assertion := FileAssertion(path)
@@ -121,5 +130,42 @@ func TestOIDCTokenSourceErrorCarriesHint(t *testing.T) {
 	}
 	if msg := err.Error(); !strings.Contains(msg, "with OIDC failed") || !strings.Contains(msg, "use the file") {
 		t.Errorf("error = %s", msg)
+	}
+}
+
+// recordingTransport keeps the URL of every request, then fails it.
+type recordingTransport struct{ urls []string }
+
+func (r *recordingTransport) Do(req *http.Request) (*http.Response, error) {
+	r.urls = append(r.urls, req.URL.String())
+	return nil, errors.New("offline")
+}
+
+// A stray AZURE_AUTHORITY_HOST in a CI runner must not send the token request
+// to another cloud: the provider only supports the public cloud with OIDC.
+func TestOIDCTokenSourceIgnoresAuthorityHostVariable(t *testing.T) {
+	t.Setenv("AZURE_AUTHORITY_HOST", "https://login.example.invalid/")
+	transport := &recordingTransport{}
+	previous := oidcCredentialOptions
+	oidcCredentialOptions = &azidentity.ClientAssertionCredentialOptions{ClientOptions: azcore.ClientOptions{
+		Transport: transport,
+		Retry:     policy.RetryOptions{MaxRetries: -1},
+	}}
+	t.Cleanup(func() { oidcCredentialOptions = previous })
+
+	source, err := NewOIDCTokenSource("contoso.onmicrosoft.com", "00000000-0000-0000-0000-000000000001", StaticAssertion("x"), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = source.Token(context.Background())
+	if len(transport.urls) == 0 {
+		t.Fatal("no request was sent")
+	}
+	// MSAL first asks login.microsoftonline.com about an unknown authority,
+	// with that authority in the query string: check the whole URL.
+	for _, u := range transport.urls {
+		if !strings.HasPrefix(u, "https://login.microsoftonline.com/") || strings.Contains(u, "example.invalid") {
+			t.Errorf("request for another authority: %s", u)
+		}
 	}
 }

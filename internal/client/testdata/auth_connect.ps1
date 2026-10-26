@@ -4,6 +4,7 @@
 #   -Case token           : EXCHANGE_BRIDGE_ACCESS_TOKEN is set
 #   -Case base64          : EXCHANGE_BRIDGE_CERTIFICATE_BASE64 holds a password-protected .pfx
 #   -Case base64-wrapped  : the same, cut in lines of 76 characters like `base64` does
+#   -Case base64-nopassword : a .pfx exported without a password
 param([string]$Script, [string]$Case)
 
 $ErrorActionPreference = "Stop"
@@ -31,12 +32,13 @@ switch ($Case) {
             [System.Security.Cryptography.HashAlgorithmName]::SHA256,
             [System.Security.Cryptography.RSASignaturePadding]::Pkcs1)
         $cert = $req.CreateSelfSigned([DateTimeOffset]::Now, [DateTimeOffset]::Now.AddDays(1))
-        $b64  = [Convert]::ToBase64String($cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, "pw"))
+        $password = if ($Case -eq "base64-nopassword") { $null } else { "pw" }
+        $b64  = [Convert]::ToBase64String($cert.Export([System.Security.Cryptography.X509Certificates.X509ContentType]::Pfx, $password))
         if ($Case -eq "base64-wrapped") {
             $b64 = (($b64 -split '(.{76})') | Where-Object { $_ }) -join "`n"
         }
         $env:EXCHANGE_BRIDGE_CERTIFICATE_BASE64   = $b64
-        $env:EXCHANGE_BRIDGE_CERTIFICATE_PASSWORD = "pw"
+        $env:EXCHANGE_BRIDGE_CERTIFICATE_PASSWORD = $password
         $expected = $cert.Thumbprint
     }
     default { throw "unknown case $Case" }
