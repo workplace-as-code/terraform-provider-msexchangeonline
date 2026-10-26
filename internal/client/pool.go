@@ -21,9 +21,10 @@ import (
 const hostScript = "bridge_host.ps1"
 
 // tokenRecycleMargin is how long before its access token expires a worker
-// stops taking requests. The library that provides the tokens renews a cached
-// token 5 minutes before it expires, so a new worker always starts with a
-// token that has more than this margin left.
+// stops taking requests, when a newer token is available. MSAL renews a token
+// from its cache 5 minutes before it expires, but an identity endpoint (IMDS,
+// Azure Arc) can hand out a cached token that is already inside this margin:
+// see acquire.
 const tokenRecycleMargin = 3 * time.Minute
 
 // workerStartTimeout bounds how long a new PowerShell process may take to
@@ -113,7 +114,9 @@ func (p *pool) tryRun(ctx context.Context, script string, params map[string]stri
 // A worker connected with an access token that expires soon is retired here,
 // just before it would take a request: Exchange would refuse the request once
 // the token expires, and the PowerShell session cannot renew the token by
-// itself. Its replacement starts with a fresh token.
+// itself. Its replacement starts with a fresh token. When the token source
+// has nothing newer, the worker is kept: its replacement would connect with
+// the same token, and every request would restart PowerShell.
 func (p *pool) acquire(ctx context.Context) (*worker, error) {
 	for {
 		select {
@@ -122,7 +125,7 @@ func (p *pool) acquire(ctx context.Context) (*worker, error) {
 				w.kill()
 				continue
 			}
-			if !w.tokenExpiresOn.IsZero() && time.Until(w.tokenExpiresOn) < tokenRecycleMargin {
+			if !w.tokenExpiresOn.IsZero() && time.Until(w.tokenExpiresOn) < tokenRecycleMargin && p.client.hasNewerToken(ctx, w.tokenExpiresOn) {
 				w.shutdown()
 				continue
 			}
@@ -131,6 +134,14 @@ func (p *pool) acquire(ctx context.Context) (*worker, error) {
 			return p.client.startWorker(ctx)
 		}
 	}
+}
+
+// hasNewerToken reports whether the token source now returns a token that
+// expires after expiresOn. An error counts as yes: the replacement worker
+// then reports it, as any worker that cannot get a token does.
+func (c *Client) hasNewerToken(ctx context.Context, expiresOn time.Time) bool {
+	token, err := c.config.TokenSource.Token(ctx)
+	return err != nil || token.ExpiresOn.After(expiresOn)
 }
 
 func (p *pool) release(w *worker) {
