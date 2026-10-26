@@ -301,12 +301,14 @@ func TestManagedIdentityErrorCarriesHint(t *testing.T) {
 			t.Fatal("expected an error")
 		}
 		msg := err.Error()
-		for _, want := range []string{"with the managed identity failed", "Azure Arc", "Hybrid agent extension applications"} {
+		// The hint is a new sentence after the SDK's message, which ends with a URL.
+		for _, want := range []string{"with the managed identity failed", ". Check that Terraform runs", "Azure Arc", "Hybrid agent extension applications"} {
 			if !strings.Contains(msg, want) {
 				t.Errorf("client_id %q: error lacks %q: %s", clientID, want, msg)
 			}
 		}
-		if got := strings.Contains(msg, "attached"); got != (clientID != "") {
+		// A leftover EXCHANGE_CLIENT_ID selects a user-assigned identity the user may not know about.
+		if got := strings.Contains(msg, "attached") && strings.Contains(msg, "EXCHANGE_CLIENT_ID"); got != (clientID != "") {
 			t.Errorf("client_id %q: user-assigned hint present = %v: %s", clientID, got, msg)
 		}
 	}

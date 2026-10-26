@@ -170,11 +170,11 @@ var managedIdentityCredentialOptions *azidentity.ManagedIdentityCredentialOption
 
 // managedIdentityHint lists what to check when no token can be obtained: the
 // SDK's own message names the endpoint it tried, not what the user can fix.
-const managedIdentityHint = "check that Terraform runs on an Azure resource with a managed identity, or on an Azure Arc-enabled server where the account running Terraform is in the himds group (Linux) or the Hybrid agent extension applications group (Windows)"
+const managedIdentityHint = "Check that Terraform runs on an Azure resource with a managed identity, or on an Azure Arc-enabled server where the account running Terraform is in the himds group (Linux) or the Hybrid agent extension applications group (Windows)"
 
 // managedIdentityUserAssignedHint is added when client_id selects a
 // user-assigned identity.
-const managedIdentityUserAssignedHint = "; with client_id, check that this user-assigned identity is attached to the resource (Azure Arc may offer only the system-assigned identity: remove client_id)"
+const managedIdentityUserAssignedHint = ". client_id (or EXCHANGE_CLIENT_ID) selects a user-assigned identity: check that it is attached to the resource, or remove it to use the system-assigned identity (Azure Arc may offer only that one)"
 
 // managedIdentityOptions returns the credential options: the bounded retries
 // and, when clientID is not empty, the user-assigned identity to use.
@@ -241,7 +241,7 @@ func (s *managedIdentityTokenSource) Token(ctx context.Context) (AccessToken, er
 	}
 	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
 	if err != nil {
-		s.failure = errors.New("obtaining an Exchange Online access token with the managed identity failed: " + err.Error() + ". " + s.hint)
+		s.failure = errors.New("obtaining an Exchange Online access token with the managed identity failed: " + strings.TrimSuffix(err.Error(), ".") + ". " + s.hint)
 		s.failedAt = s.now()
 		return AccessToken{}, s.failure
 	}
