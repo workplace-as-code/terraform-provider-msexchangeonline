@@ -38,7 +38,7 @@ func TestIsGUID(t *testing.T) {
 	}
 }
 
-func TestCertificateFileProblem(t *testing.T) {
+func TestFileProblem(t *testing.T) {
 	dir := t.TempDir()
 	pfx := filepath.Join(dir, "app.pfx")
 	if err := os.WriteFile(pfx, []byte("pfx"), 0o600); err != nil {
@@ -54,9 +54,9 @@ func TestCertificateFileProblem(t *testing.T) {
 		"folder":       {dir, "is a folder"},
 	}
 	for name, c := range cases {
-		got := certificateFileProblem(c.path)
+		got := fileProblem("certificate_path", "EXCHANGE_CERTIFICATE_PATH", c.path)
 		if c.want == "" && got != "" || c.want != "" && !strings.Contains(got, c.want) {
-			t.Errorf("%s: certificateFileProblem(%q) = %q, want %q", name, c.path, got, c.want)
+			t.Errorf("%s: fileProblem(%q) = %q, want %q", name, c.path, got, c.want)
 		}
 	}
 }

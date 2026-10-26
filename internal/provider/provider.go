@@ -2,7 +2,6 @@ package provider
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"regexp"
 
@@ -30,9 +29,13 @@ type exchangeProvider struct {
 type exchangeProviderModel struct {
 	TenantID              types.String `tfsdk:"tenant_id"`
 	ClientID              types.String `tfsdk:"client_id"`
+	AuthMethod            types.String `tfsdk:"auth_method"`
 	CertificatePath       types.String `tfsdk:"certificate_path"`
 	CertificatePassword   types.String `tfsdk:"certificate_password"`
 	CertificateThumbprint types.String `tfsdk:"certificate_thumbprint"`
+	CertificateBase64     types.String `tfsdk:"certificate_base64"`
+	OIDCToken             types.String `tfsdk:"oidc_token"`
+	OIDCTokenFilePath     types.String `tfsdk:"oidc_token_file_path"`
 	Environment           types.String `tfsdk:"environment"`
 }
 
@@ -60,18 +63,37 @@ func (p *exchangeProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 				Optional:            true,
 				MarkdownDescription: "Entra ID app registration client ID. Required. Can also be set via `EXCHANGE_CLIENT_ID` environment variable.",
 			},
+			"auth_method": schema.StringAttribute{
+				Optional:            true,
+				Validators:          []validator.String{stringvalidator.OneOf(authMethods...)},
+				MarkdownDescription: "How the provider authenticates. Valid values: `client_certificate` (default: a certificate, see `certificate_path`, `certificate_base64` and `certificate_thumbprint`), `oidc` (an OIDC token from any platform, see `oidc_token` and `oidc_token_file_path`), `oidc_github` (the OIDC token of the GitHub Actions job, which needs `permissions: id-token: write`). Can also be set via `EXCHANGE_AUTH_METHOD` environment variable.",
+			},
 			"certificate_path": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Path to the `.pfx` certificate file for app-only (CBA) authentication. Use this or `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_PATH` environment variable.",
+				MarkdownDescription: "Path to the `.pfx` certificate file for app-only (CBA) authentication. Use only one of `certificate_path`, `certificate_base64` and `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_PATH` environment variable.",
+			},
+			"certificate_base64": schema.StringAttribute{
+				Optional:            true,
+				Sensitive:           true,
+				MarkdownDescription: "Content of the `.pfx` certificate file, private key included, encoded in base64 (for example `openssl base64 -A -in app.pfx`). Decoded in memory: no file is written. Use it to pass the certificate from a vault or a masked CI variable. Use only one of `certificate_path`, `certificate_base64` and `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_BASE64` environment variable.",
 			},
 			"certificate_password": schema.StringAttribute{
 				Optional:            true,
 				Sensitive:           true,
-				MarkdownDescription: "Password for the `.pfx` certificate file. Can also be set via `EXCHANGE_CERTIFICATE_PASSWORD` environment variable.",
+				MarkdownDescription: "Password for the `.pfx` certificate, given as a file or in base64. Can also be set via `EXCHANGE_CERTIFICATE_PASSWORD` environment variable.",
 			},
 			"certificate_thumbprint": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Thumbprint of a certificate already loaded in the local certificate store (Windows). Use this or `certificate_path`. Can also be set via `EXCHANGE_CERTIFICATE_THUMBPRINT` environment variable.",
+				MarkdownDescription: "Thumbprint of a certificate already loaded in the local certificate store (Windows). Use only one of `certificate_path`, `certificate_base64` and `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_THUMBPRINT` environment variable.",
+			},
+			"oidc_token": schema.StringAttribute{
+				Optional:            true,
+				Sensitive:           true,
+				MarkdownDescription: "With `auth_method = \"oidc\"`: the OIDC token that Entra ID exchanges for an access token (for example a GitLab `id_tokens` value). It cannot be renewed during the run: prefer `oidc_token_file_path` when the platform writes the token to a file. Use only one of `oidc_token` and `oidc_token_file_path`. Can also be set via `EXCHANGE_OIDC_TOKEN` environment variable.",
+			},
+			"oidc_token_file_path": schema.StringAttribute{
+				Optional:            true,
+				MarkdownDescription: "With `auth_method = \"oidc\"`: path to a file that contains the OIDC token, read again each time a new access token is needed (Kubernetes renews projected tokens). Use only one of `oidc_token` and `oidc_token_file_path`. Can also be set via `EXCHANGE_OIDC_TOKEN_FILE_PATH` environment variable.",
 			},
 			"environment": schema.StringAttribute{
 				Optional:            true,
@@ -89,35 +111,8 @@ func (p *exchangeProvider) Configure(ctx context.Context, req provider.Configure
 		return
 	}
 
-	cfg := client.Config{
-		TenantID:              envOrConfig("EXCHANGE_TENANT_ID", config.TenantID),
-		ClientID:              envOrConfig("EXCHANGE_CLIENT_ID", config.ClientID),
-		CertificatePath:       envOrConfig("EXCHANGE_CERTIFICATE_PATH", config.CertificatePath),
-		CertificatePassword:   envOrConfig("EXCHANGE_CERTIFICATE_PASSWORD", config.CertificatePassword),
-		CertificateThumbprint: envOrConfig("EXCHANGE_CERTIFICATE_THUMBPRINT", config.CertificateThumbprint),
-		Environment:           envOrConfig("EXCHANGE_ENVIRONMENT", config.Environment),
-	}
-	if cfg.Environment == "" {
-		cfg.Environment = "global"
-	}
-
-	if cfg.TenantID == "" {
-		resp.Diagnostics.AddError("Missing tenant_id", "tenant_id is required. Set it in the provider block or via EXCHANGE_TENANT_ID.")
-	} else if isGUID(cfg.TenantID) {
-		resp.Diagnostics.AddError("Invalid tenant_id",
-			fmt.Sprintf("tenant_id %q is a tenant GUID. Exchange Online needs the tenant's primary .onmicrosoft.com domain, for example contoso.onmicrosoft.com: Connect-ExchangeOnline -Organization does not accept a GUID.", cfg.TenantID))
-	}
-	if cfg.ClientID == "" {
-		resp.Diagnostics.AddError("Missing client_id", "client_id is required. Set it in the provider block or via EXCHANGE_CLIENT_ID.")
-	}
-	if cfg.CertificatePath == "" && cfg.CertificateThumbprint == "" {
-		resp.Diagnostics.AddError("Missing certificate", "Either certificate_path or certificate_thumbprint is required.")
-	} else if problem := certificateFileProblem(cfg.CertificatePath); problem != "" {
-		// Checked here so that a wrong path fails at plan time with a clear message,
-		// instead of an OpenSSL error from PowerShell at apply time.
-		resp.Diagnostics.AddError("Invalid certificate_path", problem)
-	}
-
+	cfg, diags := resolveConfig(config)
+	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
@@ -169,28 +164,4 @@ func envOrConfig(envKey string, configVal types.String) string {
 		return configVal.ValueString()
 	}
 	return os.Getenv(envKey)
-}
-
-// certificateFileProblem describes why the .pfx file at path cannot be used, or
-// returns "" when it is a readable file. An empty path is not checked: the
-// certificate then comes from certificate_thumbprint.
-func certificateFileProblem(path string) string {
-	if path == "" {
-		return ""
-	}
-	info, err := os.Stat(path)
-	switch {
-	case os.IsNotExist(err):
-		return fmt.Sprintf("certificate_path %q does not exist. Set the path of the app registration's .pfx file, in the provider block or via EXCHANGE_CERTIFICATE_PATH. A relative path is resolved from the folder where Terraform runs.", path)
-	case err != nil:
-		return fmt.Sprintf("certificate_path %q cannot be read: %v", path, err)
-	case info.IsDir():
-		return fmt.Sprintf("certificate_path %q is a folder: set the path of the .pfx file itself.", path)
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return fmt.Sprintf("certificate_path %q cannot be read: %v", path, err)
-	}
-	_ = f.Close()
-	return ""
 }
