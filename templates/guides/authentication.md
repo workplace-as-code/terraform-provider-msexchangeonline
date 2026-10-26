@@ -5,7 +5,7 @@ subcategory: "Guides"
 
 # Authentication Guide
 
-The provider connects to Exchange Online with **app-only authentication**: an Entra ID app registration, not a user account. This page helps you choose how the provider proves it is that app, then covers the setup every method shares: the app registration and its Exchange permissions.
+The provider connects to Exchange Online with **app-only authentication**: an Entra ID app registration or an Azure managed identity, not a user account. This page helps you choose how the provider proves who it is, then covers the setup every method shares: the app registration and its Exchange permissions.
 
 ## Choose a Method
 
@@ -14,18 +14,20 @@ The provider connects to Exchange Online with **app-only authentication**: an En
 | Certificate: `.pfx` file, base64 content or Windows certificate store | `client_certificate` (default) | Anywhere: workstations, internal CI runners, servers | The `.pfx` and its password | Upload a new certificate before the old one expires (1 to 2 years) |
 | OIDC from GitHub Actions | `oidc_github` | GitHub Actions jobs | Nothing | None: GitHub issues a token for each job |
 | OIDC from another platform | `oidc` | A CI platform or cluster whose OIDC issuer Entra ID can reach over the internet | Nothing | None: the platform issues the token |
+| Managed identity | `managed_identity` | Azure VMs and other Azure compute, Azure Arc-enabled servers | Nothing | None: Azure manages the identity's credential |
 
 - **Internal CI (an on-premises GitLab or Jenkins), workstations, servers**: use a certificate. OIDC needs Entra ID to download the signing keys of the platform that issues the token, over public HTTPS: an internal platform cannot be reached. See [Certificate authentication](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_client_certificate).
 - **GitHub Actions**: use `oidc_github`. Nothing to store in GitHub, nothing to renew, and Entra ID only accepts tokens from the repository and environment you declare. See [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github).
 - **gitlab.com, Kubernetes, another platform with a public OIDC issuer**: use `oidc`. See [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc).
+- **Terraform runs on an Azure VM, a runner hosted in Azure or an Azure Arc-enabled server**: use `managed_identity`. No app registration and nothing to store: the machine's identity connects. See [Managed identity](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_managed_identity).
 
-The provider does not offer client secrets: a certificate or OIDC avoids storing a password-like credential.
+The provider does not offer client secrets: a certificate, OIDC or a managed identity avoids storing a password-like credential.
 
 ---
 
 ## Step 1 — Create an App Registration in Entra ID
 
-Every method uses the same app registration. The names below (`terraform-msexchangeonline`) are suggestions: any name works.
+Every method except `managed_identity` uses the same app registration. With a managed identity, the identity replaces the app registration: follow the [Managed identity guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_managed_identity), which grants `Exchange.ManageAsApp` with Microsoft Graph, then come back to step 2 with the identity's client ID and Object ID. The names below (`terraform-msexchangeonline`) are suggestions: any name works.
 
 1. Go to **Entra admin center → App registrations → New registration**
 2. Name: `terraform-msexchangeonline`, supported account types: **Single tenant**, then **Register**
@@ -75,6 +77,7 @@ Follow the guide of the method you chose:
 - [Certificate authentication](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_client_certificate): generate a certificate, upload its public key to the app, give the `.pfx` to the provider.
 - [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github): declare which repository and environment the app trusts.
 - [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc): declare which issuer and subject the app trusts.
+- [Managed identity](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_managed_identity): nothing to give, the identity has no credential to store. Configure the provider as step 4 of that guide shows.
 
 ---
 
@@ -85,7 +88,7 @@ Values set in the `provider` block take precedence over environment variables. E
 | Attribute | Environment variable | Methods |
 |---|---|---|
 | `tenant_id` | `EXCHANGE_TENANT_ID` | All (required) |
-| `client_id` | `EXCHANGE_CLIENT_ID` | All (required) |
+| `client_id` | `EXCHANGE_CLIENT_ID` | All, required except with `managed_identity`, where it selects a user-assigned identity |
 | `auth_method` | `EXCHANGE_AUTH_METHOD` | All (default `client_certificate`) |
 | `certificate_path`, `certificate_base64`, `certificate_thumbprint`, `certificate_password` | `EXCHANGE_CERTIFICATE_PATH`, `EXCHANGE_CERTIFICATE_BASE64`, `EXCHANGE_CERTIFICATE_THUMBPRINT`, `EXCHANGE_CERTIFICATE_PASSWORD` | `client_certificate` |
 | `oidc_token`, `oidc_token_file_path` | `EXCHANGE_OIDC_TOKEN`, `EXCHANGE_OIDC_TOKEN_FILE_PATH` | `oidc` |
@@ -108,7 +111,7 @@ provider "msexchangeonline" {
 
 Or via env var: `export EXCHANGE_ENVIRONMENT="gcchigh"`
 
-OIDC is only supported in the `global` and `gcc` environments for now. Use a certificate in the other clouds.
+OIDC and managed identities are only supported in the `global` and `gcc` environments for now. Use a certificate in the other clouds.
 
 ---
 

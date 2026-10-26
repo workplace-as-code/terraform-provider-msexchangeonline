@@ -86,18 +86,20 @@ Other connection errors start with `Failed to connect to Exchange Online:`, foll
 
 **macOS: `This platform does not support loading with EphemeralKeySet`.** Fixed in version 0.1.1: upgrade the provider.
 
-**Configuration errors at plan time.** `Missing certificate`, `Conflicting authentication settings`, `Conflicting certificate settings`, `Missing OIDC token` and `Missing GitHub Actions OIDC variables` come from the provider itself, before any connection: the message says which attribute or environment variable to change. A leftover `EXCHANGE_CERTIFICATE_*` variable in the CI environment is a common cause of the conflicts.
+**Configuration errors at plan time.** `Missing certificate`, `Conflicting authentication settings`, `Conflicting certificate settings`, `Missing OIDC token`, `Missing GitHub Actions OIDC variables` and `Invalid client_id` come from the provider itself, before any connection: the message says which attribute or environment variable to change. A leftover `EXCHANGE_CERTIFICATE_*` variable in the CI environment is a common cause of the conflicts.
+
+**Managed identity: `obtaining an Exchange Online access token with the managed identity failed`.** The provider could not get a token from the machine's identity endpoint. After less than a minute with `169.254.169.254 ... context deadline exceeded`, Terraform does not run on an Azure resource with a managed identity. On an Azure Arc-enabled server, the account running Terraform must be in the `himds` group (Linux) or the Hybrid agent extension applications group (Windows). With `client_id`, the user-assigned identity must be attached to the resource. See [Managed identity](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_managed_identity#troubleshooting).
 
 **GitHub Actions: `requesting the OIDC token from GitHub Actions failed`.** The job needs `permissions: id-token: write`. See [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github).
 
-The steps to create the app registration and the role group are in the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication); each method has its own guide: [certificate](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_client_certificate), [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github), [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc).
+The steps to create the app registration and the role group are in the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication); each method has its own guide: [certificate](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_client_certificate), [OIDC with GitHub Actions](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc_github), [OIDC with any platform](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_oidc), [managed identity](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/auth_managed_identity).
 
 ## Permissions and Licenses
 
 **`The term 'New-TransportRule' is not recognized` (or any other Exchange cmdlet).** In Exchange Online, a session only contains the cmdlets its roles allow: a missing role looks like a missing cmdlet. Check, in this order:
 
 1. **Admin consent** is granted for `Exchange.ManageAsApp` (**API permissions**, status column).
-2. The app is a member of the provider's role group, or has the Exchange Administrator role. A new assignment can take up to 30 minutes to apply.
+2. The app or managed identity is a member of the provider's role group, or has the Exchange Administrator role. A new assignment can take up to 30 minutes to apply.
 3. After upgrading the provider, run `tools/new_role_group.ps1` again: new resources can need roles the group does not have yet.
 4. `terraform apply` does not use the read-only app: an app with View-Only Organization Management can plan, but not change the organization.
 
