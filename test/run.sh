@@ -14,9 +14,12 @@
 # Required env vars (exported, or read from .env at repo root; exported values win):
 #   EXCHANGE_TENANT_ID
 #   EXCHANGE_CLIENT_ID
-#   EXCHANGE_CERTIFICATE_PATH
-#   EXCHANGE_CERTIFICATE_PASSWORD
 #   TF_VAR_primary_domain   (e.g. "yourcompany.onmicrosoft.com")
+#   and the credentials of the authentication method (EXCHANGE_AUTH_METHOD):
+#     client_certificate (default): EXCHANGE_CERTIFICATE_PATH or EXCHANGE_CERTIFICATE_BASE64,
+#                                   and EXCHANGE_CERTIFICATE_PASSWORD
+#     oidc_github                 : nothing more, inside a GitHub Actions job with id-token: write
+#     oidc                        : EXCHANGE_OIDC_TOKEN or EXCHANGE_OIDC_TOKEN_FILE_PATH
 #
 # Requires terraform, go, pwsh and jq on the PATH.
 #
@@ -69,15 +72,20 @@ step "Checking prerequisites"
 for tool in terraform go pwsh jq; do
   command -v "$tool" > /dev/null || fail "$tool is not installed or not on the PATH"
 done
-for var in EXCHANGE_TENANT_ID EXCHANGE_CLIENT_ID EXCHANGE_CERTIFICATE_PATH; do
+for var in EXCHANGE_TENANT_ID EXCHANGE_CLIENT_ID; do
   if [[ -z "${!var:-}" ]]; then
     fail "$var is not set. Add it to $ROOT/.env or export it."
   fi
 done
+AUTH_METHOD="${EXCHANGE_AUTH_METHOD:-client_certificate}"
+# The provider checks the other methods' settings itself, with clearer messages.
+if [[ "$AUTH_METHOD" == "client_certificate" && -z "${EXCHANGE_CERTIFICATE_PATH:-}" && -z "${EXCHANGE_CERTIFICATE_BASE64:-}" ]]; then
+  fail "EXCHANGE_CERTIFICATE_PATH or EXCHANGE_CERTIFICATE_BASE64 is not set. Add one to $ROOT/.env or export it."
+fi
 if [[ -z "${TF_VAR_primary_domain:-}" ]]; then
   fail "TF_VAR_primary_domain is not set. Add it to $ROOT/.env or export it."
 fi
-pass "Credentials OK (tenant: $EXCHANGE_TENANT_ID)"
+pass "Credentials OK (tenant: $EXCHANGE_TENANT_ID, auth: $AUTH_METHOD)"
 pass "Primary domain: $TF_VAR_primary_domain"
 
 # ---------------------------------------------------------------------------
