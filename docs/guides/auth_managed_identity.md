@@ -105,6 +105,16 @@ New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $identity `
     -AppRoleId "dc50a0fb-09a3-484d-be87-e023b12c6440"
 ```
 
+Or with the Azure CLI, for example in Azure Cloud Shell, which is already signed in: useful when the tenant blocks the device code sign-in of `Connect-MgGraph`.
+
+```bash
+identity="<object-id>"
+exchange=$(az ad sp show --id 00000002-0000-0ff1-ce00-000000000000 --query id --output tsv)
+az rest --method POST \
+  --uri "https://graph.microsoft.com/v1.0/servicePrincipals/$identity/appRoleAssignments" \
+  --body "{\"principalId\": \"$identity\", \"resourceId\": \"$exchange\", \"appRoleId\": \"dc50a0fb-09a3-484d-be87-e023b12c6440\"}"
+```
+
 `Exchange.ManageAsApp` grants no rights by itself: it only lets the identity open an Exchange Online PowerShell session. Check the result in **Enterprise applications → the identity → Permissions**.
 
 ## Step 3 — Grant Exchange Permissions
@@ -112,11 +122,27 @@ New-MgServicePrincipalAppRoleAssignment -ServicePrincipalId $identity `
 Follow step 2 of the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication) with the identity's values:
 
 - **Least-privilege role group (recommended)**: run `tools/new_role_group.ps1` with `-AppId` set to the identity's client ID and `-ServicePrincipalObjectId` set to its Object ID.
-- **Exchange Administrator**: in **Roles & admins → Exchange Administrator → Add assignments**, search for the identity by name (the VM, the server, or the user-assigned identity).
+- **Exchange Administrator**: in **Roles & admins → Exchange Administrator → Add assignments**, search for the identity by name (the VM, the server, or the user-assigned identity). With the Azure CLI (`29232cdf-9323-42fd-ade2-1d097af3e4de` is the Exchange Administrator role in every tenant):
+
+  ```bash
+  az rest --method POST \
+    --uri "https://graph.microsoft.com/v1.0/roleManagement/directory/roleAssignments" \
+    --body '{"principalId": "<object-id>", "roleDefinitionId": "29232cdf-9323-42fd-ade2-1d097af3e4de", "directoryScopeId": "/"}'
+  ```
 
 For `terraform plan` and drift detection, a separate identity with the **View-Only Organization Management** role group is enough: see the read and write split in the Authentication guide.
 
 Role assignments can take up to 30 minutes to apply.
+
+**Grant the permissions before Terraform first runs on the machine.** Azure caches the tokens of a managed identity for about 24 hours and cannot be forced to renew them: a token obtained before the roles applied keeps lacking them for up to a day. After granting the roles, wait about 10 minutes, then check the token from the machine itself. This prints the token's claims, never the token:
+
+```bash
+curl -s -H Metadata:true "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://outlook.office365.com" \
+  | jq -r .access_token | cut -d. -f2 \
+  | python3 -c "import sys,json,base64; p=sys.stdin.read().strip(); p+='='*(-len(p)%4); d=json.loads(base64.urlsafe_b64decode(p)); print(json.dumps({k: d.get(k) for k in ('appid','roles','wids')}, indent=1))"
+```
+
+`roles` must contain `Exchange.ManageAsApp`, and `wids` the ID of the Entra role you assigned (Exchange Administrator: `29232cdf-9323-42fd-ade2-1d097af3e4de`). An Exchange role group does not appear in the token. For a user-assigned identity, add `&client_id=<client-id>` to the URL.
 
 ## Step 4 — Configure the Provider
 
@@ -173,7 +199,7 @@ Every error from the identity endpoint starts with `obtaining an Exchange Online
 | `Invalid client_id ... is not a GUID` at plan time | `client_id` holds a name or a resource ID | Use the identity's client ID |
 | `Unknown client_id` at plan time | `client_id` comes from a resource that is not created yet, for example a user-assigned identity created in the same configuration | Create the identity and attach it to the runner first, then pass its client ID as a variable or read it with a data source |
 | `Conflicting authentication settings` at plan time | A certificate or an OIDC token is also set, often a leftover `EXCHANGE_CERTIFICATE_*` or `EXCHANGE_OIDC_*` variable | Remove it, or choose another `auth_method` |
-| Connected, but Exchange answers `The role assigned to application ... isn't supported in this scenario` or cmdlets are missing | `Exchange.ManageAsApp` or the Exchange roles are missing, or not applied yet | Check steps 2 and 3, then wait up to 30 minutes |
+| Connected, but Exchange answers `The role assigned to application ... isn't supported in this scenario` or cmdlets are missing | `Exchange.ManageAsApp` or the Exchange roles are missing, or were granted after the machine obtained its first token | Check steps 2 and 3 and the token's claims (end of step 3). A token obtained before the roles applied stays cached for up to 24 hours: wait, or use a new user-assigned identity granted before its first use |
 
 More errors are listed in the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).
 
