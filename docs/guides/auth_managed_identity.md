@@ -166,6 +166,7 @@ Every error from the identity endpoint starts with `obtaining an Exchange Online
 | Azure Arc: an error about reading a file under `/var/opt/azcmagent/tokens` or `C:\ProgramData\AzureConnectedMachineAgent\Tokens` | The account running Terraform is not in the `himds` group (Linux) or Hybrid agent extension applications group (Windows) | Add it, then restart the runner service or open a new session |
 | Azure Arc with `client_id` set | Arc may offer only the system-assigned identity | Remove `client_id` |
 | `Invalid client_id ... is not a GUID` at plan time | `client_id` holds a name or a resource ID | Use the identity's client ID |
+| `Unknown client_id` at plan time | `client_id` comes from a resource that is not created yet, for example a user-assigned identity created in the same configuration | Create the identity and attach it to the runner first, then pass its client ID as a variable or read it with a data source |
 | `Conflicting authentication settings` at plan time | A certificate or an OIDC token is also set, often a leftover `EXCHANGE_CERTIFICATE_*` or `EXCHANGE_OIDC_*` variable | Remove it, or choose another `auth_method` |
 | Connected, but Exchange answers `The role assigned to application ... isn't supported in this scenario` or cmdlets are missing | `Exchange.ManageAsApp` or the Exchange roles are missing, or not applied yet | Check steps 2 and 3, then wait up to 30 minutes |
 

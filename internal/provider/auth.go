@@ -148,7 +148,12 @@ func resolveConfig(m exchangeProviderModel) (client.Config, diag.Diagnostics) {
 			diags.AddError("Managed identity not available in this environment",
 				fmt.Sprintf("The managed identity is only supported in the global and gcc environments for now, not in %q: use certificate authentication.", cfg.Environment))
 		}
-		if cfg.ClientID != "" && !isGUID(cfg.ClientID) {
+		if m.ClientID.IsUnknown() {
+			// Unknown values fall back to EXCHANGE_CLIENT_ID or to nothing,
+			// which would silently connect as another identity.
+			diags.AddError("Unknown client_id",
+				fmt.Sprintf("With auth_method = %q, client_id comes from a resource that is not created yet, so the provider cannot know which identity to use. Give it a known value (a variable, or a data source that reads an existing identity), or leave it out for the system-assigned identity.", method))
+		} else if cfg.ClientID != "" && !isGUID(cfg.ClientID) {
 			diags.AddError("Invalid client_id",
 				fmt.Sprintf("With auth_method = %q, client_id must be the client ID (a GUID) of a user-assigned managed identity, or be left empty for the system-assigned identity: %q is not a GUID.", method, cfg.ClientID))
 		}

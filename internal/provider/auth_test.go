@@ -43,6 +43,7 @@ func TestResolveConfig(t *testing.T) {
 		wantError       string // substring of a diagnostic, "" when the configuration is valid
 		wantTokenSource bool
 		noClientID      bool // remove client_id from the base attributes
+		unknownClientID bool // client_id computed from a resource not created yet
 		check           func(t *testing.T, base64 string)
 	}{
 		"default is client_certificate": {
@@ -149,6 +150,11 @@ func TestResolveConfig(t *testing.T) {
 			attrs:     map[string]string{"auth_method": "managed_identity", "environment": "gcchigh"},
 			wantError: "only supported in the global and gcc environments",
 		},
+		"managed_identity with an unknown client_id": {
+			attrs:           map[string]string{"auth_method": "managed_identity"},
+			unknownClientID: true,
+			wantError:       "Unknown client_id",
+		},
 		"client_certificate without client_id": {
 			attrs:      map[string]string{"certificate_path": pfx},
 			noClientID: true,
@@ -199,7 +205,11 @@ func TestResolveConfig(t *testing.T) {
 			if c.noClientID {
 				delete(attrs, "client_id")
 			}
-			cfg, diags := resolveConfig(model(attrs))
+			m := model(attrs)
+			if c.unknownClientID {
+				m.ClientID = types.StringUnknown()
+			}
+			cfg, diags := resolveConfig(m)
 
 			var messages []string
 			for _, d := range diags {
