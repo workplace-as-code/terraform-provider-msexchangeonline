@@ -2,8 +2,12 @@
 # Dot-sourced by all bridge/scripts scripts.
 #
 # Runs in PowerShell 7+ (pwsh) with the ExchangeOnlineManagement v3 module.
-# App-only certificate-based authentication: the app needs Exchange.ManageAsApp
-# and the management roles of the provider's role group (or Exchange Administrator).
+# App-only authentication, in this order:
+#   - an access token obtained by the provider with OIDC (EXCHANGE_BRIDGE_ACCESS_TOKEN);
+#   - a certificate: Windows store thumbprint, base64 content of a .pfx
+#     (EXCHANGE_BRIDGE_CERTIFICATE_BASE64), or .pfx file.
+# The app needs Exchange.ManageAsApp and the management roles of the provider's
+# role group (or Exchange Administrator).
 
 param(
     [string]$TenantId              = "",
@@ -39,6 +43,8 @@ $ErrorActionPreference = "Stop"
     # command line (command lines are visible to every local user and are logged by
     # process-creation auditing). Explicit parameters still win, for manual testing.
     if (-not $CertificatePassword -and $env:EXCHANGE_BRIDGE_CERTIFICATE_PASSWORD) { $CertificatePassword = $env:EXCHANGE_BRIDGE_CERTIFICATE_PASSWORD }
+    $accessToken       = $env:EXCHANGE_BRIDGE_ACCESS_TOKEN
+    $certificateBase64 = $env:EXCHANGE_BRIDGE_CERTIFICATE_BASE64
 
     $exchangeEnvironments = @{
         "global"  = "O365Default"
@@ -66,8 +72,24 @@ $ErrorActionPreference = "Stop"
     $organization = if ($TenantId -match '\.') { $TenantId } else { "$TenantId.onmicrosoft.com" }
     $envName      = $exchangeEnvironments[$Environment]
 
+    # EphemeralKeySet keeps the private key out of the key store, but macOS does
+    # not support it: there the default loads the key into a temporary keychain.
+    $certFlags = if ($IsMacOS) {
+        [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+    } else {
+        [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    }
+
     try {
-        if ($CertificateThumbprint) {
+        if ($accessToken) {
+            # OIDC: the provider exchanged the CI's token for this access token
+            # and starts a new process before it expires.
+            Connect-ExchangeOnline `
+                -AccessToken $accessToken `
+                -Organization $organization `
+                -ExchangeEnvironmentName $envName `
+                -ShowBanner:$false
+        } elseif ($CertificateThumbprint) {
             # Windows certificate store — thumbprint lookup
             Connect-ExchangeOnline `
                 -CertificateThumbprint $CertificateThumbprint `
@@ -76,21 +98,24 @@ $ErrorActionPreference = "Stop"
                 -ExchangeEnvironmentName $envName `
                 -ShowBanner:$false
         } else {
-            # PFX file. EphemeralKeySet keeps the private key out of the key store, but macOS
-            # does not support it: there the default loads the key into a temporary keychain.
-            if (-not $CertificatePath) {
-                throw "Either certificate_path or certificate_thumbprint is required"
-            }
-            $certFlags = if ($IsMacOS) {
-                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
+            if ($certificateBase64) {
+                # Content of the .pfx, decoded in memory: no file on disk. A
+                # value cut in lines (base64 without -A, a vault) is accepted.
+                $bytes = [Convert]::FromBase64String(($certificateBase64 -replace '\s', ''))
+                $cert  = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                    [byte[]]$bytes,
+                    $CertificatePassword,
+                    $certFlags
+                )
+            } elseif ($CertificatePath) {
+                $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                    $CertificatePath,
+                    $CertificatePassword,
+                    $certFlags
+                )
             } else {
-                [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+                throw "Either certificate_path, certificate_base64 or certificate_thumbprint is required"
             }
-            $cert      = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
-                $CertificatePath,
-                $CertificatePassword,
-                $certFlags
-            )
             Connect-ExchangeOnline `
                 -Certificate $cert `
                 -AppID $ClientId `

@@ -12,8 +12,8 @@ The Microsoft Exchange Online provider manages Exchange Online configuration as 
 
 The provider drives the ExchangeOnlineManagement PowerShell module through scripts embedded in the provider binary. The machine running Terraform needs:
 
-- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module: `Install-Module ExchangeOnlineManagement -Scope CurrentUser`
-- An Entra ID app registration with certificate-based authentication, the `Exchange.ManageAsApp` permission, and either a least-privilege Exchange role group (recommended) or the Exchange Administrator role. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module (3.1.0 or later for OIDC): `Install-Module ExchangeOnlineManagement -Scope CurrentUser`
+- An Entra ID app registration with the `Exchange.ManageAsApp` permission and either a least-privilege Exchange role group (recommended) or the Exchange Administrator role. The provider authenticates as that app with a certificate (file, base64 content or Windows store) or, from a CI platform such as GitHub Actions, with OIDC and no stored secret. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 When something fails, start with the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).
 
@@ -22,6 +22,18 @@ When something fails, start with the [Troubleshooting guide](https://registry.te
 {{ tffile "examples/provider/provider.tf" }}
 
 Every argument can also come from an `EXCHANGE_*` environment variable, for example `EXCHANGE_TENANT_ID`. A value set in the provider block takes precedence over the environment.
+
+In a GitHub Actions job that has `permissions: id-token: write`, the provider can authenticate with OIDC, without any stored credential:
+
+```terraform
+provider "msexchangeonline" {
+  auth_method = "oidc_github"
+  tenant_id   = "contoso.onmicrosoft.com"
+  client_id   = var.client_id
+}
+```
+
+The certificate, OIDC with GitHub Actions and OIDC with other platforms are described in the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 ## Attributes left out of the configuration
 

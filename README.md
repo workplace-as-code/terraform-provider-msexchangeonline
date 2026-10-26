@@ -93,8 +93,9 @@ Data sources: `msexchangeonline_accepted_domain`, `msexchangeonline_accepted_dom
 
 ### Requirements
 - Terraform >= 1.5
-- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module
-- An Entra ID app registration with certificate-based authentication and the `Exchange.ManageAsApp` permission. [`tools/new_role_group.ps1`](tools/new_role_group.ps1) grants it only the Exchange roles the provider needs (see the [Authentication guide](docs/guides/authentication.md))
+- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module (3.1.0 or later for OIDC)
+- An Entra ID app registration with the `Exchange.ManageAsApp` permission. [`tools/new_role_group.ps1`](tools/new_role_group.ps1) grants it only the Exchange roles the provider needs (see the [Authentication guide](docs/guides/authentication.md))
+- A way to authenticate as that app: a certificate (`.pfx` file, base64 content or Windows certificate store), or OIDC from GitHub Actions or another platform with a public OIDC issuer, with no stored secret
 
 The PowerShell bridge scripts are embedded in the provider binary: nothing else needs to be installed. The provider keeps a few PowerShell processes open during a run, so the Exchange connection is opened once per process instead of once per resource (see [Performance tuning](#performance-tuning)).
 
@@ -113,7 +114,7 @@ The PowerShell bridge scripts are embedded in the provider binary: nothing else 
 ## Documentation
 
 - [Getting Started](docs/guides/getting_started.md)
-- [Authentication](docs/guides/authentication.md)
+- [Authentication](docs/guides/authentication.md): [certificate](docs/guides/auth_client_certificate.md), [OIDC with GitHub Actions](docs/guides/auth_oidc_github.md), [OIDC with any platform](docs/guides/auth_oidc.md)
 - [Import an existing tenant](docs/guides/import_existing.md)
 - [Detect drift in CI](docs/guides/drift_detection.md)
 - [Resources and availability](docs/guides/availability.md)
