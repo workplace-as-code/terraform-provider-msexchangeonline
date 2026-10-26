@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
@@ -157,6 +158,12 @@ const (
 	managedIdentityTryTimeout = 5 * time.Second
 )
 
+// managedIdentityFailureMemory is how long a failure to get a token is returned
+// again without asking the endpoint. Off Azure each attempt waits for the
+// timeouts above, and Terraform starts many PowerShell workers: without it, a
+// plan would wait for one attempt per worker.
+const managedIdentityFailureMemory = time.Minute
+
 // managedIdentityCredentialOptions configures the managed identity credential.
 // nil keeps the defaults below; tests replace it to answer without the network.
 var managedIdentityCredentialOptions *azidentity.ManagedIdentityCredentialOptions
@@ -195,6 +202,13 @@ func managedIdentityOptions(clientID string) azidentity.ManagedIdentityCredentia
 type managedIdentityTokenSource struct {
 	credential *azidentity.ManagedIdentityCredential
 	hint       string
+	now        func() time.Time // time.Now; tests replace it
+
+	// mu is a mutex: one goroutine at a time runs Token, so workers that start
+	// together wait for one request instead of each sending its own.
+	mu       sync.Mutex
+	failure  error     // the last failure, returned again until failedAt + managedIdentityFailureMemory
+	failedAt time.Time
 }
 
 // NewManagedIdentityTokenSource returns a TokenSource for the system-assigned
@@ -214,13 +228,23 @@ func NewManagedIdentityTokenSource(clientID string) (TokenSource, error) {
 	if clientID != "" {
 		hint += managedIdentityUserAssignedHint
 	}
-	return &managedIdentityTokenSource{credential: credential, hint: hint}, nil
+	return &managedIdentityTokenSource{credential: credential, hint: hint, now: time.Now}, nil
 }
 
 func (s *managedIdentityTokenSource) Token(ctx context.Context) (AccessToken, error) {
+	s.mu.Lock()
+	// defer runs when Token returns, whichever return it takes.
+	defer s.mu.Unlock()
+
+	if s.failure != nil && s.now().Sub(s.failedAt) < managedIdentityFailureMemory {
+		return AccessToken{}, s.failure
+	}
 	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
 	if err != nil {
-		return AccessToken{}, errors.New("obtaining an Exchange Online access token with the managed identity failed: " + err.Error() + ". " + s.hint)
+		s.failure = errors.New("obtaining an Exchange Online access token with the managed identity failed: " + err.Error() + ". " + s.hint)
+		s.failedAt = s.now()
+		return AccessToken{}, s.failure
 	}
+	s.failure = nil
 	return AccessToken{Value: token.Token, ExpiresOn: token.ExpiresOn}, nil
 }

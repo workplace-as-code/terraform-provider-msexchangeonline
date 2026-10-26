@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -322,5 +324,106 @@ func TestManagedIdentityRetryIsBounded(t *testing.T) {
 	}
 	if o := managedIdentityOptions("x"); o.ID != azidentity.ClientID("x") {
 		t.Errorf("ID = %v, want ClientID(x)", o.ID)
+	}
+}
+
+// countingOfflineTransport counts the requests and fails each of them.
+type countingOfflineTransport struct{ n atomic.Int32 }
+
+func (c *countingOfflineTransport) Do(*http.Request) (*http.Response, error) {
+	c.n.Add(1)
+	return nil, errors.New("offline")
+}
+
+// Off Azure every request waits for the IMDS timeouts: Terraform runs up to
+// 4 scripts at once and each starts a worker, so without memory a plan of 20
+// resources would wait for 5 attempts in a row and print 20 copies of the error.
+func TestManagedIdentityRemembersFailure(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	transport := &countingOfflineTransport{}
+	useManagedIdentityTransport(t, transport)
+
+	source, err := NewManagedIdentityTokenSource("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	source.(*managedIdentityTokenSource).now = func() time.Time { return now }
+
+	var wg sync.WaitGroup
+	for range 4 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if _, err := source.Token(context.Background()); err == nil {
+				t.Error("expected an error")
+			}
+		}()
+	}
+	wg.Wait()
+	if _, err := source.Token(context.Background()); err == nil || !strings.Contains(err.Error(), "with the managed identity failed") {
+		t.Errorf("remembered error = %v", err)
+	}
+	if got := transport.n.Load(); got != 1 {
+		t.Errorf("%d requests, want 1 for 5 calls", got)
+	}
+
+	// The failure is not remembered forever: the endpoint may come back.
+	now = now.Add(managedIdentityFailureMemory + time.Second)
+	_, _ = source.Token(context.Background())
+	if got := transport.n.Load(); got != 2 {
+		t.Errorf("%d requests after the memory window, want 2", got)
+	}
+}
+
+// fixedTransport answers every request with the same status and body.
+type fixedTransport struct {
+	status int
+	body   string
+}
+
+func (f fixedTransport) Do(req *http.Request) (*http.Response, error) {
+	return &http.Response{
+		StatusCode: f.status,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(f.body)),
+		Request:    req,
+	}, nil
+}
+
+// IMDS answers 400 when the user-assigned identity is not attached to the VM.
+func TestManagedIdentityErrorStatus(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	useManagedIdentityTransport(t, fixedTransport{http.StatusBadRequest, `{"error":"invalid_request","error_description":"Identity not found"}`})
+
+	source, err := NewManagedIdentityTokenSource("11111111-2222-3333-4444-555555555555")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = source.Token(context.Background())
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if msg := err.Error(); !strings.Contains(msg, "with the managed identity failed") || !strings.Contains(msg, "attached") {
+		t.Errorf("error = %s", msg)
+	}
+}
+
+// A response that carries a token but cannot be used must not put the token
+// in the error, which Terraform prints and CI logs keep.
+func TestManagedIdentityErrorHidesToken(t *testing.T) {
+	clearManagedIdentityEnv(t)
+	useManagedIdentityTransport(t, fixedTransport{http.StatusOK, `{"access_token":"at-secret-value","expires_on":"not-a-time","token_type":"Bearer"}`})
+
+	source, err := NewManagedIdentityTokenSource("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = source.Token(context.Background())
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	if strings.Contains(err.Error(), "at-secret-value") {
+		t.Errorf("the error contains the token: %s", err)
 	}
 }
