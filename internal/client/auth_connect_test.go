@@ -7,7 +7,8 @@ import (
 )
 
 // TestAuthConnects checks how auth.ps1 calls Connect-ExchangeOnline with an
-// OIDC access token and with a certificate passed in base64.
+// access token (OIDC or managed identity) and with a certificate passed in
+// base64.
 func TestAuthConnects(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh is not installed")
@@ -34,12 +35,15 @@ func TestAuthConnects(t *testing.T) {
 		return r
 	}
 
-	t.Run("token", func(t *testing.T) {
-		r := connect(t, "token")
-		if r.Connected.AccessToken != "at-1" || r.Connected.Organization != "contoso.onmicrosoft.com" || r.Connected.Thumbprint != "" {
-			t.Errorf("Connect-ExchangeOnline got %+v", r.Connected)
-		}
-	})
+	// token-noclientid: a system-assigned managed identity has no client ID.
+	for _, name := range []string{"token", "token-noclientid"} {
+		t.Run(name, func(t *testing.T) {
+			r := connect(t, name)
+			if r.Connected.AccessToken != "at-1" || r.Connected.Organization != "contoso.onmicrosoft.com" || r.Connected.Thumbprint != "" {
+				t.Errorf("Connect-ExchangeOnline got %+v", r.Connected)
+			}
+		})
+	}
 	for _, name := range []string{"base64", "base64-wrapped", "base64-nopassword"} {
 		t.Run(name, func(t *testing.T) {
 			r := connect(t, name)
