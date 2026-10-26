@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework/diag"
@@ -17,9 +18,10 @@ const (
 	authClientCertificate = "client_certificate"
 	authOIDC              = "oidc"
 	authOIDCGitHub        = "oidc_github"
+	authManagedIdentity   = "managed_identity"
 )
 
-var authMethods = []string{authClientCertificate, authOIDC, authOIDCGitHub}
+var authMethods = []string{authClientCertificate, authOIDC, authOIDCGitHub, authManagedIdentity}
 
 // staticTokenHint explains the most likely cause when a token passed as a fixed
 // value stops working during a run.
@@ -51,10 +53,6 @@ func resolveConfig(m exchangeProviderModel) (client.Config, diag.Diagnostics) {
 		diags.AddError("Invalid tenant_id",
 			fmt.Sprintf("tenant_id %q is a tenant GUID. Exchange Online needs the tenant's primary .onmicrosoft.com domain, for example contoso.onmicrosoft.com: Connect-ExchangeOnline -Organization does not accept a GUID.", cfg.TenantID))
 	}
-	if cfg.ClientID == "" {
-		diags.AddError("Missing client_id", "client_id is required. Set it in the provider block or via EXCHANGE_CLIENT_ID.")
-	}
-
 	method := envOrConfig("EXCHANGE_AUTH_METHOD", m.AuthMethod)
 	oidcToken := envOrConfig("EXCHANGE_OIDC_TOKEN", m.OIDCToken)
 	oidcFile := envOrConfig("EXCHANGE_OIDC_TOKEN_FILE_PATH", m.OIDCTokenFilePath)
@@ -64,6 +62,11 @@ func resolveConfig(m exchangeProviderModel) (client.Config, diag.Diagnostics) {
 		// keeps working. Values written in the provider block still count.
 		method = authClientCertificate
 		oidcToken, oidcFile = configValue(m.OIDCToken), configValue(m.OIDCTokenFilePath)
+	}
+	// A managed identity needs no client ID: without one, the system-assigned
+	// identity of the machine connects.
+	if cfg.ClientID == "" && method != authManagedIdentity {
+		diags.AddError("Missing client_id", "client_id is required. Set it in the provider block or via EXCHANGE_CLIENT_ID.")
 	}
 
 	certificates := setNames(
@@ -136,20 +139,44 @@ func resolveConfig(m exchangeProviderModel) (client.Config, diag.Diagnostics) {
 			hint = staticTokenHint
 		}
 
+	case authManagedIdentity:
+		if conflicting := slices.Concat(certificates, oidcSources); len(conflicting) > 0 {
+			diags.AddError("Conflicting authentication settings",
+				fmt.Sprintf("auth_method = %q uses neither a certificate nor an OIDC token, but %s is set (in the provider block or an EXCHANGE_* variable): choose one method.", method, strings.Join(conflicting, " and ")))
+		}
+		if cfg.Environment != "global" && cfg.Environment != "gcc" {
+			diags.AddError("Managed identity not available in this environment",
+				fmt.Sprintf("The managed identity is only supported in the global and gcc environments for now, not in %q: use certificate authentication.", cfg.Environment))
+		}
+		if cfg.ClientID != "" && !isGUID(cfg.ClientID) {
+			diags.AddError("Invalid client_id",
+				fmt.Sprintf("With auth_method = %q, client_id must be the client ID (a GUID) of a user-assigned managed identity, or be left empty for the system-assigned identity: %q is not a GUID.", method, cfg.ClientID))
+		}
+
 	default:
 		diags.AddError("Invalid auth_method",
 			fmt.Sprintf("auth_method %q is not supported. Valid values: %s.", method, strings.Join(authMethods, ", ")))
 	}
 
-	if diags.HasError() || assertion == nil {
+	if diags.HasError() {
 		return cfg, diags
 	}
-	source, err := client.NewOIDCTokenSource(organization(cfg.TenantID), cfg.ClientID, assertion, hint)
-	if err != nil {
-		diags.AddError("Invalid OIDC configuration", err.Error())
-		return cfg, diags
+	switch {
+	case method == authManagedIdentity:
+		source, err := client.NewManagedIdentityTokenSource(cfg.ClientID)
+		if err != nil {
+			diags.AddError("Invalid managed identity configuration", err.Error())
+			return cfg, diags
+		}
+		cfg.TokenSource = source
+	case assertion != nil:
+		source, err := client.NewOIDCTokenSource(organization(cfg.TenantID), cfg.ClientID, assertion, hint)
+		if err != nil {
+			diags.AddError("Invalid OIDC configuration", err.Error())
+			return cfg, diags
+		}
+		cfg.TokenSource = source
 	}
-	cfg.TokenSource = source
 	return cfg, diags
 }
 

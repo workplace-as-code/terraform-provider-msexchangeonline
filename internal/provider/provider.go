@@ -61,12 +61,12 @@ func (p *exchangeProvider) Schema(_ context.Context, _ provider.SchemaRequest, r
 			},
 			"client_id": schema.StringAttribute{
 				Optional:            true,
-				MarkdownDescription: "Entra ID app registration client ID. Required. Can also be set via `EXCHANGE_CLIENT_ID` environment variable.",
+				MarkdownDescription: "Entra ID app registration client ID. Required, except with `auth_method = \"managed_identity\"`: there it is the client ID of a user-assigned managed identity, and left empty the system-assigned identity connects. Can also be set via `EXCHANGE_CLIENT_ID` environment variable.",
 			},
 			"auth_method": schema.StringAttribute{
 				Optional:            true,
 				Validators:          []validator.String{stringvalidator.OneOf(authMethods...)},
-				MarkdownDescription: "How the provider authenticates. Valid values: `client_certificate` (default: a certificate, see `certificate_path`, `certificate_base64` and `certificate_thumbprint`), `oidc` (an OIDC token from any platform, see `oidc_token` and `oidc_token_file_path`), `oidc_github` (the OIDC token of the GitHub Actions job, which needs `permissions: id-token: write`). Can also be set via `EXCHANGE_AUTH_METHOD` environment variable.",
+				MarkdownDescription: "How the provider authenticates. Valid values: `client_certificate` (default: a certificate, see `certificate_path`, `certificate_base64` and `certificate_thumbprint`), `oidc` (an OIDC token from any platform, see `oidc_token` and `oidc_token_file_path`), `oidc_github` (the OIDC token of the GitHub Actions job, which needs `permissions: id-token: write`), `managed_identity` (the managed identity of the Azure resource or Azure Arc-enabled server running Terraform, see `client_id`). Can also be set via `EXCHANGE_AUTH_METHOD` environment variable.",
 			},
 			"certificate_path": schema.StringAttribute{
 				Optional:            true,
