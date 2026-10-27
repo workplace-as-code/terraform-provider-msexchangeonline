@@ -227,6 +227,27 @@ func TestPoolRecyclesWorkerBeforeTokenExpiry(t *testing.T) {
 	}
 }
 
+// An identity endpoint can return a cached token that already expires within
+// the recycle margin. A new worker would get the same token: replacing the
+// worker before each request would only restart PowerShell again and again.
+func TestPoolKeepsWorkerWhenNoNewerToken(t *testing.T) {
+	c := fakeHostClient(t, 1, 100, time.Minute)
+	c.config.TokenSource = &fakeTokenSource{tokens: []AccessToken{{Value: "at-1", ExpiresOn: time.Now().Add(time.Minute)}}}
+	first, err := run(t, c, "token.ps1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 3; i++ {
+		out, err := run(t, c, "token.ps1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if pidOf(t, out) != pidOf(t, first) {
+			t.Fatalf("request %d restarted the worker although no newer token exists", i)
+		}
+	}
+}
+
 func TestPoolKeepsWorkerWhileTokenIsValid(t *testing.T) {
 	c := fakeHostClient(t, 1, 100, time.Minute)
 	c.config.TokenSource = &fakeTokenSource{tokens: []AccessToken{{Value: "at-1", ExpiresOn: time.Now().Add(time.Hour)}}}

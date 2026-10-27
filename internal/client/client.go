@@ -41,8 +41,8 @@ const (
 // must never reach auth.ps1.
 const envBridgePrefix = "EXCHANGE_BRIDGE_"
 
-// hiddenFromBridge lists the variables that give access to an OIDC token or
-// hold the certificate. PowerShell only needs the access token and the bridge
+// hiddenFromBridge lists the variables that give access to an OIDC token or a
+// managed identity token, or hold the certificate. PowerShell only needs the access token and the bridge
 // variables, so these are not passed on.
 var hiddenFromBridge = []string{
 	"EXCHANGE_OIDC_TOKEN",
@@ -50,6 +50,10 @@ var hiddenFromBridge = []string{
 	"EXCHANGE_CERTIFICATE_BASE64",
 	"ACTIONS_ID_TOKEN_REQUEST_TOKEN",
 	"ACTIONS_ID_TOKEN_REQUEST_URL",
+	// Secrets of the managed identity endpoints of App Service and Azure
+	// Machine Learning: the provider asks for the token, PowerShell never does.
+	"IDENTITY_HEADER",
+	"MSI_SECRET",
 }
 
 // Tunables, overridable through environment variables.
@@ -88,7 +92,7 @@ type Config struct {
 	Environment           string
 
 	// TokenSource provides the access token when the provider authenticates
-	// with OIDC. nil means certificate authentication.
+	// with OIDC or a managed identity. nil means certificate authentication.
 	TokenSource TokenSource
 }
 

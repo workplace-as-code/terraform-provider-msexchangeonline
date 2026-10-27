@@ -83,13 +83,16 @@ func TestBridgeEnvDropsInheritedBridgeSecrets(t *testing.T) {
 	t.Setenv(EnvBridgeAccessToken, "stale")
 	t.Setenv("EXCHANGE_OIDC_TOKEN", "jwt")
 	t.Setenv("ACTIONS_ID_TOKEN_REQUEST_TOKEN", "gh")
+	t.Setenv("IDENTITY_HEADER", "app-service-secret")
+	t.Setenv("MSI_SECRET", "azure-ml-secret")
 	c := &Client{config: Config{CertificatePath: "/x.pfx"}}
 	env, expiresOn, err := c.buildEnv(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, kv := range env {
-		if kv == EnvBridgeAccessToken+"=stale" || strings.HasPrefix(kv, "EXCHANGE_OIDC_TOKEN=") || strings.HasPrefix(kv, "ACTIONS_ID_TOKEN_REQUEST_TOKEN=") {
+		if kv == EnvBridgeAccessToken+"=stale" || strings.HasPrefix(kv, "EXCHANGE_OIDC_TOKEN=") || strings.HasPrefix(kv, "ACTIONS_ID_TOKEN_REQUEST_TOKEN=") ||
+			strings.HasPrefix(kv, "IDENTITY_HEADER=") || strings.HasPrefix(kv, "MSI_SECRET=") {
 			t.Errorf("the bridge environment still contains %s", kv)
 		}
 	}

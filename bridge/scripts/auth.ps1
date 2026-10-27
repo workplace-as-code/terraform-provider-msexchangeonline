@@ -3,7 +3,8 @@
 #
 # Runs in PowerShell 7+ (pwsh) with the ExchangeOnlineManagement v3 module.
 # App-only authentication, in this order:
-#   - an access token obtained by the provider with OIDC (EXCHANGE_BRIDGE_ACCESS_TOKEN);
+#   - an access token obtained by the provider with OIDC or a managed identity
+#     (EXCHANGE_BRIDGE_ACCESS_TOKEN);
 #   - a certificate: Windows store thumbprint, base64 content of a .pfx
 #     (EXCHANGE_BRIDGE_CERTIFICATE_BASE64), or .pfx file.
 # The app needs Exchange.ManageAsApp and the management roles of the provider's
@@ -62,7 +63,10 @@ $ErrorActionPreference = "Stop"
     $existing = Get-ConnectionInformation -ErrorAction SilentlyContinue
     if ($existing) { return }
 
-    if (-not $ClientId) { throw "client_id is required" }
+    # A certificate belongs to an app registration, whose client ID Exchange
+    # needs. An access token already names its identity: a system-assigned
+    # managed identity has no client ID at all.
+    if (-not $accessToken -and -not $ClientId) { throw "client_id is required" }
 
     # Connect-ExchangeOnline -Organization needs the primary .onmicrosoft.com
     # domain. Accept the short name ("contoso") too, but not a tenant GUID.
@@ -82,7 +86,7 @@ $ErrorActionPreference = "Stop"
 
     try {
         if ($accessToken) {
-            # OIDC: the provider exchanged the CI's token for this access token
+            # OIDC or managed identity: the provider obtained this access token
             # and starts a new process before it expires.
             Connect-ExchangeOnline `
                 -AccessToken $accessToken `

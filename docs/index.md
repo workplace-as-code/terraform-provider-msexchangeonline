@@ -12,8 +12,8 @@ The Microsoft Exchange Online provider manages Exchange Online configuration as 
 
 The provider drives the ExchangeOnlineManagement PowerShell module through scripts embedded in the provider binary. The machine running Terraform needs:
 
-- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module (3.1.0 or later for OIDC): `Install-Module ExchangeOnlineManagement -Scope CurrentUser`
-- An Entra ID app registration with the `Exchange.ManageAsApp` permission and either a least-privilege Exchange role group (recommended) or the Exchange Administrator role. The provider authenticates as that app with a certificate (file, base64 content or Windows store) or, from a CI platform such as GitHub Actions, with OIDC and no stored secret. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+- PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module (3.1.0 or later for OIDC and managed identities): `Install-Module ExchangeOnlineManagement -Scope CurrentUser`
+- An Entra ID app registration with the `Exchange.ManageAsApp` permission and either a least-privilege Exchange role group (recommended) or the Exchange Administrator role. The provider authenticates as that app with a certificate (file, base64 content or Windows store) or, from a CI platform such as GitHub Actions, with OIDC and no stored secret. On an Azure VM or an Azure Arc-enabled server, a managed identity replaces the app registration. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 When something fails, start with the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).
 
@@ -55,7 +55,16 @@ provider "msexchangeonline" {
 }
 ```
 
-The certificate, OIDC with GitHub Actions and OIDC with other platforms are described in the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+On an Azure VM, a runner hosted in Azure or an Azure Arc-enabled server, the machine's managed identity connects, with nothing to store:
+
+```terraform
+provider "msexchangeonline" {
+  auth_method = "managed_identity"
+  tenant_id   = "contoso.onmicrosoft.com"
+}
+```
+
+The certificate, OIDC with GitHub Actions, OIDC with other platforms and managed identities are described in the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 ## Attributes left out of the configuration
 
@@ -66,12 +75,12 @@ Every resource only manages the attributes set in its configuration. An attribut
 
 ### Optional
 
-- `auth_method` (String) How the provider authenticates. Valid values: `client_certificate` (default: a certificate, see `certificate_path`, `certificate_base64` and `certificate_thumbprint`), `oidc` (an OIDC token from any platform, see `oidc_token` and `oidc_token_file_path`), `oidc_github` (the OIDC token of the GitHub Actions job, which needs `permissions: id-token: write`). Can also be set via `EXCHANGE_AUTH_METHOD` environment variable.
+- `auth_method` (String) How the provider authenticates. Valid values: `client_certificate` (default: a certificate, see `certificate_path`, `certificate_base64` and `certificate_thumbprint`), `oidc` (an OIDC token from any platform, see `oidc_token` and `oidc_token_file_path`), `oidc_github` (the OIDC token of the GitHub Actions job, which needs `permissions: id-token: write`), `managed_identity` (the managed identity of the Azure resource or Azure Arc-enabled server running Terraform, see `client_id`). Can also be set via `EXCHANGE_AUTH_METHOD` environment variable.
 - `certificate_base64` (String, Sensitive) Content of the `.pfx` certificate file, private key included, encoded in base64 (for example `openssl base64 -A -in app.pfx`). Decoded in memory: no file is written. Use it to pass the certificate from a vault or a masked CI variable. Use only one of `certificate_path`, `certificate_base64` and `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_BASE64` environment variable.
 - `certificate_password` (String, Sensitive) Password for the `.pfx` certificate, given as a file or in base64. Can also be set via `EXCHANGE_CERTIFICATE_PASSWORD` environment variable.
 - `certificate_path` (String) Path to the `.pfx` certificate file for app-only (CBA) authentication. Use only one of `certificate_path`, `certificate_base64` and `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_PATH` environment variable.
 - `certificate_thumbprint` (String) Thumbprint of a certificate already loaded in the local certificate store (Windows). Use only one of `certificate_path`, `certificate_base64` and `certificate_thumbprint`. Can also be set via `EXCHANGE_CERTIFICATE_THUMBPRINT` environment variable.
-- `client_id` (String) Entra ID app registration client ID. Required. Can also be set via `EXCHANGE_CLIENT_ID` environment variable.
+- `client_id` (String) Entra ID app registration client ID. Required, except with `auth_method = "managed_identity"`: there it is the client ID of a user-assigned managed identity, and left empty the system-assigned identity connects. Can also be set via `EXCHANGE_CLIENT_ID` environment variable.
 - `environment` (String) M365 cloud environment. Valid values: `global` (default), `gcc`, `gcchigh`, `dod`, `china`. Can also be set via `EXCHANGE_ENVIRONMENT` environment variable.
 - `oidc_token` (String, Sensitive) With `auth_method = "oidc"`: the OIDC token that Entra ID exchanges for an access token (for example a GitLab `id_tokens` value). It cannot be renewed during the run: prefer `oidc_token_file_path` when the platform writes the token to a file. Use only one of `oidc_token` and `oidc_token_file_path`. Can also be set via `EXCHANGE_OIDC_TOKEN` environment variable.
 - `oidc_token_file_path` (String) With `auth_method = "oidc"`: path to a file that contains the OIDC token, read again each time a new access token is needed (Kubernetes renews projected tokens). Use only one of `oidc_token` and `oidc_token_file_path`. Can also be set via `EXCHANGE_OIDC_TOKEN_FILE_PATH` environment variable.

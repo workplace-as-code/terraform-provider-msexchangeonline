@@ -38,11 +38,13 @@ func TestResolveConfig(t *testing.T) {
 	github := map[string]string{"ACTIONS_ID_TOKEN_REQUEST_URL": "https://token.example/x?api-version=2.0", "ACTIONS_ID_TOKEN_REQUEST_TOKEN": "req"}
 
 	cases := map[string]struct {
-		attrs     map[string]string
-		env       map[string]string
-		wantError string // substring of a diagnostic, "" when the configuration is valid
-		wantOIDC  bool
-		check     func(t *testing.T, base64 string)
+		attrs           map[string]string
+		env             map[string]string
+		wantError       string // substring of a diagnostic, "" when the configuration is valid
+		wantTokenSource bool
+		noClientID      bool // remove client_id from the base attributes
+		unknownClientID bool // client_id computed from a resource not created yet
+		check           func(t *testing.T, base64 string)
 	}{
 		"default is client_certificate": {
 			attrs: map[string]string{"certificate_path": pfx},
@@ -52,25 +54,25 @@ func TestResolveConfig(t *testing.T) {
 			env:   map[string]string{"EXCHANGE_OIDC_TOKEN": secretToken},
 		},
 		"oidc_github": {
-			attrs:    map[string]string{"auth_method": "oidc_github"},
-			env:      github,
-			wantOIDC: true,
+			attrs:           map[string]string{"auth_method": "oidc_github"},
+			env:             github,
+			wantTokenSource: true,
 		},
 		"oidc_github from env": {
-			env:      merge(github, map[string]string{"EXCHANGE_AUTH_METHOD": "oidc_github"}),
-			wantOIDC: true,
+			env:             merge(github, map[string]string{"EXCHANGE_AUTH_METHOD": "oidc_github"}),
+			wantTokenSource: true,
 		},
 		"oidc_github without GitHub variables": {
 			attrs:     map[string]string{"auth_method": "oidc_github"},
 			wantError: "id-token: write",
 		},
 		"oidc with oidc_token": {
-			attrs:    map[string]string{"auth_method": "oidc", "oidc_token": secretToken},
-			wantOIDC: true,
+			attrs:           map[string]string{"auth_method": "oidc", "oidc_token": secretToken},
+			wantTokenSource: true,
 		},
 		"oidc with oidc_token_file_path": {
-			attrs:    map[string]string{"auth_method": "oidc", "oidc_token_file_path": tokenFile},
-			wantOIDC: true,
+			attrs:           map[string]string{"auth_method": "oidc", "oidc_token_file_path": tokenFile},
+			wantTokenSource: true,
 		},
 		"oidc with both sources": {
 			attrs:     map[string]string{"auth_method": "oidc", "oidc_token": secretToken, "oidc_token_file_path": tokenFile},
@@ -99,14 +101,64 @@ func TestResolveConfig(t *testing.T) {
 			wantError: "only supported in the global and gcc environments",
 		},
 		"oidc on gcc": {
-			attrs:    map[string]string{"auth_method": "oidc_github", "environment": "gcc"},
-			env:      github,
-			wantOIDC: true,
+			attrs:           map[string]string{"auth_method": "oidc_github", "environment": "gcc"},
+			env:             github,
+			wantTokenSource: true,
 		},
 		"unknown auth_method from env": {
 			attrs:     map[string]string{"certificate_path": pfx},
 			env:       map[string]string{"EXCHANGE_AUTH_METHOD": "foo"},
-			wantError: "client_certificate, oidc, oidc_github",
+			wantError: "client_certificate, oidc, oidc_github, managed_identity",
+		},
+		"managed_identity system-assigned": {
+			attrs:           map[string]string{"auth_method": "managed_identity"},
+			noClientID:      true,
+			wantTokenSource: true,
+		},
+		"managed_identity user-assigned": {
+			attrs:           map[string]string{"auth_method": "managed_identity"},
+			wantTokenSource: true,
+		},
+		"managed_identity user-assigned upper-case client_id": {
+			attrs:           map[string]string{"auth_method": "managed_identity", "client_id": "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE"},
+			wantTokenSource: true,
+		},
+		"managed_identity from env": {
+			env:             map[string]string{"EXCHANGE_AUTH_METHOD": "managed_identity"},
+			noClientID:      true,
+			wantTokenSource: true,
+		},
+		"managed_identity with a non-GUID client_id": {
+			attrs:     map[string]string{"auth_method": "managed_identity", "client_id": "terraform-msexchangeonline"},
+			wantError: "client ID (a GUID)",
+		},
+		"managed_identity with certificate_path": {
+			attrs:     map[string]string{"auth_method": "managed_identity", "certificate_path": pfx},
+			wantError: "Conflicting authentication settings",
+		},
+		"managed_identity with EXCHANGE_CERTIFICATE_PATH": {
+			attrs:     map[string]string{"auth_method": "managed_identity"},
+			env:       map[string]string{"EXCHANGE_CERTIFICATE_PATH": pfx},
+			wantError: "Conflicting authentication settings",
+		},
+		"managed_identity with EXCHANGE_OIDC_TOKEN": {
+			attrs:     map[string]string{"auth_method": "managed_identity"},
+			env:       map[string]string{"EXCHANGE_OIDC_TOKEN": secretToken},
+			wantError: "Conflicting authentication settings",
+		},
+		"managed_identity on gcchigh": {
+			attrs:     map[string]string{"auth_method": "managed_identity", "environment": "gcchigh"},
+			wantError: "only supported in the global and gcc environments",
+		},
+		"managed_identity with an unknown client_id": {
+			attrs:           map[string]string{"auth_method": "managed_identity"},
+			unknownClientID: true,
+			wantError:       "Unknown client_id",
+		},
+		"client_certificate without client_id": {
+			attrs:      map[string]string{"certificate_path": pfx},
+			noClientID: true,
+			wantError:  "Missing client_id",
 		},
 		"two certificate sources": {
 			attrs:     map[string]string{"certificate_path": pfx, "certificate_base64": secretBase64},
@@ -136,8 +188,8 @@ func TestResolveConfig(t *testing.T) {
 			wantError: "not valid base64",
 		},
 		"short tenant name with oidc": {
-			attrs:    map[string]string{"tenant_id": "contoso", "auth_method": "oidc", "oidc_token": secretToken},
-			wantOIDC: true,
+			attrs:           map[string]string{"tenant_id": "contoso", "auth_method": "oidc", "oidc_token": secretToken},
+			wantTokenSource: true,
 		},
 	}
 
@@ -149,7 +201,15 @@ func TestResolveConfig(t *testing.T) {
 			for k, v := range c.env {
 				t.Setenv(k, v)
 			}
-			cfg, diags := resolveConfig(model(merge(base, c.attrs)))
+			attrs := merge(base, c.attrs)
+			if c.noClientID {
+				delete(attrs, "client_id")
+			}
+			m := model(attrs)
+			if c.unknownClientID {
+				m.ClientID = types.StringUnknown()
+			}
+			cfg, diags := resolveConfig(m)
 
 			var messages []string
 			for _, d := range diags {
@@ -168,8 +228,8 @@ func TestResolveConfig(t *testing.T) {
 			case c.wantError != "":
 				return
 			}
-			if got := cfg.TokenSource != nil; got != c.wantOIDC {
-				t.Errorf("TokenSource set = %v, want %v", got, c.wantOIDC)
+			if got := cfg.TokenSource != nil; got != c.wantTokenSource {
+				t.Errorf("TokenSource set = %v, want %v", got, c.wantTokenSource)
 			}
 			if c.check != nil {
 				c.check(t, cfg.CertificateBase64)

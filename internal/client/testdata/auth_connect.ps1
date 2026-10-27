@@ -2,6 +2,7 @@
 # JSON, the parameters it passed to Connect-ExchangeOnline (run by
 # auth_connect_test.go).
 #   -Case token           : EXCHANGE_BRIDGE_ACCESS_TOKEN is set
+#   -Case token-noclientid : the same, without a client ID (system-assigned managed identity)
 #   -Case base64          : EXCHANGE_BRIDGE_CERTIFICATE_BASE64 holds a password-protected .pfx
 #   -Case base64-wrapped  : the same, cut in lines of 76 characters like `base64` does
 #   -Case base64-nopassword : a .pfx exported without a password
@@ -22,7 +23,7 @@ function Connect-ExchangeOnline {
 
 $expected = $null
 switch ($Case) {
-    "token" {
+    { $_ -like "token*" } {
         $env:EXCHANGE_BRIDGE_ACCESS_TOKEN = "at-1"
     }
     { $_ -like "base64*" } {
@@ -44,6 +45,7 @@ switch ($Case) {
     default { throw "unknown case $Case" }
 }
 
-. $Script -TenantId contoso -ClientId 00000000-0000-0000-0000-000000000001
+$clientId = if ($Case -eq "token-noclientid") { "" } else { "00000000-0000-0000-0000-000000000001" }
+. $Script -TenantId contoso -ClientId $clientId
 
 ConvertTo-Json -Compress -InputObject @{ connected = $global:Connected; expectedThumbprint = $expected }
