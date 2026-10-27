@@ -207,7 +207,7 @@ type managedIdentityTokenSource struct {
 	// mu is a mutex: one goroutine at a time runs Token, so workers that start
 	// together wait for one request instead of each sending its own.
 	mu       sync.Mutex
-	failure  error     // the last failure, returned again until failedAt + managedIdentityFailureMemory
+	failure  error // the last failure, returned again until failedAt + managedIdentityFailureMemory
 	failedAt time.Time
 }
 
