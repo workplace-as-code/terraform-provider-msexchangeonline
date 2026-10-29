@@ -1,0 +1,1 @@
+terraform import msexchangeonline_eop_protection_policy_rule.this "Standard Preset Security Policy"

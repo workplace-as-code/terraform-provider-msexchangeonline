@@ -74,6 +74,9 @@ var objectSpecs = []objectSpec{
 			boolAttr("convert_disclaimer_wrapper_to_eml", "ConvertDisclaimerWrapperToEml",
 				"Attach the original message as an .eml file when a transport rule disclaimer cannot be inserted."),
 			boolAttr("rfc2231_encoding_enabled", "Rfc2231EncodingEnabled", "Encode attachment names with RFC 2231."),
+			stringAttr("journaling_report_ndr_to", "JournalingReportNdrTo",
+				"Address that receives the journal reports that cannot be delivered, required before the first journal rule is created. "+
+					"It cannot be an Exchange Online mailbox. Once set, it can be changed but never cleared."),
 		},
 	},
 	{
@@ -95,6 +98,58 @@ var objectSpecs = []objectSpec{
 			listAttr("except_if_from", "ExceptIfFrom", "Exception: the sender is one of these addresses or mailboxes."),
 			listAttr("except_if_from_member_of", "ExceptIfFromMemberOf", "Exception: the sender is a member of one of these groups."),
 			listAttr("except_if_sender_domain_is", "ExceptIfSenderDomainIs", "Exception: the sender's domain is one of these domains."),
+		},
+	},
+	{
+		typeName:    "journal_rule",
+		noun:        "JournalRule",
+		script:      "journal_rule.ps1",
+		description: "Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online",
+		notes: "`journal_email_address` is required to create a rule. Set `transport_config.journaling_report_ndr_to` first: " +
+			"Exchange Online refuses to create a rule without it, and sends there the journal reports it cannot deliver.",
+		fields: []field{
+			stringAttr("journal_email_address", "JournalEmailAddress",
+				"Address that receives the journal reports: an archiving system or service outside Exchange Online, never an Exchange Online mailbox."),
+			stringAttr("recipient", "Recipient",
+				"SMTP address of the mailbox, contact or group whose messages are journaled. `\"\"` journals the messages of every recipient."),
+			enumAttr("scope", "Scope", "Messages the rule journals: all of them, internal ones or external ones.", "Global", "Internal", "External"),
+			boolAttr("enabled", "Enabled", "Whether the rule is enabled."),
+		},
+	},
+	{
+		typeName:    "eop_protection_policy_rule",
+		noun:        "EOPProtectionPolicyRule",
+		script:      "eop_protection_policy_rule.ps1",
+		description: "Manages the Exchange Online Protection part of a preset security policy (Standard or Strict): whether it applies, and to which recipients",
+		notes: "`name` is `Standard Preset Security Policy` or `Strict Preset Security Policy`. The rule is not created: it exists once the Exchange Online Protection part of the preset has been applied to recipients in the Microsoft Defender portal, and the resource adopts it. " +
+			"Destroying the resource turns the preset off and keeps the rule. A condition left out of the configuration is not managed: set it to `[]` to clear it.",
+		fields: []field{
+			boolAttr("enabled", "Enabled", "Whether the preset security policy applies. Turning it off keeps the rule and its recipients."),
+			stringAttr("comments", "Comments", "Comments about the rule."),
+			listAttr("sent_to", "SentTo", "Condition: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("sent_to_member_of", "SentToMemberOf", "Condition: the recipient is a member of one of these groups."),
+			listAttr("recipient_domain_is", "RecipientDomainIs", "Condition: the recipient's domain is one of these accepted domains."),
+			listAttr("except_if_sent_to", "ExceptIfSentTo", "Exception: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("except_if_sent_to_member_of", "ExceptIfSentToMemberOf", "Exception: the recipient is a member of one of these groups."),
+			listAttr("except_if_recipient_domain_is", "ExceptIfRecipientDomainIs", "Exception: the recipient's domain is one of these accepted domains."),
+		},
+	},
+	{
+		typeName:    "atp_protection_policy_rule",
+		noun:        "ATPProtectionPolicyRule",
+		script:      "atp_protection_policy_rule.ps1",
+		description: "Manages the Defender for Office 365 part of a preset security policy (Standard or Strict): whether Safe Links and Safe Attachments protection applies, and to which recipients. Needs Defender for Office 365",
+		notes: "`name` is `Standard Preset Security Policy` or `Strict Preset Security Policy`. The rule is not created: it exists once the Defender for Office 365 part of the preset has been applied to recipients in the Microsoft Defender portal, and the resource adopts it. " +
+			"Destroying the resource turns the preset off and keeps the rule. A condition left out of the configuration is not managed: set it to `[]` to clear it.",
+		fields: []field{
+			boolAttr("enabled", "Enabled", "Whether the preset security policy applies. Turning it off keeps the rule and its recipients."),
+			stringAttr("comments", "Comments", "Comments about the rule."),
+			listAttr("sent_to", "SentTo", "Condition: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("sent_to_member_of", "SentToMemberOf", "Condition: the recipient is a member of one of these groups."),
+			listAttr("recipient_domain_is", "RecipientDomainIs", "Condition: the recipient's domain is one of these accepted domains."),
+			listAttr("except_if_sent_to", "ExceptIfSentTo", "Exception: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("except_if_sent_to_member_of", "ExceptIfSentToMemberOf", "Exception: the recipient is a member of one of these groups."),
+			listAttr("except_if_recipient_domain_is", "ExceptIfRecipientDomainIs", "Exception: the recipient's domain is one of these accepted domains."),
 		},
 	},
 }

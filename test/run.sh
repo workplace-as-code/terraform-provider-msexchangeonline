@@ -32,6 +32,10 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   EXCHANGE_TEST_PRESET    (any value) — also tests the rules of the Standard preset security
+#                           policy, which must have been turned on once in the Defender portal;
+#                           they are adopted and turned off on destroy (the Defender part with
+#                           EXCHANGE_TEST_DEFENDER)
 #   TF_DEV_PROVIDER_DIR     folder written in a new ~/.terraformrc (default /tmp). When
 #                           ~/.terraformrc already has a dev override for this provider, the
 #                           provider is built into the folder it names.
@@ -151,6 +155,7 @@ CREATED=(
   "msexchangeonline_retention_policy_tag.test=TF-CI-RetentionTag"
   "msexchangeonline_hosted_outbound_spam_filter_rule.test=TF-CI-OutboundSpamRule"
   "msexchangeonline_outbound_spam_filter_policy.unscoped=TF-CI-OutboundSpam-Unscoped"
+  "msexchangeonline_journal_rule.test=TF-CI-Journal"
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
 )
@@ -175,6 +180,14 @@ if [[ -n "${TF_VAR_test_dkim_domain:-}" ]]; then
   # A DKIM configuration cannot be deleted: the resource adopts it on create and
   # disables it on destroy, so it is imported and checked on its own.
   DKIM="msexchangeonline_dkim_signing_config.test[0]"
+fi
+# The preset security policy rules cannot be deleted: adopted on create, turned
+# off on destroy, imported and checked on their own.
+PRESET=()
+if [[ -n "${EXCHANGE_TEST_PRESET:-}" ]]; then
+  export TF_VAR_test_preset=true
+  PRESET=("msexchangeonline_eop_protection_policy_rule.standard[0]")
+  [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]] && PRESET+=("msexchangeonline_atp_protection_policy_rule.standard[0]")
 fi
 # Tenant-wide objects imported by main.tf and never destroyed.
 KEEP=(
@@ -372,6 +385,10 @@ if [[ -n "${DKIM:-}" ]]; then
   terraform state rm -no-color "$DKIM" > /dev/null
   terraform import -no-color -var phase=update "$DKIM" "$TF_VAR_test_dkim_domain" > /dev/null || fail "Import of $DKIM failed"
 fi
+for addr in "${PRESET[@]}"; do
+  terraform state rm -no-color "$addr" > /dev/null
+  terraform import -no-color -var phase=update "$addr" "Standard Preset Security Policy" > /dev/null || fail "Import of $addr failed"
+done
 pass "${#CREATED[@]} resources imported"
 expect_no_changes "Drift check after import" -var phase=update
 
@@ -392,8 +409,8 @@ provider "msexchangeonline" {}
 HCL
 for doc in "$ROOT"/docs/resources/*.md; do
   name="$(basename "$doc" .md)"
-  # Safe Links and Safe Attachments need Defender for Office 365.
-  [[ "$name" == safe_* && -z "${EXCHANGE_TEST_DEFENDER:-}" ]] && continue
+  # Safe Links, Safe Attachments and the preset rules of Defender need Defender for Office 365.
+  [[ ( "$name" == safe_* || "$name" == atp_* ) && -z "${EXCHANGE_TEST_DEFENDER:-}" ]] && continue
   printf 'list "msexchangeonline_%s" "all" {\n  provider = msexchangeonline\n}\n\n' "$name" >> "$QUERYDIR/all.tfquery.hcl"
 done
 (cd "$QUERYDIR" && terraform query -no-color -generate-config-out=generated.tf > query.log 2>&1) ||
@@ -413,7 +430,7 @@ for addr in "${KEEP[@]}"; do
   terraform state rm -no-color "$addr" > /dev/null
 done
 # The import blocks would bring the tenant-wide objects back into the plan.
-terraform destroy -auto-approve -no-color -var phase=update $(printf -- '-target=%s ' "${CREATED[@]%%=*}" ${APP_POLICY:+"$APP_POLICY"} ${DKIM:+"$DKIM"}) | tail -1
+terraform destroy -auto-approve -no-color -var phase=update $(printf -- '-target=%s ' "${CREATED[@]%%=*}" ${APP_POLICY:+"$APP_POLICY"} ${DKIM:+"$DKIM"} "${PRESET[@]}") | tail -1
 pass "Destroy OK"
 
 # ---------------------------------------------------------------------------
@@ -435,6 +452,13 @@ if [[ -n "${DKIM:-}" ]]; then
   pass "DKIM signing disabled for $TF_VAR_test_dkim_domain (the configuration itself cannot be deleted)"
 fi
 
+for addr in "${PRESET[@]}"; do
+  terraform import -no-color -var phase=update "$addr" "Standard Preset Security Policy" > /dev/null || fail "Import of $addr after destroy failed"
+  [[ "$(state_string "$addr" enabled)" == "false" ]] || fail "$addr is still on after destroy"
+  reset_state
+  pass "$addr turned off (the rule itself is kept)"
+done
+
 # ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
@@ -450,15 +474,20 @@ echo "  Adopted with a minimal configuration, no change planned: remote_domain, 
 echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
-  echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox"
+  echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"
 else
-  echo "  Data sources:     accepted_domain, accepted_domains, organization_config"
+  echo "  Data sources:     accepted_domain, accepted_domains, organization_config, and the policies"
   echo "                    (mailbox skipped: set TF_VAR_test_mailbox to test it)"
 fi
 if [[ -n "${DKIM:-}" ]]; then
   echo "  Adopted, disabled on destroy: dkim_signing_config $TF_VAR_test_dkim_domain (signing enabled: ${TF_VAR_test_dkim_enabled:-false})"
 else
   echo "  Skipped:          dkim_signing_config (set TF_VAR_test_dkim_domain)"
+fi
+if [[ ${#PRESET[@]} -gt 0 ]]; then
+  echo "  Adopted, turned off on destroy: ${PRESET[*]%%.standard*} (Standard preset)"
+else
+  echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
 fi
 if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   echo "  Defender:         safe_links_*, safe_attachment_*, anti-phishing Defender settings"

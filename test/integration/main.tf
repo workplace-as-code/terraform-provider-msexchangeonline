@@ -68,6 +68,12 @@ variable "test_dkim_enabled" {
   default     = false
 }
 
+variable "test_preset" {
+  description = "Set by test/run.sh to test the rules of the Standard preset security policy, which must have been turned on once in the Defender portal. They are adopted, and turned off on destroy."
+  type        = bool
+  default     = false
+}
+
 variable "test_app_id" {
   description = "Client ID of an app registration, to test application access policies with test_mail_enabled_group."
   type        = string
@@ -96,6 +102,41 @@ data "msexchangeonline_organization_config" "tenant" {}
 data "msexchangeonline_mailbox" "test" {
   count    = var.test_mailbox != "" ? 1 : 0
   identity = var.test_mailbox
+}
+
+# Data sources built from resources, reading the built-in policies of every
+# tenant (the Defender ones are in defender.tf).
+data "msexchangeonline_anti_phish_policy" "default" {
+  name = "Office365 AntiPhish Default"
+}
+
+data "msexchangeonline_hosted_content_filter_policy" "default" {
+  name = "Default"
+}
+
+data "msexchangeonline_malware_filter_policy" "default" {
+  name = "Default"
+}
+
+data "msexchangeonline_outbound_spam_filter_policy" "default" {
+  name = "Default"
+}
+
+data "msexchangeonline_quarantine_policy" "default" {
+  name = "DefaultFullAccessPolicy"
+}
+
+# A test object read back as a data source, once it exists.
+data "msexchangeonline_malware_filter_policy" "test" {
+  name       = msexchangeonline_malware_filter_policy.test.name
+  depends_on = [msexchangeonline_malware_filter_policy.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == msexchangeonline_malware_filter_policy.test.id
+      error_message = "The data source read another object than the test one."
+    }
+  }
 }
 
 # ---------------------------------------------------------------------------
@@ -334,6 +375,27 @@ resource "msexchangeonline_hosted_outbound_spam_filter_rule" "test" {
   sender_domain_is                   = [var.primary_domain]
   except_if_from                     = local.updated ? ["tf-ci@${var.primary_domain}"] : []
   comments                           = local.comment
+}
+
+# Standard preset security policy, adopted and kept off: the test only changes
+# its recipients. Destroying the resource turns the preset off.
+resource "msexchangeonline_eop_protection_policy_rule" "standard" {
+  count               = var.test_preset ? 1 : 0
+  name                = "Standard Preset Security Policy"
+  enabled             = false
+  comments            = local.comment
+  recipient_domain_is = [var.primary_domain]
+  except_if_sent_to   = local.updated && var.test_mailbox != "" ? [var.test_mailbox] : []
+}
+
+# Disabled: a journal rule that delivers to an address that does not exist
+# makes Microsoft contact the organization.
+resource "msexchangeonline_journal_rule" "test" {
+  name                  = "TF-CI-Journal"
+  journal_email_address = "tf-ci-journal@tf-ci-test.example"
+  scope                 = local.updated ? "External" : "Global"
+  recipient             = local.updated && var.test_mailbox != "" ? var.test_mailbox : ""
+  enabled               = false
 }
 
 resource "msexchangeonline_tenant_allow_block_list_item" "sender" {
