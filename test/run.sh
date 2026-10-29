@@ -474,9 +474,9 @@ echo "  Adopted with a minimal configuration, no change planned: remote_domain, 
 echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
-  echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox"
+  echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"
 else
-  echo "  Data sources:     accepted_domain, accepted_domains, organization_config"
+  echo "  Data sources:     accepted_domain, accepted_domains, organization_config, and the policies"
   echo "                    (mailbox skipped: set TF_VAR_test_mailbox to test it)"
 fi
 if [[ -n "${DKIM:-}" ]]; then

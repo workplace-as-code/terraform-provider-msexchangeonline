@@ -102,3 +102,13 @@ resource "msexchangeonline_atp_protection_policy_rule" "standard" {
   comments            = local.comment
   recipient_domain_is = [var.primary_domain]
 }
+
+data "msexchangeonline_safe_links_policy" "builtin" {
+  count = local.defender
+  name  = "Built-In Protection Policy"
+}
+
+data "msexchangeonline_safe_attachment_policy" "builtin" {
+  count = local.defender
+  name  = "Built-In Protection Policy"
+}

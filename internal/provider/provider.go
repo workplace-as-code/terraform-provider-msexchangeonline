@@ -140,12 +140,13 @@ func (p *exchangeProvider) ListResources(_ context.Context) []func() list.ListRe
 
 // DataSources returns the list of all data sources.
 func (p *exchangeProvider) DataSources(_ context.Context) []func() datasource.DataSource {
-	return []func() datasource.DataSource{
+	sources := []func() datasource.DataSource{
 		datasources.NewAcceptedDomainDataSource,
 		datasources.NewAcceptedDomainsDataSource,
 		datasources.NewMailboxDataSource,
 		datasources.NewOrganizationConfigDataSource,
 	}
+	return append(sources, resources.DataSources()...)
 }
 
 var guidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)

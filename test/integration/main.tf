@@ -104,6 +104,41 @@ data "msexchangeonline_mailbox" "test" {
   identity = var.test_mailbox
 }
 
+# Data sources built from resources, reading the built-in policies of every
+# tenant (the Defender ones are in defender.tf).
+data "msexchangeonline_anti_phish_policy" "default" {
+  name = "Office365 AntiPhish Default"
+}
+
+data "msexchangeonline_hosted_content_filter_policy" "default" {
+  name = "Default"
+}
+
+data "msexchangeonline_malware_filter_policy" "default" {
+  name = "Default"
+}
+
+data "msexchangeonline_outbound_spam_filter_policy" "default" {
+  name = "Default"
+}
+
+data "msexchangeonline_quarantine_policy" "default" {
+  name = "DefaultFullAccessPolicy"
+}
+
+# A test object read back as a data source, once it exists.
+data "msexchangeonline_malware_filter_policy" "test" {
+  name       = msexchangeonline_malware_filter_policy.test.name
+  depends_on = [msexchangeonline_malware_filter_policy.test]
+}
+
+check "data_sources" {
+  assert {
+    condition     = data.msexchangeonline_malware_filter_policy.test.id == msexchangeonline_malware_filter_policy.test.id
+    error_message = "The malware filter policy data source did not read the test policy."
+  }
+}
+
 # ---------------------------------------------------------------------------
 # Tenant-wide objects: imported, never modified. test/run.sh removes them from
 # state before the destroy, so the tenant keeps them.
