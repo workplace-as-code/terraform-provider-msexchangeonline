@@ -29,7 +29,7 @@ resource "msexchangeonline_transport_config" "this" {
 - `allow_legacy_tls_clients` (Boolean) Allow TLS 1.0 and 1.1 clients to connect with SMTP AUTH.
 - `convert_disclaimer_wrapper_to_eml` (Boolean) Attach the original message as an .eml file when a transport rule disclaimer cannot be inserted.
 - `external_postmaster_address` (String) Sender address of the delivery status notifications sent to external senders.
-- `journaling_report_ndr_to` (String) Address that receives the journal reports that cannot be delivered, required before journal rules deliver anything. It cannot be an Exchange Online mailbox. Once set, it can be changed but never cleared.
+- `journaling_report_ndr_to` (String) Address that receives the journal reports that cannot be delivered, required before the first journal rule is created. It cannot be an Exchange Online mailbox. Once set, it can be changed but never cleared.
 - `reply_all_storm_block_duration_hours` (Number) Hours during which further reply-all messages are blocked.
 - `reply_all_storm_detection_minimum_recipients` (Number) Minimum number of recipients for a thread to be considered a reply-all storm.
 - `reply_all_storm_detection_minimum_replies` (Number) Minimum number of reply-all messages, within 60 minutes, to detect a storm.

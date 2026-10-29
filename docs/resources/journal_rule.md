@@ -2,12 +2,12 @@
 page_title: "msexchangeonline_journal_rule (Resource) - msexchangeonline"
 subcategory: "Mail flow"
 description: |-
-  Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online (New-JournalRule). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. journal_email_address is required to create a rule. Set transport_config.journaling_report_ndr_to first: Exchange Online sends the journal reports it cannot deliver there.
+  Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online (New-JournalRule). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. journal_email_address is required to create a rule. Set transport_config.journaling_report_ndr_to first: Exchange Online refuses to create a rule without it, and sends there the journal reports it cannot deliver.
 ---
 
 # msexchangeonline_journal_rule (Resource)
 
-Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online (`New-JournalRule`). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. `journal_email_address` is required to create a rule. Set `transport_config.journaling_report_ndr_to` first: Exchange Online sends the journal reports it cannot deliver there.
+Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online (`New-JournalRule`). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. `journal_email_address` is required to create a rule. Set `transport_config.journaling_report_ndr_to` first: Exchange Online refuses to create a rule without it, and sends there the journal reports it cannot deliver.
 
 ## Example Usage
 

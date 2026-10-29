@@ -75,7 +75,7 @@ var objectSpecs = []objectSpec{
 				"Attach the original message as an .eml file when a transport rule disclaimer cannot be inserted."),
 			boolAttr("rfc2231_encoding_enabled", "Rfc2231EncodingEnabled", "Encode attachment names with RFC 2231."),
 			stringAttr("journaling_report_ndr_to", "JournalingReportNdrTo",
-				"Address that receives the journal reports that cannot be delivered, required before journal rules deliver anything. "+
+				"Address that receives the journal reports that cannot be delivered, required before the first journal rule is created. "+
 					"It cannot be an Exchange Online mailbox. Once set, it can be changed but never cleared."),
 		},
 	},
@@ -106,7 +106,7 @@ var objectSpecs = []objectSpec{
 		script:      "journal_rule.ps1",
 		description: "Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online",
 		notes: "`journal_email_address` is required to create a rule. Set `transport_config.journaling_report_ndr_to` first: " +
-			"Exchange Online sends the journal reports it cannot deliver there.",
+			"Exchange Online refuses to create a rule without it, and sends there the journal reports it cannot deliver.",
 		fields: []field{
 			stringAttr("journal_email_address", "JournalEmailAddress",
 				"Address that receives the journal reports: an archiving system or service outside Exchange Online, never an Exchange Online mailbox."),
