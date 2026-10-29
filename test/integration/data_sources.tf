@@ -171,7 +171,7 @@ data "msexchangeonline_retention_policy" "test" {
 }
 
 data "msexchangeonline_dkim_signing_config" "test" {
-  count       = length(msexchangeonline_dkim_signing_config.test)
+  count       = var.test_dkim_domain != "" ? 1 : 0
   domain_name = msexchangeonline_dkim_signing_config.test[0].domain_name
   depends_on  = [msexchangeonline_dkim_signing_config.test]
 
@@ -184,7 +184,7 @@ data "msexchangeonline_dkim_signing_config" "test" {
 }
 
 data "msexchangeonline_eop_protection_policy_rule" "standard" {
-  count      = length(msexchangeonline_eop_protection_policy_rule.standard)
+  count      = var.test_preset ? 1 : 0
   name       = msexchangeonline_eop_protection_policy_rule.standard[0].name
   depends_on = [msexchangeonline_eop_protection_policy_rule.standard]
 
@@ -223,7 +223,7 @@ data "msexchangeonline_safe_attachment_rule" "test" {
 }
 
 data "msexchangeonline_atp_protection_policy_rule" "standard" {
-  count      = length(msexchangeonline_atp_protection_policy_rule.standard)
+  count      = var.test_preset && var.test_defender ? 1 : 0
   name       = msexchangeonline_atp_protection_policy_rule.standard[0].name
   depends_on = [msexchangeonline_atp_protection_policy_rule.standard]
 
