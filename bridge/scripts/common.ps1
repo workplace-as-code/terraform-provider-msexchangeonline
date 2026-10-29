@@ -248,3 +248,62 @@ function Remove-BridgeRule {
     try { & "Remove-$Noun" -Identity $Name -ErrorAction Stop }
     catch { if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw } }
 }
+
+# Invoke-BridgePresetRule manages a rule of a preset security policy (Standard
+# or Strict) for eop_protection_policy_rule.ps1 and atp_protection_policy_rule.ps1,
+# with the contract of exo_object.ps1. The Defender portal creates these rules
+# when the preset is first turned on, with the policies they need, and
+# Microsoft advises against New-<noun>: Create adopts the existing rule, and
+# Delete turns the preset off and keeps the rule. Enabled is read from State.
+function Invoke-BridgePresetRule {
+    param(
+        [ValidateSet("EOPProtectionPolicyRule", "ATPProtectionPolicyRule")] [string]$Noun,
+        [string]$Action, [string]$Identity, [string]$Values, [string]$Properties
+    )
+    $splat = ConvertFrom-BridgeValues $Values
+    $props = @(ConvertFrom-BridgeJson $Properties)
+    $enabled = $null
+    if ($splat.ContainsKey("Enabled")) { $enabled = [bool]$splat["Enabled"]; $splat.Remove("Enabled") }
+
+    $read = {
+        $rule = Invoke-BridgeRetry { & "Get-$Noun" -Identity $Identity }
+        $out = [ordered]@{ Name = [string]$rule.Name }
+        foreach ($p in $props) {
+            $out[$p] = if ($p -eq "Enabled") { [string](Get-BridgeProp $rule "State") -eq "Enabled" }
+                       else { ConvertTo-BridgeValue (Get-BridgeProp $rule $p) }
+        }
+        ConvertTo-Json -Compress -Depth 4 -InputObject $out
+    }
+    $write = {
+        if ($splat.Count -gt 0) { & "Set-$Noun" -Identity $Identity @splat }
+        if ($enabled -eq $true)  { & "Enable-$Noun" -Identity $Identity }
+        if ($enabled -eq $false) { & "Disable-$Noun" -Identity $Identity }
+    }
+
+    switch ($Action) {
+        "Get" {
+            try { & $read } catch {
+                if (Test-BridgeNotFound $_.Exception.Message) { return }
+                throw
+            }
+        }
+        "Create" {
+            try {
+                Invoke-BridgeRetry { & "Get-$Noun" -Identity $Identity } | Out-Null
+            } catch {
+                if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw }
+                throw "Rule '$Identity' does not exist: turn the preset security policy on once in the Microsoft Defender portal (Email & collaboration > Policies & rules > Threat policies > Preset security policies), which creates its rules, then apply again"
+            }
+            & $write
+            & $read
+        }
+        "Update" { & $write; & $read }
+        "Delete" {
+            # The rule stays: only the portal can recreate it with its policies.
+            try { & "Disable-$Noun" -Identity $Identity } catch {
+                if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw }
+            }
+            "{}"
+        }
+    }
+}

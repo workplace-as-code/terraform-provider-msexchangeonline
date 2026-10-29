@@ -1,6 +1,6 @@
-# exo_rule_preset.ps1 - runs exo_rule.ps1 against fake preset security policy
-# rule cmdlets (run by exo_rule_test.go): the rule is adopted, never created,
-# and destroying it turns the preset off instead of removing the rule.
+# preset_rule.ps1 - runs bridge/scripts/eop_protection_policy_rule.ps1 against
+# fake preset security policy rule cmdlets (run by rule_scripts_test.go): the
+# rule is adopted, never created, and destroying it turns the preset off.
 param([string]$Script)
 $ErrorActionPreference = "Stop"
 
@@ -31,12 +31,12 @@ $props = ConvertTo-B64 @("SentToMemberOf", "Enabled")
 $values = ConvertTo-B64 @{ SentToMemberOf = @("Pilot"); Enabled = $true }
 
 # Not turned on yet in the portal: no rule to adopt.
-$out = & $Script -Action Create -Noun EOPProtectionPolicyRule -Identity $name -Values $values -Properties $props 2>&1
+$out = & $Script -Action Create -Identity $name -Values $values -Properties $props 2>&1
 "missing: $LASTEXITCODE $out"
 
 $global:Rule = [pscustomobject]@{ Name = $name; State = "Disabled"; SentToMemberOf = $null; Comments = $null }
-"create: " + (& $Script -Action Create -Noun EOPProtectionPolicyRule -Identity $name -Values $values -Properties $props)
+"create: " + (& $Script -Action Create -Identity $name -Values $values -Properties $props)
 "create calls: " + ($global:Calls -join "; ")
 $global:Calls.Clear()
-"delete: " + (& $Script -Action Delete -Noun EOPProtectionPolicyRule -Identity $name)
+"delete: " + (& $Script -Action Delete -Identity $name)
 "delete calls: " + ($global:Calls -join "; ") + " | state " + $global:Rule.State

@@ -6,15 +6,15 @@ import (
 	"testing"
 )
 
-// TestExoRuleJournalRule guards the journal rule specifics of exo_rule.ps1:
-// the state is read from Enabled (journal rules have no State), and an empty
-// recipient clears it, since New-JournalRule and Set-JournalRule reject "".
-func TestExoRuleJournalRule(t *testing.T) {
+// TestJournalRuleScript guards journal_rule.ps1: the state is read from
+// Enabled (journal rules have no State), and an empty recipient clears it,
+// since New-JournalRule and Set-JournalRule reject "".
+func TestJournalRuleScript(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh is not installed")
 	}
 	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive",
-		"-File", "testdata/exo_rule_journal.ps1", "-Script", "../../bridge/scripts/exo_rule.ps1").CombinedOutput()
+		"-File", "testdata/journal_rule.ps1", "-Script", "../../bridge/scripts/journal_rule.ps1").CombinedOutput()
 	if err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}
@@ -30,14 +30,15 @@ func TestExoRuleJournalRule(t *testing.T) {
 	}
 }
 
-// TestExoRulePresetRule guards the preset security policy rules: they are
-// adopted, never created, and destroying the resource turns the preset off.
-func TestExoRulePresetRule(t *testing.T) {
+// TestPresetRuleScript guards the preset security policy rule scripts
+// (Invoke-BridgePresetRule): the rule is adopted, never created, and
+// destroying the resource turns the preset off.
+func TestPresetRuleScript(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh is not installed")
 	}
 	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive",
-		"-File", "testdata/exo_rule_preset.ps1", "-Script", "../../bridge/scripts/exo_rule.ps1").CombinedOutput()
+		"-File", "testdata/preset_rule.ps1", "-Script", "../../bridge/scripts/eop_protection_policy_rule.ps1").CombinedOutput()
 	if err != nil {
 		t.Fatalf("%v: %s", err, out)
 	}

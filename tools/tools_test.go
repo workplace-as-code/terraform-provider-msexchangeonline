@@ -22,6 +22,8 @@ var (
 	quotedRe   = regexp.MustCompile(`"([^"]+)"`)
 	// Sync-BridgeRule (common.ps1) builds the rule cmdlet names from -Noun.
 	ruleNounRe = regexp.MustCompile(`Sync-BridgeRule -Noun "([A-Za-z]+)"`)
+	// Invoke-BridgePresetRule (common.ps1) does the same for the preset rules.
+	presetNounRe = regexp.MustCompile(`Invoke-BridgePresetRule -Noun "([A-Za-z]+)"`)
 	// restRe matches the REST cmdlets of the module, which use the permissions
 	// of the server cmdlet without EXO: Get-EXORecipient needs Get-Recipient.
 	restRe = regexp.MustCompile(`^Get-EXO([A-Z][A-Za-z]+)$`)
@@ -29,6 +31,10 @@ var (
 
 // ruleVerbs are the verbs Sync-BridgeRule and exo_rule.ps1 use on a rule noun.
 var ruleVerbs = []string{"Get", "New", "Set", "Remove", "Enable", "Disable"}
+
+// presetVerbs are the verbs Invoke-BridgePresetRule uses: the preset rules are
+// adopted, never created or removed.
+var presetVerbs = []string{"Get", "Set", "Enable", "Disable"}
 
 var (
 	specNounRe      = regexp.MustCompile(`noun:\s*"([A-Za-z]+)"`)
@@ -100,6 +106,11 @@ func bridgeCmdlets(t *testing.T) []string {
 		}
 		for _, m := range ruleNounRe.FindAllStringSubmatch(string(data), -1) {
 			for _, verb := range ruleVerbs {
+				found[verb+"-"+m[1]] = true
+			}
+		}
+		for _, m := range presetNounRe.FindAllStringSubmatch(string(data), -1) {
+			for _, verb := range presetVerbs {
 				found[verb+"-"+m[1]] = true
 			}
 		}

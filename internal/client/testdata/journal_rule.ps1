@@ -1,6 +1,6 @@
-# exo_rule_journal.ps1 - runs exo_rule.ps1 against fake journal rule cmdlets
-# (run by exo_rule_test.go): a journal rule reports Enabled, not State, and
-# Recipient = "" must clear the recipient instead of being sent as is.
+# journal_rule.ps1 - runs bridge/scripts/journal_rule.ps1 against fake journal
+# rule cmdlets (run by rule_scripts_test.go): the state is read from Enabled,
+# and Recipient = "" must clear the recipient instead of being sent as is.
 param([string]$Script)
 $ErrorActionPreference = "Stop"
 
@@ -34,11 +34,11 @@ function ConvertTo-B64($Object) {
 $props = ConvertTo-B64 @("JournalEmailAddress", "Recipient", "Scope", "Enabled")
 
 $values = ConvertTo-B64 @{ JournalEmailAddress = "journal@archive.example"; Recipient = ""; Scope = "Global"; Enabled = $false }
-"create: " + (& $Script -Action Create -Noun JournalRule -Identity TF-Journal -Values $values -Properties $props)
+"create: " + (& $Script -Action Create -Identity TF-Journal -Values $values -Properties $props)
 "create calls: " + ($global:Calls -join "; ")
 $global:Calls.Clear()
 
 $global:Rule.Recipient = "user@contoso.com"
 $values = ConvertTo-B64 @{ Recipient = ""; Enabled = $true }
-"update: " + (& $Script -Action Update -Noun JournalRule -Identity TF-Journal -Values $values -Properties $props)
+"update: " + (& $Script -Action Update -Identity TF-Journal -Values $values -Properties $props)
 "update calls: " + ($global:Calls -join "; ")

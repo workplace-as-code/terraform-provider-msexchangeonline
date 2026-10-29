@@ -103,7 +103,7 @@ var objectSpecs = []objectSpec{
 	{
 		typeName:    "journal_rule",
 		noun:        "JournalRule",
-		script:      "exo_rule.ps1",
+		script:      "journal_rule.ps1",
 		description: "Manages a journal rule, which sends a copy of the matching messages to an archive outside Exchange Online",
 		notes: "`journal_email_address` is required to create a rule. Set `transport_config.journaling_report_ndr_to` first: " +
 			"Exchange Online sends the journal reports it cannot deliver there.",
@@ -119,7 +119,7 @@ var objectSpecs = []objectSpec{
 	{
 		typeName:    "eop_protection_policy_rule",
 		noun:        "EOPProtectionPolicyRule",
-		script:      "exo_rule.ps1",
+		script:      "eop_protection_policy_rule.ps1",
 		description: "Manages the Exchange Online Protection part of a preset security policy (Standard or Strict): whether it applies, and to which recipients",
 		notes: "`name` is `Standard Preset Security Policy` or `Strict Preset Security Policy`. The rule is not created: it exists once the preset has been turned on in the Microsoft Defender portal, and the resource adopts it. " +
 			"Destroying the resource turns the preset off and keeps the rule. A condition left out of the configuration is not managed: set it to `[]` to clear it.",
@@ -137,7 +137,7 @@ var objectSpecs = []objectSpec{
 	{
 		typeName:    "atp_protection_policy_rule",
 		noun:        "ATPProtectionPolicyRule",
-		script:      "exo_rule.ps1",
+		script:      "atp_protection_policy_rule.ps1",
 		description: "Manages the Defender for Office 365 part of a preset security policy (Standard or Strict): whether Safe Links and Safe Attachments protection applies, and to which recipients. Needs Defender for Office 365",
 		notes: "`name` is `Standard Preset Security Policy` or `Strict Preset Security Policy`. The rule is not created: it exists once the preset has been turned on in the Microsoft Defender portal, and the resource adopts it. " +
 			"Destroying the resource turns the preset off and keeps the rule. A condition left out of the configuration is not managed: set it to `[]` to clear it.",
