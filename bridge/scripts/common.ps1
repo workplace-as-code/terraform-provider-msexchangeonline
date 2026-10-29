@@ -292,7 +292,8 @@ function Invoke-BridgePresetRule {
                 Invoke-BridgeRetry { & "Get-$Noun" -Identity $Identity } | Out-Null
             } catch {
                 if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw }
-                throw "Rule '$Identity' does not exist: turn the preset security policy on once in the Microsoft Defender portal (Email & collaboration > Policies & rules > Threat policies > Preset security policies), which creates its rules, then apply again"
+                $part = if ($Noun -eq "EOPProtectionPolicyRule") { "Exchange Online Protection" } else { "Defender for Office 365" }
+                throw "Rule '$Identity' does not exist: in the Microsoft Defender portal (Email & collaboration > Policies & rules > Threat policies > Preset security policies), open Manage protection settings of the preset and apply its $part part to recipients, which creates the rule, then apply again. The preset can show as on while this part has no rule"
             }
             & $write
             & $read
