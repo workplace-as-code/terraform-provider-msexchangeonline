@@ -8,6 +8,10 @@
 #     outside 0..(rule count - 1)
 #   - an empty list clears the condition, an empty string clears the value
 #     (JournalRule -Recipient: every recipient is journaled)
+#   - the rules of the preset security policies (EOPProtectionPolicyRule,
+#     ATPProtectionPolicyRule) are never created or removed: the Defender portal
+#     creates them when the preset is first turned on. Create adopts the rule,
+#     Delete turns the preset off.
 
 param(
     [string]$TenantId              = "",
@@ -31,6 +35,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot/auth.ps1" -TenantId $TenantId -ClientId $ClientId -CertificatePath $CertificatePath -CertificatePassword $CertificatePassword -CertificateThumbprint $CertificateThumbprint -Environment $Environment
 . "$PSScriptRoot/common.ps1"
 
+$preset = $Noun -match '^(EOP|ATP)ProtectionPolicyRule$'
 $splat = ConvertFrom-BridgeValues $Values
 # The cmdlets reject "" for an address: $null clears it.
 foreach ($k in @($splat.Keys)) { if ($splat[$k] -is [string] -and $splat[$k] -eq "") { $splat[$k] = $null } }
@@ -72,6 +77,18 @@ try {
         }
 
         "Create" {
+            if ($preset) {
+                try {
+                    Invoke-BridgeRetry { & "Get-$Noun" -Identity $Identity } | Out-Null
+                } catch {
+                    if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw }
+                    throw "Rule '$Identity' does not exist: turn the preset security policy on once in the Microsoft Defender portal (Email & collaboration > Policies & rules > Threat policies > Preset security policies), which creates its rules, then apply again"
+                }
+                if ($splat.Count -gt 0) { & "Set-$Noun" -Identity $Identity @splat }
+                Set-BridgeRuleState
+                Read-BridgeRule
+                break
+            }
             # New-<noun> rejects $null conditions: only send the ones with values.
             $new = @{}
             foreach ($k in $splat.Keys) { if ($null -ne $splat[$k]) { $new[$k] = $splat[$k] } }
@@ -100,6 +117,12 @@ try {
         }
 
         "Delete" {
+            if ($preset) {
+                # The rule stays: removing it would need the portal to recreate it.
+                try { & "Disable-$Noun" -Identity $Identity } catch { if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw } }
+                "{}"
+                break
+            }
             try {
                 & "Remove-$Noun" -Identity $Identity
             } catch {

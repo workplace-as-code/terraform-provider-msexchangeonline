@@ -68,6 +68,12 @@ variable "test_dkim_enabled" {
   default     = false
 }
 
+variable "test_preset" {
+  description = "Set by test/run.sh to test the rules of the Standard preset security policy, which must have been turned on once in the Defender portal. They are adopted, and turned off on destroy."
+  type        = bool
+  default     = false
+}
+
 variable "test_app_id" {
   description = "Client ID of an app registration, to test application access policies with test_mail_enabled_group."
   type        = string
@@ -334,6 +340,17 @@ resource "msexchangeonline_hosted_outbound_spam_filter_rule" "test" {
   sender_domain_is                   = [var.primary_domain]
   except_if_from                     = local.updated ? ["tf-ci@${var.primary_domain}"] : []
   comments                           = local.comment
+}
+
+# Standard preset security policy, adopted and kept off: the test only changes
+# its recipients. Destroying the resource turns the preset off.
+resource "msexchangeonline_eop_protection_policy_rule" "standard" {
+  count               = var.test_preset ? 1 : 0
+  name                = "Standard Preset Security Policy"
+  enabled             = false
+  comments            = local.comment
+  recipient_domain_is = [var.primary_domain]
+  except_if_sent_to   = local.updated && var.test_mailbox != "" ? [var.test_mailbox] : []
 }
 
 # Disabled: a journal rule that delivers to an address that does not exist

@@ -90,3 +90,15 @@ resource "msexchangeonline_anti_phish_policy" "defender" {
   mailbox_intelligence_protection_action = "MoveToJmf"
   enable_organization_domains_protection = !local.updated
 }
+
+# ---------------------------------------------------------------------------
+# Standard preset security policy, Defender part (see the EOP part in main.tf).
+# ---------------------------------------------------------------------------
+
+resource "msexchangeonline_atp_protection_policy_rule" "standard" {
+  count               = var.test_preset && var.test_defender ? 1 : 0
+  name                = "Standard Preset Security Policy"
+  enabled             = false
+  comments            = local.comment
+  recipient_domain_is = [var.primary_domain]
+}

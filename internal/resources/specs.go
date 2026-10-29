@@ -116,4 +116,40 @@ var objectSpecs = []objectSpec{
 			boolAttr("enabled", "Enabled", "Whether the rule is enabled."),
 		},
 	},
+	{
+		typeName:    "eop_protection_policy_rule",
+		noun:        "EOPProtectionPolicyRule",
+		script:      "exo_rule.ps1",
+		description: "Manages the Exchange Online Protection part of a preset security policy (Standard or Strict): whether it applies, and to which recipients",
+		notes: "`name` is `Standard Preset Security Policy` or `Strict Preset Security Policy`. The rule is not created: it exists once the preset has been turned on in the Microsoft Defender portal, and the resource adopts it. " +
+			"Destroying the resource turns the preset off and keeps the rule. A condition left out of the configuration is not managed: set it to `[]` to clear it.",
+		fields: []field{
+			boolAttr("enabled", "Enabled", "Whether the preset security policy applies. Turning it off keeps the rule and its recipients."),
+			stringAttr("comments", "Comments", "Comments about the rule."),
+			listAttr("sent_to", "SentTo", "Condition: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("sent_to_member_of", "SentToMemberOf", "Condition: the recipient is a member of one of these groups."),
+			listAttr("recipient_domain_is", "RecipientDomainIs", "Condition: the recipient's domain is one of these accepted domains."),
+			listAttr("except_if_sent_to", "ExceptIfSentTo", "Exception: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("except_if_sent_to_member_of", "ExceptIfSentToMemberOf", "Exception: the recipient is a member of one of these groups."),
+			listAttr("except_if_recipient_domain_is", "ExceptIfRecipientDomainIs", "Exception: the recipient's domain is one of these accepted domains."),
+		},
+	},
+	{
+		typeName:    "atp_protection_policy_rule",
+		noun:        "ATPProtectionPolicyRule",
+		script:      "exo_rule.ps1",
+		description: "Manages the Defender for Office 365 part of a preset security policy (Standard or Strict): whether Safe Links and Safe Attachments protection applies, and to which recipients. Needs Defender for Office 365",
+		notes: "`name` is `Standard Preset Security Policy` or `Strict Preset Security Policy`. The rule is not created: it exists once the preset has been turned on in the Microsoft Defender portal, and the resource adopts it. " +
+			"Destroying the resource turns the preset off and keeps the rule. A condition left out of the configuration is not managed: set it to `[]` to clear it.",
+		fields: []field{
+			boolAttr("enabled", "Enabled", "Whether the preset security policy applies. Turning it off keeps the rule and its recipients."),
+			stringAttr("comments", "Comments", "Comments about the rule."),
+			listAttr("sent_to", "SentTo", "Condition: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("sent_to_member_of", "SentToMemberOf", "Condition: the recipient is a member of one of these groups."),
+			listAttr("recipient_domain_is", "RecipientDomainIs", "Condition: the recipient's domain is one of these accepted domains."),
+			listAttr("except_if_sent_to", "ExceptIfSentTo", "Exception: the recipient is one of these mailboxes, mail users or contacts."),
+			listAttr("except_if_sent_to_member_of", "ExceptIfSentToMemberOf", "Exception: the recipient is a member of one of these groups."),
+			listAttr("except_if_recipient_domain_is", "ExceptIfRecipientDomainIs", "Exception: the recipient's domain is one of these accepted domains."),
+		},
+	},
 }
