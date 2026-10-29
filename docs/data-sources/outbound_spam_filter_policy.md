@@ -7,7 +7,7 @@ description: |-
 
 # msexchangeonline_outbound_spam_filter_policy (Data Source)
 
-Reads an existing object by name, with the attributes of the [`msexchangeonline_outbound_spam_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/outbound_spam_filter_policy) resource. Use it to reference an object that this configuration does not manage, such as a default policy.
+Reads an existing object by `name`, with the attributes of the [`msexchangeonline_outbound_spam_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/outbound_spam_filter_policy) resource. Use it to reference an object that this configuration does not manage, such as a default policy.
 
 ## Example Usage
 
@@ -27,7 +27,7 @@ output "recipient_limit_per_day" {
 
 ### Required
 
-- `name` (String) Name of the outbound spam filter policy.
+- `name` (String) Identifies the object to read.
 
 ### Read-Only
 

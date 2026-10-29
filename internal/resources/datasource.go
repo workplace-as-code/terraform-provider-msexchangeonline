@@ -16,28 +16,67 @@ import (
 
 // Data sources built from resources
 //
-// A data source reads an existing object by name and exposes the attributes
-// of its resource, all computed. It runs the resource's own ImportState and
-// Read, like terraform query does: the data source always reads exactly what
-// the resource reads, and a new attribute of the resource appears in both.
+// A data source reads an existing object by its key (the name, or the domain
+// for DKIM) and exposes the attributes of its resource, all computed. It runs
+// the resource's own ImportState and Read, like terraform query does: the data
+// source always reads exactly what the resource reads, and a new attribute of
+// the resource appears in both.
 
-// dataSourceResources are the resources that also exist as a data source.
-var dataSourceResources = []func() resource.Resource{
-	NewAntiPhishPolicyResource,
-	NewHostedContentFilterPolicyResource,
-	NewMalwareFilterPolicyResource,
-	NewOutboundSpamFilterPolicyResource,
-	NewQuarantinePolicyResource,
-	NewSafeAttachmentPolicyResource,
-	NewSafeLinksPolicyResource,
+// dataSourceResources are the resources that also exist as a data source,
+// and the argument that names the object to read. Tenant-wide settings and
+// objects without a name (allow/block list items, application access
+// policies) have none; accepted domains and the organization config have
+// their own data source in internal/datasources.
+var dataSourceResources = []dataSourceResource{
+	{NewAntiPhishPolicyResource, "name"},
+	{NewAntiPhishRuleResource, "name"},
+	{NewDkimSigningConfigResource, "domain_name"},
+	{NewEmailAddressPolicyResource, "name"},
+	{NewHostedContentFilterPolicyResource, "name"},
+	{NewHostedContentFilterRuleResource, "name"},
+	{NewInboundConnectorResource, "name"},
+	{NewMalwareFilterPolicyResource, "name"},
+	{NewMalwareFilterRuleResource, "name"},
+	{NewMobileDeviceMailboxPolicyResource, "name"},
+	{NewOutboundConnectorResource, "name"},
+	{NewOutboundSpamFilterPolicyResource, "name"},
+	{NewOwaMailboxPolicyResource, "name"},
+	{NewQuarantinePolicyResource, "name"},
+	{NewRemoteDomainResource, "name"},
+	{NewRetentionPolicyResource, "name"},
+	{NewSafeAttachmentPolicyResource, "name"},
+	{NewSafeAttachmentRuleResource, "name"},
+	{NewSafeLinksPolicyResource, "name"},
+	{NewSafeLinksRuleResource, "name"},
+	{NewTransportRuleResource, "name"},
+}
+
+// dataSourceResource pairs a resource with the argument of its data source,
+// whose value is the import ID.
+type dataSourceResource struct {
+	newResource func() resource.Resource
+	key         string
+}
+
+// allDataSourceResources adds the generic resources that are not tenant-wide
+// settings: they are all imported by name.
+func allDataSourceResources() []dataSourceResource {
+	out := append([]dataSourceResource(nil), dataSourceResources...)
+	for _, spec := range objectSpecs {
+		if !spec.singleton {
+			out = append(out, dataSourceResource{newObjectResource(spec), "name"})
+		}
+	}
+	return out
 }
 
 // DataSources returns the data sources built from resources.
 func DataSources() []func() datasource.DataSource {
-	out := make([]func() datasource.DataSource, 0, len(dataSourceResources))
-	for _, newResource := range dataSourceResources {
+	sources := allDataSourceResources()
+	out := make([]func() datasource.DataSource, 0, len(sources))
+	for _, source := range sources {
 		out = append(out, func() datasource.DataSource {
-			return &resourceDataSource{resource: newResource()}
+			return &resourceDataSource{resource: source.newResource(), key: source.key}
 		})
 	}
 	return out
@@ -46,6 +85,7 @@ func DataSources() []func() datasource.DataSource {
 // resourceDataSource is a data source that reads through a resource.
 type resourceDataSource struct {
 	resource resource.Resource
+	key      string
 }
 
 var _ datasource.DataSourceWithConfigure = &resourceDataSource{}
@@ -69,7 +109,7 @@ func (d *resourceDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 	rs := d.resourceSchema(ctx)
 	attrs := make(map[string]dsschema.Attribute, len(rs.Attributes))
 	for name, a := range rs.Attributes {
-		converted, err := dataSourceAttribute(name, a)
+		converted, err := dataSourceAttribute(name == d.key, a)
 		if err != nil {
 			resp.Diagnostics.AddError("Invalid data source schema", err.Error())
 			return
@@ -77,23 +117,24 @@ func (d *resourceDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 		attrs[name] = converted
 	}
 	resp.Schema = dsschema.Schema{
-		MarkdownDescription: fmt.Sprintf("Reads an existing object by name, with the attributes of the "+
+		MarkdownDescription: fmt.Sprintf("Reads an existing object by `%[3]s`, with the attributes of the "+
 			"[`%[1]s`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/%[2]s) resource. "+
 			"Use it to reference an object that this configuration does not manage, such as a default policy.",
-			meta.TypeName, meta.TypeName[len("msexchangeonline_"):]),
+			meta.TypeName, meta.TypeName[len("msexchangeonline_"):], d.key),
 		Attributes: attrs,
 	}
 }
 
 // dataSourceAttribute turns a resource attribute into a computed data source
-// attribute; name is the only argument.
-func dataSourceAttribute(name string, a schema.Attribute) (dsschema.Attribute, error) {
-	required := name == "name"
-	computed := !required
+// attribute; the key, which names the object to read, is the only argument.
+func dataSourceAttribute(key bool, a schema.Attribute) (dsschema.Attribute, error) {
 	desc := a.GetMarkdownDescription()
+	if key {
+		desc = "Identifies the object to read."
+	}
 	switch a := a.(type) {
 	case schema.StringAttribute:
-		return dsschema.StringAttribute{Required: required, Computed: computed, Sensitive: a.Sensitive, MarkdownDescription: desc}, nil
+		return dsschema.StringAttribute{Required: key, Computed: !key, Sensitive: a.Sensitive, MarkdownDescription: desc}, nil
 	case schema.BoolAttribute:
 		return dsschema.BoolAttribute{Computed: true, Sensitive: a.Sensitive, MarkdownDescription: desc}, nil
 	case schema.Int64Attribute:
@@ -103,7 +144,7 @@ func dataSourceAttribute(name string, a schema.Attribute) (dsschema.Attribute, e
 	case schema.SetAttribute:
 		return dsschema.SetAttribute{Computed: true, ElementType: a.ElementType, Sensitive: a.Sensitive, MarkdownDescription: desc}, nil
 	}
-	return nil, fmt.Errorf("attribute %q: %T has no data source equivalent", name, a)
+	return nil, fmt.Errorf("%T has no data source equivalent", a)
 }
 
 func (d *resourceDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
@@ -118,13 +159,13 @@ func (d *resourceDataSource) Configure(ctx context.Context, req datasource.Confi
 
 func (d *resourceDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
 	var name types.String
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root("name"), &name)...)
+	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(d.key), &name)...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	importer, ok := d.resource.(resource.ResourceWithImportState)
 	if !ok {
-		resp.Diagnostics.AddError("Data source not supported", "This resource cannot be imported, so it cannot be read by name.")
+		resp.Diagnostics.AddError("Data source not supported", "This resource cannot be imported, so it cannot be read by "+d.key+".")
 		return
 	}
 
@@ -146,7 +187,7 @@ func (d *resourceDataSource) Read(ctx context.Context, req datasource.ReadReques
 	if read.State.Raw.IsNull() {
 		var meta datasource.MetadataResponse
 		d.Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "msexchangeonline"}, &meta)
-		resp.Diagnostics.AddError("Object not found", fmt.Sprintf("No %s named %q exists in Exchange Online.", meta.TypeName, name.ValueString()))
+		resp.Diagnostics.AddError("Object not found", fmt.Sprintf("No %s with %s %q exists in Exchange Online.", meta.TypeName, d.key, name.ValueString()))
 		return
 	}
 	// Both schemas have the same attributes and types, so the value fits as is.

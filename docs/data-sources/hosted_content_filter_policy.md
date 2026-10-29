@@ -7,7 +7,7 @@ description: |-
 
 # msexchangeonline_hosted_content_filter_policy (Data Source)
 
-Reads an existing object by name, with the attributes of the [`msexchangeonline_hosted_content_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_content_filter_policy) resource. Use it to reference an object that this configuration does not manage, such as a default policy.
+Reads an existing object by `name`, with the attributes of the [`msexchangeonline_hosted_content_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_content_filter_policy) resource. Use it to reference an object that this configuration does not manage, such as a default policy.
 
 ## Example Usage
 
@@ -27,7 +27,7 @@ output "spam_action" {
 
 ### Required
 
-- `name` (String) The name of the spam filter policy. Immutable after creation.
+- `name` (String) Identifies the object to read.
 
 ### Read-Only
 

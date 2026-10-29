@@ -130,12 +130,12 @@ data "msexchangeonline_quarantine_policy" "default" {
 data "msexchangeonline_malware_filter_policy" "test" {
   name       = msexchangeonline_malware_filter_policy.test.name
   depends_on = [msexchangeonline_malware_filter_policy.test]
-}
 
-check "data_sources" {
-  assert {
-    condition     = data.msexchangeonline_malware_filter_policy.test.id == msexchangeonline_malware_filter_policy.test.id
-    error_message = "The malware filter policy data source did not read the test policy."
+  lifecycle {
+    postcondition {
+      condition     = self.id == msexchangeonline_malware_filter_policy.test.id
+      error_message = "The data source read another object than the test one."
+    }
   }
 }
 

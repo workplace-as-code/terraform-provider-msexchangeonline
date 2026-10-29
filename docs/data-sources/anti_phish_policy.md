@@ -7,7 +7,7 @@ description: |-
 
 # msexchangeonline_anti_phish_policy (Data Source)
 
-Reads an existing object by name, with the attributes of the [`msexchangeonline_anti_phish_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_policy) resource. Use it to reference an object that this configuration does not manage, such as a default policy.
+Reads an existing object by `name`, with the attributes of the [`msexchangeonline_anti_phish_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_policy) resource. Use it to reference an object that this configuration does not manage, such as a default policy.
 
 ## Example Usage
 
@@ -27,7 +27,7 @@ output "enable_spoof_intelligence" {
 
 ### Required
 
-- `name` (String) The name of the anti-phishing policy. Immutable after creation.
+- `name` (String) Identifies the object to read.
 
 ### Read-Only
 
