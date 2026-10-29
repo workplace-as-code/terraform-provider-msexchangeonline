@@ -1,11 +1,13 @@
 # exo_rule.ps1 — Generic CRUD for the rules that scope a protection policy to
-# senders or recipients (HostedOutboundSpamFilterRule, ...). Same contract as
-# exo_object.ps1, with the rule specifics:
+# senders or recipients (HostedOutboundSpamFilterRule, ...), and for journal
+# rules. Same contract as exo_object.ps1, with the rule specifics:
 #   - "Enabled" is set with New-<noun> -Enabled, then Enable-<noun> /
-#     Disable-<noun>, and read from the State property
+#     Disable-<noun>, and read from the State property (protection rules) or
+#     the Enabled property (journal rules)
 #   - "Priority" is set after the rule exists: New-<noun> rejects a value
 #     outside 0..(rule count - 1)
-#   - an empty list clears the condition
+#   - an empty list clears the condition, an empty string clears the value
+#     (JournalRule -Recipient: every recipient is journaled)
 
 param(
     [string]$TenantId              = "",
@@ -30,6 +32,8 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot/common.ps1"
 
 $splat = ConvertFrom-BridgeValues $Values
+# The cmdlets reject "" for an address: $null clears it.
+foreach ($k in @($splat.Keys)) { if ($splat[$k] -is [string] -and $splat[$k] -eq "") { $splat[$k] = $null } }
 $props = @(ConvertFrom-BridgeJson $Properties)
 
 # Enabled and Priority are not plain Set-<noun> parameters.
@@ -42,8 +46,9 @@ function Read-BridgeRule {
     $rule = Invoke-BridgeRetry { & "Get-$Noun" -Identity $Identity }
     $out = [ordered]@{ Name = [string]$rule.Name }
     foreach ($p in $props) {
-        $out[$p] = if ($p -eq "Enabled") { [string](Get-BridgeProp $rule "State") -eq "Enabled" }
-                   else { ConvertTo-BridgeValue (Get-BridgeProp $rule $p) }
+        $out[$p] = if ($p -ne "Enabled") { ConvertTo-BridgeValue (Get-BridgeProp $rule $p) }
+                   elseif ($rule.PSObject.Properties["State"]) { [string]$rule.State -eq "Enabled" }
+                   else { [bool](Get-BridgeProp $rule "Enabled") }
     }
     # A condition that was never set comes back as null: report an empty list.
     ConvertTo-Json -Compress -Depth 4 -InputObject $out

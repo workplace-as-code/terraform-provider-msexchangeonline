@@ -336,6 +336,16 @@ resource "msexchangeonline_hosted_outbound_spam_filter_rule" "test" {
   comments                           = local.comment
 }
 
+# Disabled: a journal rule that delivers to an address that does not exist
+# makes Microsoft contact the organization.
+resource "msexchangeonline_journal_rule" "test" {
+  name                  = "TF-CI-Journal"
+  journal_email_address = "tf-ci-journal@tf-ci-test.example"
+  scope                 = local.updated ? "External" : "Global"
+  recipient             = local.updated && var.test_mailbox != "" ? var.test_mailbox : ""
+  enabled               = false
+}
+
 resource "msexchangeonline_tenant_allow_block_list_item" "sender" {
   list_type = "Sender"
   entry     = "tf-ci-blocked@tf-ci-test.example"

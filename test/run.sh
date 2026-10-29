@@ -151,6 +151,7 @@ CREATED=(
   "msexchangeonline_retention_policy_tag.test=TF-CI-RetentionTag"
   "msexchangeonline_hosted_outbound_spam_filter_rule.test=TF-CI-OutboundSpamRule"
   "msexchangeonline_outbound_spam_filter_policy.unscoped=TF-CI-OutboundSpam-Unscoped"
+  "msexchangeonline_journal_rule.test=TF-CI-Journal"
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
 )
