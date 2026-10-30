@@ -17,7 +17,7 @@ description: |-
 
 ## Permissions
 
-The provider's app registration needs the read-only **View-Only Recipients** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+The provider's app registration needs a management role that grants `Get-Mailbox`, such as **Retention Management** or the read-only **View-Only Recipients**. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 ## Microsoft documentation
 

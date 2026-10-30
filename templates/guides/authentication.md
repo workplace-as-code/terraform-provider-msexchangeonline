@@ -59,7 +59,7 @@ Connect-ExchangeOnline   # as an Exchange or Global administrator
 ./tools/new_role_group.ps1 -AppId "<client-id>" -ServicePrincipalObjectId "<enterprise-app-object-id>" -Apply
 ```
 
-Run the script again after upgrading the provider: new resources can need new roles, and the script adds the missing ones to the existing group. It also lists the roles of the group that the provider no longer needs: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted **Mail Recipient Creation**, which can create and delete mailboxes, where the read-only **View-Only Recipients** is enough.
+Run the script again after upgrading the provider: new resources can need new roles, and the script adds the missing ones to the existing group. It also lists the roles of the group that the provider no longer needs: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted **Mail Recipient Creation**, which can create and delete mailboxes, for reads that the other roles of the group already allow.
 
 **Option B — Exchange Administrator role**
 

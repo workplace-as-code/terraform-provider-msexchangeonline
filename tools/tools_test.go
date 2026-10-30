@@ -194,10 +194,28 @@ $byCmdlet4 = @{
   "Get-C" = @("Wide")
 }
 $d = Select-BridgeRoles -RolesByCmdlet $byCmdlet4 -RoleWeight @{ "Small" = 3; "Wide" = 10 }
+# Exchange Online as seen on 2026-10-30: Compliance Admin grants the recipient
+# reads and many writes the provider does not run; Retention Management, needed
+# anyway for the retention policies, also grants the recipient reads.
+$needed = @("Get-Mailbox", "Get-Recipient", "New-RetentionPolicy", "Get-JournalRule", "New-JournalRule")
+$byCmdlet5 = @{
+  "Get-Mailbox"         = @("Compliance Admin", "Retention Management", "View-Only Recipients")
+  "Get-Recipient"       = @("Compliance Admin", "Retention Management", "View-Only Recipients", "Journaling")
+  "New-RetentionPolicy" = @("Retention Management", "Compliance Admin")
+  "Get-JournalRule"     = @("Journaling", "Compliance Admin")
+  "New-JournalRule"     = @("Journaling", "Compliance Admin")
+}
+$weights5 = @{
+  "Compliance Admin"     = Get-RoleWeight -Needed $needed -Cmdlets ($needed + @($gets[0..39]) + $writes)
+  "Retention Management" = Get-RoleWeight -Needed $needed -Cmdlets @("Get-Mailbox", "Get-Recipient", "New-RetentionPolicy", "Get-Thing1")
+  "View-Only Recipients" = Get-RoleWeight -Needed $needed -Cmdlets (@("Get-Mailbox", "Get-Recipient") + $gets)
+  "Journaling"           = Get-RoleWeight -Needed $needed -Cmdlets @("Get-Recipient", "Get-JournalRule", "New-JournalRule")
+}
+$e = Select-BridgeRoles -RolesByCmdlet $byCmdlet5 -RoleWeight $weights5
 $err = ""
 try { Select-BridgeRoles -RolesByCmdlet @{ "Get-Nothing" = @() } | Out-Null } catch { $err = $_.Exception.Message }
-$w = Get-RoleWeight -Cmdlets @("Get-A", "Get-B", "Set-A")
-@{ a = @($a); b = @($b); c = @($c); d = @($d); err = $err; w = $w } | ConvertTo-Json -Compress
+$w = Get-RoleWeight -Cmdlets @("Get-A", "Get-B", "Set-A", "Set-B") -Needed @("Set-B")
+@{ a = @($a); b = @($b); c = @($c); d = @($d); e = @($e); err = $err; w = $w } | ConvertTo-Json -Compress
 `
 	cmd := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script)
 	out, err := cmd.CombinedOutput()
@@ -209,6 +227,7 @@ $w = Get-RoleWeight -Cmdlets @("Get-A", "Get-B", "Set-A")
 		B   []string `json:"b"`
 		C   []string `json:"c"`
 		D   []string `json:"d"`
+		E   []string `json:"e"`
 		Err string   `json:"err"`
 		W   int      `json:"w"`
 	}
@@ -227,8 +246,11 @@ $w = Get-RoleWeight -Cmdlets @("Get-A", "Get-B", "Set-A")
 	if strings.Join(res.D, ",") != "Wide" {
 		t.Errorf("a role covered by the others must be dropped: got %v", res.D)
 	}
-	if res.W != 103 {
-		t.Errorf("weight of two Get- and one Set- cmdlet: got %d, want 103", res.W)
+	if strings.Join(res.E, ",") != "Journaling,Retention Management" {
+		t.Errorf("roles needed anyway must cover the recipient reads: got %v", res.E)
+	}
+	if res.W != 104 {
+		t.Errorf("weight of two Get-, one needed and one unneeded Set- cmdlet: got %d, want 104", res.W)
 	}
 	if !strings.Contains(res.Err, "Get-Nothing") {
 		t.Errorf("uncovered cmdlet not reported: %q", res.Err)
@@ -246,7 +268,10 @@ $env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
 . ./` + roleGroupScript + `
 $full = Select-FullRoles -ParameterCount @{ "Organization Configuration" = 126; "Mail Tips" = 12; "Wider" = 130 }
 $none = Select-FullRoles -ParameterCount @{}
-@{ full = @($full); none = @($none) } | ConvertTo-Json -Compress
+# Get-Mailbox in Exchange Online: Compliance Admin grants more parameters than
+# the read-only View-Only Recipients, which must stay a candidate.
+$read = Select-FullRoles -Read -ParameterCount @{ "Compliance Admin" = 34; "View-Only Recipients" = 28; "Retention Management" = 21 }
+@{ full = @($full); none = @($none); read = @($read) } | ConvertTo-Json -Compress
 `
 	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
 	if err != nil {
@@ -255,11 +280,15 @@ $none = Select-FullRoles -ParameterCount @{}
 	var res struct {
 		Full []string `json:"full"`
 		None []string `json:"none"`
+		Read []string `json:"read"`
 	}
 	if err := json.Unmarshal(out, &res); err != nil {
 		t.Fatalf("output %q: %v", out, err)
 	}
 	if strings.Join(res.Full, ",") != "Organization Configuration,Wider" || len(res.None) != 0 {
 		t.Errorf("got %+v, want the two roles with (almost) every parameter and nothing for no role", res)
+	}
+	if strings.Join(res.Read, ",") != "Compliance Admin,Retention Management,View-Only Recipients" {
+		t.Errorf("a read keeps every role: got %v", res.Read)
 	}
 }

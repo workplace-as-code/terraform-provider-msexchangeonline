@@ -252,12 +252,14 @@ function Select-BridgeRoles {
 }
 
 # Get-RoleWeight weighs a role by what it allows: each cmdlet counts once, and
-# each cmdlet that is not a Get- cmdlet counts $WriteWeight times more. Mail
-# Recipient Creation (Get-Mailbox, but also New-Mailbox and Remove-Mailbox)
-# then weighs far more than View-Only Recipients, which only reads.
+# each write cmdlet (not Get-) that the provider does not run counts
+# $WriteWeight times more. Mail Recipient Creation (Get-Mailbox, but also
+# New-Mailbox and Remove-Mailbox) then weighs far more than View-Only
+# Recipients, which only reads, while Transport Rules stays light: the provider
+# runs its write cmdlets.
 function Get-RoleWeight {
-    param([string[]]$Cmdlets, [int]$WriteWeight = 100)
-    $write = @($Cmdlets | Where-Object { $_ -notlike "Get-*" }).Count
+    param([string[]]$Cmdlets, [string[]]$Needed = @(), [int]$WriteWeight = 100)
+    $write = @($Cmdlets | Where-Object { $_ -notlike "Get-*" -and $Needed -notcontains $_ }).Count
     $Cmdlets.Count + $WriteWeight * $write
 }
 
@@ -265,9 +267,13 @@ function Get-RoleWeight {
 # grant (almost) all its parameters. A role can grant a cmdlet with only some
 # of them: Mail Tips grants Set-OrganizationConfig for the MailTips*
 # parameters only. $ParameterCount maps each role to its parameter count.
+# -Read keeps every role: the bridge reads with -Identity at most, and a broad
+# role granting more parameters (Compliance Admin for Get-Mailbox) must not
+# push out the read-only ones.
 function Select-FullRoles {
-    param([hashtable]$ParameterCount)
+    param([hashtable]$ParameterCount, [switch]$Read)
     if ($ParameterCount.Count -eq 0) { return @() }
+    if ($Read) { return @($ParameterCount.Keys | Sort-Object) }
     $max = ($ParameterCount.Values | Measure-Object -Maximum).Maximum
     @($ParameterCount.Keys | Where-Object { $ParameterCount[$_] -ge 0.9 * $max } | Sort-Object)
 }
@@ -292,14 +298,14 @@ foreach ($cmdlet in $ProviderCmdlets) {
     foreach ($entry in @(Get-ManagementRoleEntry "*\$cmdlet" -ErrorAction SilentlyContinue)) {
         if ($endUserRoles -notcontains [string]$entry.Role) { $counts[[string]$entry.Role] = @($entry.Parameters).Count }
     }
-    $rolesByCmdlet[$cmdlet] = Select-FullRoles -ParameterCount $counts
+    $rolesByCmdlet[$cmdlet] = Select-FullRoles -ParameterCount $counts -Read:($cmdlet -like "Get-*")
 }
 if ($skipped.Count -gt 0) {
     Write-Warning ("Not available in this organization, skipped: $($skipped -join ', '). These cmdlets need a license " +
         "(Safe Links and Safe Attachments need Defender for Office 365): run the script again after adding the license.")
 }
 foreach ($role in ($rolesByCmdlet.Values | ForEach-Object { $_ } | Sort-Object -Unique)) {
-    $roleWeight[$role] = Get-RoleWeight -Cmdlets @(Get-ManagementRoleEntry "$role\*" | ForEach-Object { [string]$_.Name })
+    $roleWeight[$role] = Get-RoleWeight -Needed $ProviderCmdlets -Cmdlets @(Get-ManagementRoleEntry "$role\*" | ForEach-Object { [string]$_.Name })
 }
 
 $selected = Select-BridgeRoles -RolesByCmdlet $rolesByCmdlet -RoleWeight $roleWeight
