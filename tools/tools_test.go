@@ -16,10 +16,11 @@ import (
 const roleGroupScript = "new_role_group.ps1"
 
 var (
-	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
-	functionRe = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
-	listRe     = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
-	rolesRe    = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
+	cmdletRe    = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
+	functionRe  = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
+	listRe      = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
+	rolesRe     = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
+	retentionRe = regexp.MustCompile(`(?s)\$RetentionCmdlets = @\((.*?)\n\)`)
 	// guideRoleRe matches the role list of the authentication guide: one
 	// "- **Role**" item per role, alone on its line.
 	guideRoleRe = regexp.MustCompile(`(?m)^- \*\*([^*]+)\*\*$`)
@@ -211,5 +212,34 @@ func TestGuideListsTheProviderRoles(t *testing.T) {
 	}
 	if strings.Join(documented, ",") != strings.Join(roles, ",") {
 		t.Errorf("the authentication guide lists %v, the script grants %v", documented, roles)
+	}
+}
+
+// TestRetentionRoleKeepsTheRetentionCmdlets checks the custom retention role:
+// it keeps exactly the retention cmdlets of the bridge and Get-Mailbox, so a
+// new retention cmdlet in a script cannot be forgotten.
+func TestRetentionRoleKeepsTheRetentionCmdlets(t *testing.T) {
+	script, err := os.ReadFile(roleGroupScript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := retentionRe.FindStringSubmatch(string(script))
+	if block == nil {
+		t.Fatal("$RetentionCmdlets list not found")
+	}
+	var kept []string
+	for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
+		kept = append(kept, m[1])
+	}
+	want := []string{"Get-Mailbox"}
+	for _, c := range bridgeCmdlets(t) {
+		if strings.Contains(c, "-Retention") {
+			want = append(want, c)
+		}
+	}
+	sort.Strings(kept)
+	sort.Strings(want)
+	if strings.Join(kept, ",") != strings.Join(want, ",") {
+		t.Errorf("$RetentionCmdlets is %v, the bridge runs %v", kept, want)
 	}
 }

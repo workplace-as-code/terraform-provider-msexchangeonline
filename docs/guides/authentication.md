@@ -45,7 +45,7 @@ Choose one option.
 
 **Option A — Least-privilege role group (recommended)**
 
-[`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) creates a role group with only the management roles that contain the cmdlets the provider runs, and adds the app to it. Unlike Exchange Administrator, the group cannot manage mailboxes or other recipients. Its roles:
+[`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) creates a role group with only the management roles that contain the cmdlets the provider runs, and adds the app to it. Unlike Exchange Administrator, the group cannot create, delete or change mailboxes and other recipients. Its roles:
 
 - **E-Mail Address Policies**
 - **Journaling**
@@ -53,11 +53,11 @@ Choose one option.
 - **Organization Transport Settings**
 - **Recipient Policies**
 - **Remote and Accepted Domains**
-- **Retention Management**
 - **Transport Hygiene**
 - **Transport Rules**
+- `terraform-msexchangeonline Retention`, a custom role that the script creates from **Retention Management** with only the retention policy and tag cmdlets and `Get-Mailbox`. The built-in role can also lift litigation holds and disable accounts.
 
-The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one.
+The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one. Run it as an administrator who can manage roles (Organization Management).
 
 You need the Object ID of the app's **service principal**: **Entra admin center → Enterprise applications → terraform-msexchangeonline → Object ID**. It differs from the Object ID shown under App registrations.
 
@@ -71,7 +71,7 @@ Connect-ExchangeOnline   # as an Exchange or Global administrator
 ./tools/new_role_group.ps1 -AppId "<client-id>" -ServicePrincipalObjectId "<enterprise-app-object-id>" -Apply
 ```
 
-Run the script again after upgrading the provider: it adds the roles a new version needs to the existing group, and lists the roles of the group that are not in the list above: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted Mail Recipient Creation, which can create and delete mailboxes: run the script with `-Apply -RemoveExtraRoles` to remove it.
+Run the script again after upgrading the provider: it adds the roles a new version needs to the existing group, and lists the roles of the group that are not in the list above: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted Mail Recipient Creation, which can create and delete mailboxes, and Retention Management: run the script with `-Apply -RemoveExtraRoles` to replace them.
 
 **Option B — Exchange Administrator role**
 
