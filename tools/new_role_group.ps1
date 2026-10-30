@@ -5,13 +5,13 @@
     provider's app registration to it.
 
 .DESCRIPTION
-    The provider only needs the management roles that contain the cmdlets its
-    bridge scripts run. This script asks Exchange Online which roles contain
-    each of those cmdlets (Get-ManagementRole -Cmdlet), picks a small set of
-    roles that covers all of them, then creates the role group and adds the
-    app's service principal to it.
+    The role group gets the management roles listed in $ProviderRoles, chosen
+    by hand: the narrowest roles that contain the cmdlets the bridge scripts
+    run, with no role that can manage recipients. The script does not pick
+    roles itself: it checks with Exchange Online that these roles still
+    contain every cmdlet of the provider, and stops if one is missing.
 
-    Without -Apply, the script only prints the roles it would use.
+    Without -Apply, the script only checks the roles and shows what it would do.
 
     Run it from an Exchange Online PowerShell session opened by an
     administrator (Connect-ExchangeOnline), with ExchangeOnlineManagement 3.x.
@@ -28,16 +28,17 @@
     Name of the role group to create.
 
 .PARAMETER Apply
-    Create the role group and add the service principal. Without it, the
-    script only shows what it would do.
+    Create the role group, or add the missing roles to it, and add the
+    service principal. Without it, the script only shows what it would do.
+
 .PARAMETER RemoveExtraRoles
-    With -Apply, also remove from an existing role group the roles the
-    provider no longer needs. Without it, the script only lists them.
+    With -Apply, also remove from an existing role group the roles that are
+    not in $ProviderRoles. Without it, the script only lists them.
 
 .EXAMPLE
     ./new_role_group.ps1
 
-    Lists the management roles the provider needs.
+    Checks the roles and shows what the script would change.
 
 .EXAMPLE
     ./new_role_group.ps1 -AppId <client-id> -ServicePrincipalObjectId <object-id> -Apply
@@ -53,6 +54,22 @@ param(
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+# The management roles of the role group. Change this list only in a pull
+# request, after checking what the new role allows: the docs list the same
+# roles (a unit test compares them). Get-Mailbox and Get-Recipient come with
+# Retention Management and Journaling: no recipient management role is needed.
+$ProviderRoles = @(
+    "E-Mail Address Policies",
+    "Journaling",
+    "Organization Configuration",
+    "Organization Transport Settings",
+    "Recipient Policies",
+    "Remote and Accepted Domains",
+    "Retention Management",
+    "Transport Hygiene",
+    "Transport Rules"
+)
 
 # Every Exchange cmdlet run by the provider's bridge scripts (bridge/scripts).
 # A unit test (tools/tools_test.go) fails when this list drifts from the scripts.
@@ -205,77 +222,14 @@ $ProviderCmdlets = @(
     "Set-TransportRule"
 )
 
-# Select-BridgeRoles returns a small set of roles that together contain every
-# cmdlet. $RolesByCmdlet maps each cmdlet to the names of the roles containing it,
-# $RoleWeight each role to its weight (see Get-RoleWeight).
-# Weighted greedy set cover: repeatedly take the role whose cmdlets are most
-# useful, i.e. the highest ratio of still-needed cmdlets to its weight. A narrow
-# role such as "Transport Rules" therefore wins over a broad role that happens
-# to contain the same cmdlets plus hundreds of others, and a read-only role over
-# one that also writes. A last pass drops the selected roles, heaviest first,
-# whose cmdlets the other selected roles already cover.
-function Select-BridgeRoles {
-    param([hashtable]$RolesByCmdlet, [hashtable]$RoleWeight = @{})
-    $missing = @($RolesByCmdlet.Keys | Where-Object { @($RolesByCmdlet[$_]).Count -eq 0 })
-    if ($missing.Count -gt 0) { throw "No management role contains: $($missing -join ', ')" }
-
-    $remaining = [System.Collections.Generic.HashSet[string]]::new([string[]]@($RolesByCmdlet.Keys))
-    $selected  = [System.Collections.Generic.List[string]]::new()
-    while ($remaining.Count -gt 0) {
-        $coverage = @{}
-        foreach ($cmdlet in $remaining) {
-            foreach ($role in @($RolesByCmdlet[$cmdlet])) { $coverage[$role] = 1 + [int]$coverage[$role] }
-        }
-        $best = $coverage.GetEnumerator() |
-            Sort-Object @{ Expression = {
-                            $weight = if ($RoleWeight.ContainsKey($_.Key) -and $RoleWeight[$_.Key] -gt 0) { $RoleWeight[$_.Key] } else { $_.Value }
-                            $_.Value / $weight }; Descending = $true },
-                        @{ Expression = { $_.Value }; Descending = $true },
-                        @{ Expression = { $_.Key } } |
-            Select-Object -First 1
-        $selected.Add($best.Key)
-        foreach ($cmdlet in @($remaining)) {
-            if (@($RolesByCmdlet[$cmdlet]) -contains $best.Key) { [void]$remaining.Remove($cmdlet) }
-        }
-    }
-
-    $heaviestFirst = @($selected | Sort-Object @{ Expression = { [int]$RoleWeight[$_] }; Descending = $true }, @{ Expression = { $_ } })
-    foreach ($role in $heaviestFirst) {
-        $others = @($selected | Where-Object { $_ -ne $role })
-        $covered = $true
-        foreach ($cmdlet in $RolesByCmdlet.Keys) {
-            if (-not @($RolesByCmdlet[$cmdlet] | Where-Object { $others -contains $_ })) { $covered = $false; break }
-        }
-        if ($covered) { [void]$selected.Remove($role) }
-    }
-    @($selected | Sort-Object)
-}
-
-# Get-RoleWeight weighs a role by what it allows: each cmdlet counts once, and
-# each write cmdlet (not Get-) that the provider does not run counts
-# $WriteWeight times more. Mail Recipient Creation (Get-Mailbox, but also
-# New-Mailbox and Remove-Mailbox) then weighs far more than View-Only
-# Recipients, which only reads, while Transport Rules stays light: the provider
-# runs its write cmdlets.
-function Get-RoleWeight {
-    param([string[]]$Cmdlets, [string[]]$Needed = @(), [int]$WriteWeight = 100)
-    $write = @($Cmdlets | Where-Object { $_ -notlike "Get-*" -and $Needed -notcontains $_ }).Count
-    $Cmdlets.Count + $WriteWeight * $write
-}
-
-# Select-FullRoles keeps, among the roles that contain a cmdlet, the ones that
-# grant (almost) all its parameters. A role can grant a cmdlet with only some
-# of them: Mail Tips grants Set-OrganizationConfig for the MailTips*
-# parameters only. $ParameterCount maps each role to its parameter count.
-# -Read keeps every role: the bridge reads with -Identity at most, and a broad
-# role granting more parameters (Compliance Admin for Get-Mailbox) must not
-# push out the read-only ones.
-function Select-FullRoles {
-    param([hashtable]$ParameterCount, [switch]$Read)
-    if ($ParameterCount.Count -eq 0) { return @() }
-    if ($Read) { return @($ParameterCount.Keys | Sort-Object) }
-    $max = ($ParameterCount.Values | Measure-Object -Maximum).Maximum
-    @($ParameterCount.Keys | Where-Object { $ParameterCount[$_] -ge 0.9 * $max } | Sort-Object)
+# Find-UncoveredCmdlets returns the cmdlets that none of $Roles contains.
+# $RolesByCmdlet maps each cmdlet to the names of the roles containing it.
+function Find-UncoveredCmdlets {
+    param([hashtable]$RolesByCmdlet, [string[]]$Roles)
+    @($RolesByCmdlet.Keys | Where-Object {
+        $cmdlet = $_
+        -not @($RolesByCmdlet[$cmdlet] | Where-Object { $Roles -contains $_ })
+    } | Sort-Object)
 }
 
 # Allows the test suite to load the functions without running anything.
@@ -285,51 +239,53 @@ if (-not (Get-Command Get-ManagementRole -ErrorAction SilentlyContinue)) {
     throw "Connect to Exchange Online first: Connect-ExchangeOnline"
 }
 
-Write-Host "Looking up the management roles for $($ProviderCmdlets.Count) cmdlets..."
+Write-Host "Checking that $($ProviderRoles.Count) roles contain the $($ProviderCmdlets.Count) cmdlets of the provider..."
+$unknownRoles = @($ProviderRoles | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
+if ($unknownRoles.Count -gt 0) {
+    throw "These roles do not exist in this organization: $($unknownRoles -join ', ')"
+}
+
 $rolesByCmdlet = @{}
-$roleWeight = @{}
 $skipped = @()
-$endUserRoles = @(Get-ManagementRole | Where-Object { $_.IsEndUserRole } | ForEach-Object { [string]$_.Name })
 foreach ($cmdlet in $ProviderCmdlets) {
     # Some cmdlets only exist with a license (Safe Links and Safe Attachments
     # need Defender for Office 365): the organization has no role for them.
     if (-not (Get-Command $cmdlet -ErrorAction SilentlyContinue)) { $skipped += $cmdlet; continue }
-    $counts = @{}
-    foreach ($entry in @(Get-ManagementRoleEntry "*\$cmdlet" -ErrorAction SilentlyContinue)) {
-        if ($endUserRoles -notcontains [string]$entry.Role) { $counts[[string]$entry.Role] = @($entry.Parameters).Count }
-    }
-    $rolesByCmdlet[$cmdlet] = Select-FullRoles -ParameterCount $counts -Read:($cmdlet -like "Get-*")
+    $rolesByCmdlet[$cmdlet] = @(Get-ManagementRoleEntry "*\$cmdlet" -ErrorAction SilentlyContinue |
+        ForEach-Object { [string]$_.Role } | Sort-Object -Unique)
 }
 if ($skipped.Count -gt 0) {
     Write-Warning ("Not available in this organization, skipped: $($skipped -join ', '). These cmdlets need a license " +
         "(Safe Links and Safe Attachments need Defender for Office 365): run the script again after adding the license.")
 }
-foreach ($role in ($rolesByCmdlet.Values | ForEach-Object { $_ } | Sort-Object -Unique)) {
-    $roleWeight[$role] = Get-RoleWeight -Needed $ProviderCmdlets -Cmdlets @(Get-ManagementRoleEntry "$role\*" | ForEach-Object { [string]$_.Name })
+
+$uncovered = @(Find-UncoveredCmdlets -RolesByCmdlet $rolesByCmdlet -Roles $ProviderRoles)
+if ($uncovered.Count -gt 0) {
+    $details = $uncovered | ForEach-Object { "  - $_ (in: $(@($rolesByCmdlet[$_]) -join ', '))" }
+    throw ("The roles of the provider no longer contain these cmdlets:`n$($details -join "`n")`n" +
+        "Exchange Online has moved them: please open an issue on the provider, with this output.")
 }
 
-$selected = Select-BridgeRoles -RolesByCmdlet $rolesByCmdlet -RoleWeight $roleWeight
 Write-Host ""
-Write-Host "Management roles needed by the provider:"
-$selected | ForEach-Object { Write-Host "  - $_" }
+Write-Host "Management roles of '$RoleGroupName':"
+$ProviderRoles | ForEach-Object { Write-Host "  - $_" }
 
-# Roles of an existing role group that the provider no longer needs, for
-# example Mail Recipient Creation, chosen by earlier versions of this script.
+# Roles of an existing role group that are not in the list, for example Mail
+# Recipient Creation, granted by versions before 0.3.1.
 $extra = @()
 if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
     $current = @((Get-RoleGroup -Identity $RoleGroupName).Roles | ForEach-Object { (Get-ManagementRole -Identity $_).Name })
-    $extra = @($current | Where-Object { $selected -notcontains $_ } | Sort-Object)
+    $extra = @($current | Where-Object { $ProviderRoles -notcontains $_ } | Sort-Object)
 }
 if ($extra.Count -gt 0 -and -not ($Apply -and $RemoveExtraRoles)) {
     Write-Host ""
     Write-Warning ("'$RoleGroupName' has roles the provider does not need: $($extra -join ', '). " +
-        "Remove them with -Apply -RemoveExtraRoles, or one by one with: " +
-        "Get-ManagementRoleAssignment -RoleAssignee '$RoleGroupName' -Role '<role>' | Remove-ManagementRoleAssignment")
+        "Remove them with -Apply -RemoveExtraRoles.")
 }
 
 if (-not $Apply) {
     Write-Host ""
-    Write-Host "Nothing changed. Run again with -AppId, -ServicePrincipalObjectId and -Apply to create '$RoleGroupName'."
+    Write-Host "Nothing changed. Run again with -AppId, -ServicePrincipalObjectId and -Apply to create or update '$RoleGroupName'."
     return
 }
 if (-not $AppId -or -not $ServicePrincipalObjectId) {
@@ -344,7 +300,7 @@ if (-not $sp) {
 
 if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
     $current = @((Get-RoleGroup -Identity $RoleGroupName).Roles | ForEach-Object { (Get-ManagementRole -Identity $_).Name })
-    foreach ($role in $selected | Where-Object { $current -notcontains $_ }) {
+    foreach ($role in $ProviderRoles | Where-Object { $current -notcontains $_ }) {
         New-ManagementRoleAssignment -SecurityGroup $RoleGroupName -Role $role | Out-Null
         Write-Host "Added role '$role' to '$RoleGroupName'."
     }
@@ -357,7 +313,7 @@ if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
         }
     }
 } else {
-    New-RoleGroup -Name $RoleGroupName -Roles $selected -Description "Least-privilege roles for the workplace-as-code/msexchangeonline Terraform provider" | Out-Null
+    New-RoleGroup -Name $RoleGroupName -Roles $ProviderRoles -Description "Least-privilege roles for the workplace-as-code/msexchangeonline Terraform provider" | Out-Null
     Write-Host "Created role group '$RoleGroupName'."
 }
 
@@ -366,4 +322,4 @@ if ($members -notcontains [string]$sp.Identity) {
     Add-RoleGroupMember -Identity $RoleGroupName -Member $sp.Identity
     Write-Host "Added the app's service principal to '$RoleGroupName'."
 }
-Write-Host "Done. New permissions can take a while to apply to new sessions."
+Write-Host "Done. New permissions can take a while, sometimes more than an hour, to apply to new sessions."

@@ -45,7 +45,19 @@ Choose one option.
 
 **Option A — Least-privilege role group (recommended)**
 
-The provider only needs the management roles that contain the cmdlets it runs. [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) asks Exchange Online which roles contain those cmdlets, creates a role group with just those roles and adds the app to it. Unlike Exchange Administrator, the group contains nothing the provider does not use. Review the list printed by the first run before applying it.
+[`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) creates a role group with only the management roles that contain the cmdlets the provider runs, and adds the app to it. Unlike Exchange Administrator, the group cannot manage mailboxes or other recipients. Its roles:
+
+- **E-Mail Address Policies**
+- **Journaling**
+- **Organization Configuration**
+- **Organization Transport Settings**
+- **Recipient Policies**
+- **Remote and Accepted Domains**
+- **Retention Management**
+- **Transport Hygiene**
+- **Transport Rules**
+
+The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one.
 
 You need the Object ID of the app's **service principal**: **Entra admin center → Enterprise applications → terraform-msexchangeonline → Object ID**. It differs from the Object ID shown under App registrations.
 
@@ -59,7 +71,7 @@ Connect-ExchangeOnline   # as an Exchange or Global administrator
 ./tools/new_role_group.ps1 -AppId "<client-id>" -ServicePrincipalObjectId "<enterprise-app-object-id>" -Apply
 ```
 
-Run the script again after upgrading the provider: new resources can need new roles, and the script adds the missing ones to the existing group. It also lists the roles of the group that the provider no longer needs: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted **Mail Recipient Creation**, which can create and delete mailboxes, for reads that the other roles of the group already allow.
+Run the script again after upgrading the provider: it adds the roles a new version needs to the existing group, and lists the roles of the group that are not in the list above: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted Mail Recipient Creation, which can create and delete mailboxes: run the script with `-Apply -RemoveExtraRoles` to remove it.
 
 **Option B — Exchange Administrator role**
 
