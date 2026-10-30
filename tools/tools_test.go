@@ -153,8 +153,8 @@ func TestSelectBridgeRoles(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh not installed")
 	}
-	// "Broad" contains every needed cmdlet but 500 cmdlets in total: the two
-	// narrow roles must be preferred even though it takes two of them.
+	// "Broad" contains every needed cmdlet but weighs 500: the two narrow roles
+	// must be preferred even though it takes two of them.
 	script := `
 $env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
 . ./` + roleGroupScript + `
@@ -163,16 +163,41 @@ $byCmdlet = @{
   "Set-TransportRule" = @("Transport Rules", "Broad")
   "Get-RemoteDomain"  = @("Remote and Accepted Domains", "Broad")
 }
-$a = Select-BridgeRoles -RolesByCmdlet $byCmdlet -RoleSize @{ "Broad" = 500; "Transport Rules" = 10; "Remote and Accepted Domains" = 12 }
+$a = Select-BridgeRoles -RolesByCmdlet $byCmdlet -RoleWeight @{ "Broad" = 500; "Transport Rules" = 10; "Remote and Accepted Domains" = 12 }
 $byCmdlet2 = @{
   "Get-TransportRule" = @("Transport Rules", "Big Transport")
   "Set-TransportRule" = @("Transport Rules", "Big Transport")
   "Get-RemoteDomain"  = @("Remote and Accepted Domains")
 }
-$b = Select-BridgeRoles -RolesByCmdlet $byCmdlet2 -RoleSize @{ "Big Transport" = 300; "Transport Rules" = 10; "Remote and Accepted Domains" = 12 }
+$b = Select-BridgeRoles -RolesByCmdlet $byCmdlet2 -RoleWeight @{ "Big Transport" = 300; "Transport Rules" = 10; "Remote and Accepted Domains" = 12 }
+# What Exchange Online returns for the two recipient cmdlets of the bridge:
+# three roles grant all their parameters, only View-Only Recipients just reads.
+# It is the largest of the three, so weighing roles by size alone picks Mail
+# Recipient Creation.
+$gets = 1..80 | ForEach-Object { "Get-Thing$_" }
+$writes = 1..35 | ForEach-Object { "New-Thing$_" }
+$byCmdlet3 = @{
+  "Get-Mailbox"   = @("Mail Recipient Creation", "Mail Recipients", "View-Only Recipients")
+  "Get-Recipient" = @("Mail Recipient Creation", "Mail Recipients", "View-Only Recipients")
+}
+$weights = @{
+  "Mail Recipient Creation" = Get-RoleWeight -Cmdlets (@($gets[0..29]) + $writes)
+  "Mail Recipients"         = Get-RoleWeight -Cmdlets ($gets + $writes + $writes)
+  "View-Only Recipients"    = Get-RoleWeight -Cmdlets $gets
+}
+$c = Select-BridgeRoles -RolesByCmdlet $byCmdlet3 -RoleWeight $weights
+# "Small" is taken first (best ratio), then "Wide" for the rest: Wide also
+# covers Get-A, so Small is dropped.
+$byCmdlet4 = @{
+  "Get-A" = @("Small", "Wide")
+  "Get-B" = @("Wide")
+  "Get-C" = @("Wide")
+}
+$d = Select-BridgeRoles -RolesByCmdlet $byCmdlet4 -RoleWeight @{ "Small" = 3; "Wide" = 10 }
 $err = ""
 try { Select-BridgeRoles -RolesByCmdlet @{ "Get-Nothing" = @() } | Out-Null } catch { $err = $_.Exception.Message }
-@{ a = @($a); b = @($b); err = $err } | ConvertTo-Json -Compress
+$w = Get-RoleWeight -Cmdlets @("Get-A", "Get-B", "Set-A")
+@{ a = @($a); b = @($b); c = @($c); d = @($d); err = $err; w = $w } | ConvertTo-Json -Compress
 `
 	cmd := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script)
 	out, err := cmd.CombinedOutput()
@@ -182,7 +207,10 @@ try { Select-BridgeRoles -RolesByCmdlet @{ "Get-Nothing" = @() } | Out-Null } ca
 	var res struct {
 		A   []string `json:"a"`
 		B   []string `json:"b"`
+		C   []string `json:"c"`
+		D   []string `json:"d"`
 		Err string   `json:"err"`
+		W   int      `json:"w"`
 	}
 	if err := json.Unmarshal(out, &res); err != nil {
 		t.Fatalf("output %q: %v", out, err)
@@ -192,6 +220,15 @@ try { Select-BridgeRoles -RolesByCmdlet @{ "Get-Nothing" = @() } | Out-Null } ca
 	}
 	if strings.Join(res.B, ",") != "Remote and Accepted Domains,Transport Rules" {
 		t.Errorf("got %v", res.B)
+	}
+	if strings.Join(res.C, ",") != "View-Only Recipients" {
+		t.Errorf("a read-only role must beat roles that also write: got %v", res.C)
+	}
+	if strings.Join(res.D, ",") != "Wide" {
+		t.Errorf("a role covered by the others must be dropped: got %v", res.D)
+	}
+	if res.W != 103 {
+		t.Errorf("weight of two Get- and one Set- cmdlet: got %d, want 103", res.W)
 	}
 	if !strings.Contains(res.Err, "Get-Nothing") {
 		t.Errorf("uncovered cmdlet not reported: %q", res.Err)

@@ -30,6 +30,9 @@
 .PARAMETER Apply
     Create the role group and add the service principal. Without it, the
     script only shows what it would do.
+.PARAMETER RemoveExtraRoles
+    With -Apply, also remove from an existing role group the roles the
+    provider no longer needs. Without it, the script only lists them.
 
 .EXAMPLE
     ./new_role_group.ps1
@@ -44,7 +47,8 @@ param(
     [string]$AppId = "",
     [string]$ServicePrincipalObjectId = "",
     [string]$RoleGroupName = "terraform-msexchangeonline",
-    [switch]$Apply
+    [switch]$Apply,
+    [switch]$RemoveExtraRoles
 )
 
 Set-StrictMode -Version Latest
@@ -202,13 +206,16 @@ $ProviderCmdlets = @(
 )
 
 # Select-BridgeRoles returns a small set of roles that together contain every
-# cmdlet. $RolesByCmdlet maps each cmdlet to the names of the roles containing it.
+# cmdlet. $RolesByCmdlet maps each cmdlet to the names of the roles containing it,
+# $RoleWeight each role to its weight (see Get-RoleWeight).
 # Weighted greedy set cover: repeatedly take the role whose cmdlets are most
-# useful, i.e. the highest ratio of still-needed cmdlets to all cmdlets in the
-# role. A narrow role such as "Transport Rules" therefore wins over a broad
-# role that happens to contain the same cmdlets plus hundreds of others.
+# useful, i.e. the highest ratio of still-needed cmdlets to its weight. A narrow
+# role such as "Transport Rules" therefore wins over a broad role that happens
+# to contain the same cmdlets plus hundreds of others, and a read-only role over
+# one that also writes. A last pass drops the selected roles, heaviest first,
+# whose cmdlets the other selected roles already cover.
 function Select-BridgeRoles {
-    param([hashtable]$RolesByCmdlet, [hashtable]$RoleSize = @{})
+    param([hashtable]$RolesByCmdlet, [hashtable]$RoleWeight = @{})
     $missing = @($RolesByCmdlet.Keys | Where-Object { @($RolesByCmdlet[$_]).Count -eq 0 })
     if ($missing.Count -gt 0) { throw "No management role contains: $($missing -join ', ')" }
 
@@ -221,8 +228,8 @@ function Select-BridgeRoles {
         }
         $best = $coverage.GetEnumerator() |
             Sort-Object @{ Expression = {
-                            $size = if ($RoleSize.ContainsKey($_.Key) -and $RoleSize[$_.Key] -gt 0) { $RoleSize[$_.Key] } else { $_.Value }
-                            $_.Value / $size }; Descending = $true },
+                            $weight = if ($RoleWeight.ContainsKey($_.Key) -and $RoleWeight[$_.Key] -gt 0) { $RoleWeight[$_.Key] } else { $_.Value }
+                            $_.Value / $weight }; Descending = $true },
                         @{ Expression = { $_.Value }; Descending = $true },
                         @{ Expression = { $_.Key } } |
             Select-Object -First 1
@@ -231,7 +238,27 @@ function Select-BridgeRoles {
             if (@($RolesByCmdlet[$cmdlet]) -contains $best.Key) { [void]$remaining.Remove($cmdlet) }
         }
     }
+
+    $heaviestFirst = @($selected | Sort-Object @{ Expression = { [int]$RoleWeight[$_] }; Descending = $true }, @{ Expression = { $_ } })
+    foreach ($role in $heaviestFirst) {
+        $others = @($selected | Where-Object { $_ -ne $role })
+        $covered = $true
+        foreach ($cmdlet in $RolesByCmdlet.Keys) {
+            if (-not @($RolesByCmdlet[$cmdlet] | Where-Object { $others -contains $_ })) { $covered = $false; break }
+        }
+        if ($covered) { [void]$selected.Remove($role) }
+    }
     @($selected | Sort-Object)
+}
+
+# Get-RoleWeight weighs a role by what it allows: each cmdlet counts once, and
+# each cmdlet that is not a Get- cmdlet counts $WriteWeight times more. Mail
+# Recipient Creation (Get-Mailbox, but also New-Mailbox and Remove-Mailbox)
+# then weighs far more than View-Only Recipients, which only reads.
+function Get-RoleWeight {
+    param([string[]]$Cmdlets, [int]$WriteWeight = 100)
+    $write = @($Cmdlets | Where-Object { $_ -notlike "Get-*" }).Count
+    $Cmdlets.Count + $WriteWeight * $write
 }
 
 # Select-FullRoles keeps, among the roles that contain a cmdlet, the ones that
@@ -254,7 +281,7 @@ if (-not (Get-Command Get-ManagementRole -ErrorAction SilentlyContinue)) {
 
 Write-Host "Looking up the management roles for $($ProviderCmdlets.Count) cmdlets..."
 $rolesByCmdlet = @{}
-$roleSize = @{}
+$roleWeight = @{}
 $skipped = @()
 $endUserRoles = @(Get-ManagementRole | Where-Object { $_.IsEndUserRole } | ForEach-Object { [string]$_.Name })
 foreach ($cmdlet in $ProviderCmdlets) {
@@ -272,13 +299,27 @@ if ($skipped.Count -gt 0) {
         "(Safe Links and Safe Attachments need Defender for Office 365): run the script again after adding the license.")
 }
 foreach ($role in ($rolesByCmdlet.Values | ForEach-Object { $_ } | Sort-Object -Unique)) {
-    $roleSize[$role] = @(Get-ManagementRoleEntry "$role\*").Count
+    $roleWeight[$role] = Get-RoleWeight -Cmdlets @(Get-ManagementRoleEntry "$role\*" | ForEach-Object { [string]$_.Name })
 }
 
-$selected = Select-BridgeRoles -RolesByCmdlet $rolesByCmdlet -RoleSize $roleSize
+$selected = Select-BridgeRoles -RolesByCmdlet $rolesByCmdlet -RoleWeight $roleWeight
 Write-Host ""
 Write-Host "Management roles needed by the provider:"
 $selected | ForEach-Object { Write-Host "  - $_" }
+
+# Roles of an existing role group that the provider no longer needs, for
+# example Mail Recipient Creation, chosen by earlier versions of this script.
+$extra = @()
+if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
+    $current = @((Get-RoleGroup -Identity $RoleGroupName).Roles | ForEach-Object { (Get-ManagementRole -Identity $_).Name })
+    $extra = @($current | Where-Object { $selected -notcontains $_ } | Sort-Object)
+}
+if ($extra.Count -gt 0 -and -not ($Apply -and $RemoveExtraRoles)) {
+    Write-Host ""
+    Write-Warning ("'$RoleGroupName' has roles the provider does not need: $($extra -join ', '). " +
+        "Remove them with -Apply -RemoveExtraRoles, or one by one with: " +
+        "Get-ManagementRoleAssignment -RoleAssignee '$RoleGroupName' -Role '<role>' | Remove-ManagementRoleAssignment")
+}
 
 if (-not $Apply) {
     Write-Host ""
@@ -300,6 +341,14 @@ if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
     foreach ($role in $selected | Where-Object { $current -notcontains $_ }) {
         New-ManagementRoleAssignment -SecurityGroup $RoleGroupName -Role $role | Out-Null
         Write-Host "Added role '$role' to '$RoleGroupName'."
+    }
+    if ($RemoveExtraRoles) {
+        foreach ($role in $extra) {
+            Get-ManagementRoleAssignment -RoleAssignee $RoleGroupName -Role $role |
+                Where-Object { $_.RoleAssigneeName -eq $RoleGroupName } |
+                Remove-ManagementRoleAssignment -Confirm:$false
+            Write-Host "Removed role '$role' from '$RoleGroupName'."
+        }
     }
 } else {
     New-RoleGroup -Name $RoleGroupName -Roles $selected -Description "Least-privilege roles for the workplace-as-code/msexchangeonline Terraform provider" | Out-Null
