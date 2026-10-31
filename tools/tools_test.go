@@ -16,10 +16,15 @@ import (
 const roleGroupScript = "new_role_group.ps1"
 
 var (
-	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
-	functionRe = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
-	listRe     = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
-	quotedRe   = regexp.MustCompile(`"([^"]+)"`)
+	cmdletRe    = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
+	functionRe  = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
+	listRe      = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
+	rolesRe     = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
+	retentionRe = regexp.MustCompile(`(?s)\$RetentionCmdlets = @\((.*?)\n\)`)
+	// guideRoleRe matches the role list of the authentication guide: one
+	// "- **Role**" item per role, alone on its line.
+	guideRoleRe = regexp.MustCompile(`(?m)^- \*\*([^*]+)\*\*$`)
+	quotedRe    = regexp.MustCompile(`"([^"]+)"`)
 	// Sync-BridgeRule (common.ps1) builds the rule cmdlet names from -Noun.
 	ruleNounRe = regexp.MustCompile(`Sync-BridgeRule -Noun "([A-Za-z]+)"`)
 	// Invoke-BridgePresetRule (common.ps1) does the same for the preset rules.
@@ -149,80 +154,92 @@ func TestRoleGroupScriptListsEveryBridgeCmdlet(t *testing.T) {
 	}
 }
 
-func TestSelectBridgeRoles(t *testing.T) {
+func TestFindUncoveredCmdlets(t *testing.T) {
 	if _, err := exec.LookPath("pwsh"); err != nil {
 		t.Skip("pwsh not installed")
 	}
-	// "Broad" contains every needed cmdlet but 500 cmdlets in total: the two
-	// narrow roles must be preferred even though it takes two of them.
 	script := `
 $env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
 . ./` + roleGroupScript + `
 $byCmdlet = @{
-  "Get-TransportRule" = @("Transport Rules", "Broad")
-  "Set-TransportRule" = @("Transport Rules", "Broad")
-  "Get-RemoteDomain"  = @("Remote and Accepted Domains", "Broad")
+  "Get-TransportRule" = @("Transport Rules", "Organization Management")
+  "Get-Mailbox"       = @("Mail Recipient Creation", "Retention Management")
+  "New-Mailbox"       = @("Mail Recipient Creation")
 }
-$a = Select-BridgeRoles -RolesByCmdlet $byCmdlet -RoleSize @{ "Broad" = 500; "Transport Rules" = 10; "Remote and Accepted Domains" = 12 }
-$byCmdlet2 = @{
-  "Get-TransportRule" = @("Transport Rules", "Big Transport")
-  "Set-TransportRule" = @("Transport Rules", "Big Transport")
-  "Get-RemoteDomain"  = @("Remote and Accepted Domains")
-}
-$b = Select-BridgeRoles -RolesByCmdlet $byCmdlet2 -RoleSize @{ "Big Transport" = 300; "Transport Rules" = 10; "Remote and Accepted Domains" = 12 }
-$err = ""
-try { Select-BridgeRoles -RolesByCmdlet @{ "Get-Nothing" = @() } | Out-Null } catch { $err = $_.Exception.Message }
-@{ a = @($a); b = @($b); err = $err } | ConvertTo-Json -Compress
-`
-	cmd := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("pwsh: %v\n%s", err, out)
-	}
-	var res struct {
-		A   []string `json:"a"`
-		B   []string `json:"b"`
-		Err string   `json:"err"`
-	}
-	if err := json.Unmarshal(out, &res); err != nil {
-		t.Fatalf("output %q: %v", out, err)
-	}
-	if strings.Join(res.A, ",") != "Remote and Accepted Domains,Transport Rules" {
-		t.Errorf("narrow roles must beat a broad one: got %v", res.A)
-	}
-	if strings.Join(res.B, ",") != "Remote and Accepted Domains,Transport Rules" {
-		t.Errorf("got %v", res.B)
-	}
-	if !strings.Contains(res.Err, "Get-Nothing") {
-		t.Errorf("uncovered cmdlet not reported: %q", res.Err)
-	}
-}
-
-func TestSelectFullRoles(t *testing.T) {
-	if _, err := exec.LookPath("pwsh"); err != nil {
-		t.Skip("pwsh not installed")
-	}
-	// Mail Tips grants Set-OrganizationConfig for 12 of its 126 parameters: it
-	// must not count as a role that can run the cmdlet.
-	script := `
-$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
-. ./` + roleGroupScript + `
-$full = Select-FullRoles -ParameterCount @{ "Organization Configuration" = 126; "Mail Tips" = 12; "Wider" = 130 }
-$none = Select-FullRoles -ParameterCount @{}
-@{ full = @($full); none = @($none) } | ConvertTo-Json -Compress
+$missing = Find-UncoveredCmdlets -RolesByCmdlet $byCmdlet -Roles @("Transport Rules", "Retention Management")
+$none = Find-UncoveredCmdlets -RolesByCmdlet $byCmdlet -Roles @("Transport Rules", "Mail Recipient Creation")
+@{ missing = @($missing); none = @($none) } | ConvertTo-Json -Compress
 `
 	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
 	if err != nil {
 		t.Fatalf("pwsh: %v\n%s", err, out)
 	}
 	var res struct {
-		Full []string `json:"full"`
-		None []string `json:"none"`
+		Missing []string `json:"missing"`
+		None    []string `json:"none"`
 	}
 	if err := json.Unmarshal(out, &res); err != nil {
 		t.Fatalf("output %q: %v", out, err)
 	}
-	if strings.Join(res.Full, ",") != "Organization Configuration,Wider" || len(res.None) != 0 {
-		t.Errorf("got %+v, want the two roles with (almost) every parameter and nothing for no role", res)
+	if strings.Join(res.Missing, ",") != "New-Mailbox" || len(res.None) != 0 {
+		t.Errorf("got %+v, want only New-Mailbox uncovered, then nothing", res)
+	}
+}
+
+// TestGuideListsTheProviderRoles keeps the role list of the authentication
+// guide in line with $ProviderRoles, so that the docs say exactly what the
+// role group grants.
+func TestGuideListsTheProviderRoles(t *testing.T) {
+	script, err := os.ReadFile(roleGroupScript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := rolesRe.FindStringSubmatch(string(script))
+	if block == nil {
+		t.Fatal("$ProviderRoles list not found")
+	}
+	var roles []string
+	for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
+		roles = append(roles, m[1])
+	}
+	guide, err := os.ReadFile(filepath.Join("..", "templates", "guides", "authentication.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var documented []string
+	for _, m := range guideRoleRe.FindAllStringSubmatch(string(guide), -1) {
+		documented = append(documented, m[1])
+	}
+	if strings.Join(documented, ",") != strings.Join(roles, ",") {
+		t.Errorf("the authentication guide lists %v, the script grants %v", documented, roles)
+	}
+}
+
+// TestRetentionRoleKeepsTheRetentionCmdlets checks the custom retention role:
+// it keeps exactly the retention cmdlets of the bridge and Get-Mailbox, so a
+// new retention cmdlet in a script cannot be forgotten.
+func TestRetentionRoleKeepsTheRetentionCmdlets(t *testing.T) {
+	script, err := os.ReadFile(roleGroupScript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	block := retentionRe.FindStringSubmatch(string(script))
+	if block == nil {
+		t.Fatal("$RetentionCmdlets list not found")
+	}
+	var kept []string
+	for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
+		kept = append(kept, m[1])
+	}
+	want := []string{"Get-Mailbox"}
+	for _, c := range bridgeCmdlets(t) {
+		if strings.Contains(c, "-Retention") {
+			want = append(want, c)
+		}
+	}
+	sort.Strings(kept)
+	sort.Strings(want)
+	if strings.Join(kept, ",") != strings.Join(want, ",") {
+		t.Errorf("$RetentionCmdlets is %v, the bridge runs %v", kept, want)
 	}
 }

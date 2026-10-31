@@ -58,7 +58,7 @@ resource "msexchangeonline_retention_policy" "standard" {
 
 ## Permissions
 
-The provider's app registration needs the **Retention Management** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+The provider's app registration needs the retention policy cmdlets of the **Retention Management** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) grants them through a custom role that holds only these cmdlets. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 ## Microsoft documentation
 

@@ -80,7 +80,7 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 | Clients and devices | `msexchangeonline_owa_mailbox_policy`, `msexchangeonline_mobile_device_mailbox_policy` |
 | Organization | `msexchangeonline_organization_config`, `msexchangeonline_email_address_policy`, `msexchangeonline_retention_policy`, `msexchangeonline_retention_policy_tag`, `msexchangeonline_application_access_policy` |
 
-Data sources: `msexchangeonline_accepted_domain`, `msexchangeonline_accepted_domains`, `msexchangeonline_mailbox`, `msexchangeonline_organization_config`.
+Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Two more read the tenant: `msexchangeonline_accepted_domains` and `msexchangeonline_mailbox`. Full reference in [docs/data-sources](docs/data-sources/).
 
 ### Related providers
 
