@@ -1,0 +1,1 @@
+terraform import msexchangeonline_cas_mailbox_plan.enterprise "ExchangeOnlineEnterprise"

@@ -41,6 +41,8 @@ func registrations() []registration {
 		// list.ps1 lists the four lists and returns "<list_type>:<value>".
 		{NewTenantAllowBlockListItemResource, listQuery{noun: "TenantAllowBlockListItems"}},
 		{NewApplicationAccessPolicyResource, listQuery{noun: "ApplicationAccessPolicy"}},
+		// Exchange names a rule "<query string> (<characteristic>)": the import ID.
+		{NewActiveSyncDeviceAccessRuleResource, listQuery{noun: "ActiveSyncDeviceAccessRule", property: "Name"}},
 	}
 	for _, spec := range objectSpecs {
 		regs = append(regs, registration{newObjectResource(spec), spec.listQuery()})

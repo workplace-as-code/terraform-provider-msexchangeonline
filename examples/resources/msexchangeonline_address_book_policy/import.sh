@@ -1,0 +1,1 @@
+terraform import msexchangeonline_address_book_policy.contoso "Contoso"

@@ -80,6 +80,123 @@ var objectSpecs = []objectSpec{
 		},
 	},
 	{
+		typeName:    "admin_audit_log_config",
+		noun:        "AdminAuditLogConfig",
+		singleton:   true,
+		description: "Manages the recording of user and admin activities in the Microsoft 365 unified audit log",
+		fields: []field{
+			boolAttr("unified_audit_log_ingestion_enabled", "UnifiedAuditLogIngestionEnabled",
+				"Record user and admin activities in the unified audit log. A change can take up to 60 minutes to apply."),
+		},
+	},
+	{
+		typeName:    "activesync_organization_settings",
+		noun:        "ActiveSyncOrganizationSettings",
+		singleton:   true,
+		description: "Manages the Exchange ActiveSync settings of the organization: what happens to mobile devices that match no device access rule",
+		fields: []field{
+			enumAttr("default_access_level", "DefaultAccessLevel", "Access of the devices that match no "+
+				"`msexchangeonline_activesync_device_access_rule`.", "Allow", "Block", "Quarantine"),
+			listAttr("admin_mail_recipients", "AdminMailRecipients", "Email addresses notified when a device is quarantined."),
+			stringAttr("user_mail_insert", "UserMailInsert", "Text added to the message sent to users whose device is quarantined, "+
+				"up to 256 characters."),
+			boolAttr("allow_access_for_unsupported_platform", "AllowAccessForUnSupportedPlatform",
+				"Let devices that do not support ActiveSync policies connect."),
+		},
+	},
+	{
+		typeName: "mailbox_plan",
+		noun:     "MailboxPlan",
+		script:   "mailbox_plan.ps1",
+		adopted:  true,
+		description: "Manages a mailbox plan: the size limits and deleted item retention that new mailboxes get from " +
+			"their license. Existing mailboxes keep their settings",
+		notes: "`name` is the display name of the plan, the same in every tenant, for example `ExchangeOnlineEnterprise` " +
+			"(Exchange Online Plan 2), `ExchangeOnline` (Plan 1), `ExchangeOnlineDeskless` (Kiosk) or `ExchangeOnlineEssentials`. " +
+			"Sizes are in megabytes and cannot exceed what the license allows.",
+		fields: []field{
+			int64Attr("max_send_size_mb", "MaxSendSize", "Largest message a new mailbox can send, in MB (up to 150).",
+				int64validator.Between(1, 150)),
+			int64Attr("max_receive_size_mb", "MaxReceiveSize", "Largest message a new mailbox can receive, in MB (up to 150).",
+				int64validator.Between(1, 150)),
+			int64Attr("issue_warning_quota_mb", "IssueWarningQuota", "Mailbox size, in MB, at which the user is warned.",
+				int64validator.AtLeast(1)),
+			int64Attr("prohibit_send_quota_mb", "ProhibitSendQuota", "Mailbox size, in MB, at which the user can no longer send.",
+				int64validator.AtLeast(1)),
+			int64Attr("prohibit_send_receive_quota_mb", "ProhibitSendReceiveQuota",
+				"Mailbox size, in MB, at which the mailbox can no longer send or receive.", int64validator.AtLeast(1)),
+			daysAttr("retain_deleted_items_for_days", "RetainDeletedItemsFor", "Days deleted items can be recovered (up to 30).",
+				int64validator.Between(1, 30)),
+			stringAttr("retention_policy", "RetentionPolicy", "Retention policy of new mailboxes, by name."),
+		},
+	},
+	{
+		typeName: "cas_mailbox_plan",
+		noun:     "CASMailboxPlan",
+		script:   "mailbox_plan.ps1",
+		adopted:  true,
+		description: "Manages a CAS mailbox plan: the client protocols that new mailboxes get from their license. " +
+			"Existing mailboxes keep their settings",
+		notes: "`name` is the display name of the plan, the same in every tenant, for example `ExchangeOnlineEnterprise` " +
+			"(Exchange Online Plan 2), `ExchangeOnline` (Plan 1), `ExchangeOnlineDeskless` (Kiosk) or `ExchangeOnlineEssentials`.",
+		fields: []field{
+			boolAttr("pop_enabled", "PopEnabled", "Allow POP3."),
+			boolAttr("imap_enabled", "ImapEnabled", "Allow IMAP4."),
+			boolAttr("active_sync_enabled", "ActiveSyncEnabled", "Allow Exchange ActiveSync."),
+			boolAttr("ews_enabled", "EwsEnabled", "Allow Exchange Web Services."),
+			boolAttr("mapi_enabled", "MAPIEnabled", "Allow MAPI clients such as Outlook for Windows."),
+			boolAttr("owa_enabled", "OWAEnabled", "Allow Outlook on the web."),
+			stringAttr("owa_mailbox_policy", "OwaMailboxPolicy", "Outlook on the web mailbox policy, by name."),
+		},
+	},
+	{
+		typeName: "sharing_policy",
+		noun:     "SharingPolicy",
+		script:   "sharing_policy.ps1",
+		description: "Manages a sharing policy, which sets the calendar and contact information users can share with people " +
+			"outside the organization",
+		notes: "`domains` is required to create a policy. Mailboxes without a sharing policy of their own use the " +
+			"default one, `Default Sharing Policy`: import it to restrict sharing for the whole organization.",
+		fields: []field{
+			setAttr("domains", "Domains", "Domains and what users can share with them, as `domain:Action` or "+
+				"`domain:Action,Action` without spaces. The domain is a domain name (subdomains are not included), `*` "+
+				"for every federated organization or `Anonymous` for anyone with a link. Actions: "+
+				"`CalendarSharingFreeBusySimple`, `CalendarSharingFreeBusyDetail`, `CalendarSharingFreeBusyReviewer`, "+
+				"`ContactsSharing`."),
+			boolAttr("enabled", "Enabled", "Whether the policy applies. Mailboxes keep sharing until the sharing "+
+				"policy assistant next processes them."),
+		},
+	},
+	{
+		typeName: "organization_relationship",
+		noun:     "OrganizationRelationship",
+		description: "Manages an organization relationship, which shares free/busy information, MailTips and photos " +
+			"with another Microsoft 365 organization or an on-premises Exchange organization",
+		notes: "`domain_names` is required to create a relationship. Get the `target_*` values of the other organization with " +
+			"`Get-FederationInformation -DomainName <domain>`. The mailbox move settings of cross-tenant migrations are not managed.",
+		fields: []field{
+			setAttr("domain_names", "DomainNames", "Domains of the other organization."),
+			boolAttr("enabled", "Enabled", "Whether the relationship is used."),
+			boolAttr("free_busy_access_enabled", "FreeBusyAccessEnabled", "Share free/busy information with the other organization."),
+			enumAttr("free_busy_access_level", "FreeBusyAccessLevel", "Free/busy details shared when `free_busy_access_enabled` is `true`.",
+				"None", "AvailabilityOnly", "LimitedDetails"),
+			boolAttr("mail_tips_access_enabled", "MailTipsAccessEnabled", "Share MailTips with the other organization."),
+			enumAttr("mail_tips_access_level", "MailTipsAccessLevel", "MailTips shared when `mail_tips_access_enabled` is `true`.",
+				"None", "Limited", "All"),
+			boolAttr("photos_enabled", "PhotosEnabled", "Share user photos with the other organization."),
+			boolAttr("archive_access_enabled", "ArchiveAccessEnabled", "The other organization hosts the cloud archives of "+
+				"this organization's mailboxes (hybrid)."),
+			boolAttr("delivery_report_enabled", "DeliveryReportEnabled", "Share delivery reports with the other organization."),
+			stringAttr("organization_contact", "OrganizationContact", "Email address of a contact in the other organization."),
+			stringAttr("target_application_uri", "TargetApplicationUri", "Application URI of the other organization, "+
+				"for example `outlook.com` for Microsoft 365."),
+			stringAttr("target_autodiscover_epr", "TargetAutodiscoverEpr", "Autodiscover endpoint of the other organization."),
+			stringAttr("target_sharing_epr", "TargetSharingEpr", "Exchange Web Services endpoint of the other organization, "+
+				"when Autodiscover cannot find it."),
+			stringAttr("target_owa_url", "TargetOwaURL", "Outlook on the web URL of the other organization."),
+		},
+	},
+	{
 		typeName: "hosted_outbound_spam_filter_rule",
 		noun:     "HostedOutboundSpamFilterRule",
 		script:   "exo_rule.ps1",
@@ -150,6 +267,68 @@ var objectSpecs = []objectSpec{
 			listAttr("except_if_sent_to", "ExceptIfSentTo", "Exception: the recipient is one of these mailboxes, mail users or contacts."),
 			listAttr("except_if_sent_to_member_of", "ExceptIfSentToMemberOf", "Exception: the recipient is a member of one of these groups."),
 			listAttr("except_if_recipient_domain_is", "ExceptIfRecipientDomainIs", "Exception: the recipient's domain is one of these accepted domains."),
+		},
+	},
+	{
+		typeName: "address_list",
+		noun:     "AddressList",
+		script:   "address_book.ps1",
+		description: "Manages an address list: the recipients that match a filter, shown to users through an address book " +
+			"policy",
+		notes: "In Exchange Online, users only see an address list through an address book policy. Exchange Online cannot " +
+			"recalculate the members of a list: after a change of `recipient_filter`, a recipient enters or leaves the list when " +
+			"its own object next changes. Precanned filters (`-IncludedRecipients` and `-Conditional*`) are not managed: an " +
+			"imported precanned list shows the equivalent filter in `recipient_filter`, and applying writes it as a custom filter.",
+		fields: []field{
+			stringAttr("display_name", "DisplayName", "The name shown in Outlook. Defaults to `name`."),
+			{
+				name: "container", param: "Container", kind: stringField, forceNew: true,
+				desc: "Name of the parent address list, for a list nested in another one. Empty for a top-level list. " +
+					"Changing it creates a new list.",
+			},
+			filterAttr("recipient_filter", "RecipientFilter", "OPATH filter of the recipients in the list, for example "+
+				"`Company -eq 'Contoso' -and RecipientType -eq 'UserMailbox'`. Exchange rewrites it with parentheses: the "+
+				"configured text is kept as long as Exchange returns the text it wrote."),
+		},
+	},
+	{
+		typeName:    "global_address_list",
+		noun:        "GlobalAddressList",
+		description: "Manages a global address list (GAL), the main address list of an address book policy",
+		notes: "Manage a custom GAL for each entity of the organization; the default GAL, `Default Global Address List`, " +
+			"can be imported but not changed. Exchange Online cannot recalculate the members of a GAL: after a change of " +
+			"`recipient_filter`, a recipient enters or leaves it when its own object next changes.",
+		fields: []field{
+			filterAttr("recipient_filter", "RecipientFilter", "OPATH filter of the recipients in the GAL, for example "+
+				"`CustomAttribute1 -eq 'Contoso'`. Exchange rewrites it with parentheses: the configured text is kept as long "+
+				"as Exchange returns the text it wrote."),
+		},
+	},
+	{
+		typeName:    "offline_address_book",
+		noun:        "OfflineAddressBook",
+		script:      "address_book.ps1",
+		description: "Manages an offline address book (OAB), the address lists Outlook downloads for offline use",
+		notes:       "Which offline address book is the default is not managed.",
+		fields: []field{
+			setAttr("address_lists", "AddressLists", "Names of the address lists in the offline address book, usually the "+
+				"GAL of an address book policy. Required to create it."),
+		},
+	},
+	{
+		typeName: "address_book_policy",
+		noun:     "AddressBookPolicy",
+		script:   "address_book.ps1",
+		description: "Manages an address book policy (ABP), which gives the mailboxes it is assigned to their own GAL, " +
+			"address lists, offline address book and room list",
+		notes: "All four references are required to create a policy; they are names of the corresponding resources. " +
+			"Assigning the policy to mailboxes (`Set-Mailbox -AddressBookPolicy`) is not managed.",
+		fields: []field{
+			stringAttr("global_address_list", "GlobalAddressList", "Name of the global address list."),
+			stringAttr("offline_address_book", "OfflineAddressBook", "Name of the offline address book."),
+			stringAttr("room_list", "RoomList", "Name of the address list of the rooms users can book, an address list "+
+				"whose filter selects room mailboxes."),
+			setAttr("address_lists", "AddressLists", "Names of the address lists users see besides the GAL."),
 		},
 	},
 }

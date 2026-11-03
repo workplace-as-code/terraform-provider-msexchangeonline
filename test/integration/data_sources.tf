@@ -234,3 +234,39 @@ data "msexchangeonline_atp_protection_policy_rule" "standard" {
     }
   }
 }
+
+data "msexchangeonline_sharing_policy" "test" {
+  name       = msexchangeonline_sharing_policy.test.name
+  depends_on = [msexchangeonline_sharing_policy.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == msexchangeonline_sharing_policy.test.id
+      error_message = "The data source read another object than the test one."
+    }
+  }
+}
+
+data "msexchangeonline_organization_relationship" "test" {
+  name       = msexchangeonline_organization_relationship.test.name
+  depends_on = [msexchangeonline_organization_relationship.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == msexchangeonline_organization_relationship.test.id
+      error_message = "The data source read another object than the test one."
+    }
+  }
+}
+
+data "msexchangeonline_address_book_policy" "test" {
+  name       = msexchangeonline_address_book_policy.test.name
+  depends_on = [msexchangeonline_address_book_policy.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.global_address_list == msexchangeonline_global_address_list.test.name
+      error_message = "The data source read another policy than the test one, or without its GAL."
+    }
+  }
+}

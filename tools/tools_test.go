@@ -16,11 +16,12 @@ import (
 const roleGroupScript = "new_role_group.ps1"
 
 var (
-	cmdletRe    = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
-	functionRe  = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
-	listRe      = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
-	rolesRe     = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
-	retentionRe = regexp.MustCompile(`(?s)\$RetentionCmdlets = @\((.*?)\n\)`)
+	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
+	functionRe = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
+	listRe     = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
+	rolesRe    = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
+	// customRoleRe matches one entry of $CustomRoles: name, parent, cmdlets.
+	customRoleRe = regexp.MustCompile(`(?s)@\{ Name = "([^"]+)"; Parent = "([^"]+)"; Cmdlets = @\((.*?)\) \}`)
 	// guideRoleRe matches the role list of the authentication guide: one
 	// "- **Role**" item per role, alone on its line.
 	guideRoleRe = regexp.MustCompile(`(?m)^- \*\*([^*]+)\*\*$`)
@@ -44,6 +45,7 @@ var presetVerbs = []string{"Get", "Set", "Enable", "Disable"}
 var (
 	specNounRe      = regexp.MustCompile(`noun:\s*"([A-Za-z]+)"`)
 	specSingletonRe = regexp.MustCompile(`singleton:\s*true`)
+	specAdoptedRe   = regexp.MustCompile(`adopted:\s*true`)
 	specRuleRe      = regexp.MustCompile(`script:\s*"exo_rule\.ps1"`)
 )
 
@@ -63,7 +65,7 @@ func specCmdlets(t *testing.T) []string {
 		}
 		verbs := []string{"Get", "New", "Set", "Remove"}
 		switch {
-		case specSingletonRe.MatchString(block):
+		case specSingletonRe.MatchString(block), specAdoptedRe.MatchString(block):
 			verbs = []string{"Get", "Set"}
 		case specRuleRe.MatchString(block):
 			verbs = ruleVerbs
@@ -186,6 +188,36 @@ $none = Find-UncoveredCmdlets -RolesByCmdlet $byCmdlet -Roles @("Transport Rules
 	}
 }
 
+func TestCustomRoleNames(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	run := func(args string) (string, error) {
+		script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + ` ` + args + `
+($CustomRoles | ForEach-Object { "$($_.Name)=$($_.Role)" }) -join "|"
+`
+		out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
+
+	out, err := run(`-RoleGroupName RG-TF`)
+	if err != nil || !strings.Contains(out, "Retention=RG-TF Retention") {
+		t.Errorf("default names: %v %s", err, out)
+	}
+	out, err = run(`-CustomRolePrefix CR-TF- -CustomRoleNames @{ Retention = "CR-RET" }`)
+	if err != nil || !strings.Contains(out, "Retention=CR-RET") || !strings.Contains(out, "Sharing=CR-TF-Sharing") {
+		t.Errorf("prefix and names: %v %s", err, out)
+	}
+	if out, err = run(`-CustomRoleNames @{ Retentions = "CR-RET" }`); err == nil {
+		t.Errorf("an unknown custom role name must fail: %s", out)
+	}
+	if out, err = run(`-CustomRoleNames @{ Retention = "CR-X"; Sharing = "CR-X" }`); err == nil {
+		t.Errorf("two custom roles with the same name must fail: %s", out)
+	}
+}
+
 // TestGuideListsTheProviderRoles keeps the role list of the authentication
 // guide in line with $ProviderRoles, so that the docs say exactly what the
 // role group grants.
@@ -215,31 +247,41 @@ func TestGuideListsTheProviderRoles(t *testing.T) {
 	}
 }
 
-// TestRetentionRoleKeepsTheRetentionCmdlets checks the custom retention role:
-// it keeps exactly the retention cmdlets of the bridge and Get-Mailbox, so a
-// new retention cmdlet in a script cannot be forgotten.
-func TestRetentionRoleKeepsTheRetentionCmdlets(t *testing.T) {
+// TestCustomRolesKeepTheBridgeCmdlets checks each custom role of $CustomRoles:
+// for every noun of its list that the bridge runs, the role keeps exactly the
+// cmdlets the bridge runs on that noun. A new cmdlet in a script cannot be
+// forgotten, and the role never keeps more than needed. Nouns the bridge does
+// not run yet are skipped: the roles of a release are granted before its
+// resources are written, because roles take hours to reach the app.
+func TestCustomRolesKeepTheBridgeCmdlets(t *testing.T) {
 	script, err := os.ReadFile(roleGroupScript)
 	if err != nil {
 		t.Fatal(err)
 	}
-	block := retentionRe.FindStringSubmatch(string(script))
-	if block == nil {
-		t.Fatal("$RetentionCmdlets list not found")
+	roles := customRoleRe.FindAllStringSubmatch(string(script), -1)
+	if len(roles) == 0 {
+		t.Fatal("$CustomRoles entries not found")
 	}
-	var kept []string
-	for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
-		kept = append(kept, m[1])
-	}
-	want := []string{"Get-Mailbox"}
+	bridgeByNoun := map[string][]string{}
 	for _, c := range bridgeCmdlets(t) {
-		if strings.Contains(c, "-Retention") {
-			want = append(want, c)
-		}
+		noun := c[strings.Index(c, "-")+1:]
+		bridgeByNoun[noun] = append(bridgeByNoun[noun], c)
 	}
-	sort.Strings(kept)
-	sort.Strings(want)
-	if strings.Join(kept, ",") != strings.Join(want, ",") {
-		t.Errorf("$RetentionCmdlets is %v, the bridge runs %v", kept, want)
+	for _, role := range roles {
+		keptByNoun := map[string][]string{}
+		for _, m := range quotedRe.FindAllStringSubmatch(role[3], -1) {
+			noun := m[1][strings.Index(m[1], "-")+1:]
+			keptByNoun[noun] = append(keptByNoun[noun], m[1])
+		}
+		for noun, kept := range keptByNoun {
+			want, ok := bridgeByNoun[noun]
+			if !ok {
+				continue
+			}
+			sort.Strings(kept)
+			if strings.Join(kept, ",") != strings.Join(want, ",") {
+				t.Errorf("custom role %q keeps %v, the bridge runs %v", role[1], kept, want)
+			}
+		}
 	}
 }

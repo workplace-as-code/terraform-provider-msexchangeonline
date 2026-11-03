@@ -58,10 +58,21 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_organization_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/organization_config) | Singleton |
 | [`msexchangeonline_owa_mailbox_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/owa_mailbox_policy) | Outlook on the web |
 | [`msexchangeonline_mobile_device_mailbox_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/mobile_device_mailbox_policy) | Exchange ActiveSync devices |
+| [`msexchangeonline_activesync_organization_settings`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/activesync_organization_settings) | Singleton: default access of mobile devices |
+| [`msexchangeonline_activesync_device_access_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/activesync_device_access_rule) | Allow, block or quarantine devices by type, model or OS |
 | [`msexchangeonline_email_address_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/email_address_policy) | Microsoft 365 Groups only |
 | [`msexchangeonline_retention_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy) | Messaging records management |
 | [`msexchangeonline_retention_policy_tag`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy_tag) |  |
 | [`msexchangeonline_application_access_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/application_access_policy) | Limits the mailboxes a Microsoft Graph app can access |
+| [`msexchangeonline_sharing_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/sharing_policy) | Calendar and contact sharing with external domains |
+| [`msexchangeonline_organization_relationship`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/organization_relationship) | Free/busy, MailTips and photos with another organization |
+| [`msexchangeonline_mailbox_plan`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/mailbox_plan) | Adopted: size limits of new mailboxes, per license |
+| [`msexchangeonline_cas_mailbox_plan`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/cas_mailbox_plan) | Adopted: client protocols of new mailboxes, per license |
+| [`msexchangeonline_admin_audit_log_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/admin_audit_log_config) | Singleton: unified audit log on or off |
+| [`msexchangeonline_address_list`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/address_list) | Address book segmentation: filtered list of recipients |
+| [`msexchangeonline_global_address_list`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/global_address_list) | Custom GAL of an address book policy |
+| [`msexchangeonline_offline_address_book`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/offline_address_book) | Offline address book of an address book policy |
+| [`msexchangeonline_address_book_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/address_book_policy) | Assigning it to mailboxes is not managed |
 
 ## Data sources
 
@@ -74,7 +85,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 
 ## Singletons
 
-Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
+Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
 
 ```terraform
 import {

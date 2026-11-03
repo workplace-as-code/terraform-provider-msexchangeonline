@@ -44,6 +44,24 @@ variable "external_tag_allow_list" {
   default     = null
 }
 
+variable "activesync_admin_mail_recipients" {
+  description = "Set by test/run.sh to test a write to the ActiveSync settings, then to restore them. null leaves them unmanaged."
+  type        = list(string)
+  default     = null
+}
+
+variable "cas_mailbox_plan_pop_enabled" {
+  description = "Set by test/run.sh to test a write to a CAS mailbox plan, then to restore it. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
+variable "mailbox_plan_retain_deleted_items_for_days" {
+  description = "Set by test/run.sh to test a write to a mailbox plan, then to restore it. null leaves it unmanaged."
+  type        = number
+  default     = null
+}
+
 variable "reply_all_storm_block_duration_hours" {
   description = "Set by test/run.sh to test a write to the transport config, then to restore it. null leaves it unmanaged."
   type        = number
@@ -177,6 +195,15 @@ resource "msexchangeonline_external_in_outlook" "this" {
   allow_list = var.external_tag_allow_list
 }
 
+import {
+  to = msexchangeonline_activesync_organization_settings.this
+  id = "default"
+}
+
+resource "msexchangeonline_activesync_organization_settings" "this" {
+  admin_mail_recipients = var.activesync_admin_mail_recipients
+}
+
 # Built-in objects adopted with a minimal configuration: the plan must show no
 # change, since attributes left out of the configuration are never written.
 import {
@@ -207,6 +234,27 @@ resource "msexchangeonline_mobile_device_mailbox_policy" "default" {
   name = "Default"
 }
 
+# Mailbox plans come with the licenses: adopted by display name, never created.
+import {
+  to = msexchangeonline_mailbox_plan.enterprise
+  id = "ExchangeOnlineEnterprise"
+}
+
+resource "msexchangeonline_mailbox_plan" "enterprise" {
+  name                          = "ExchangeOnlineEnterprise"
+  retain_deleted_items_for_days = var.mailbox_plan_retain_deleted_items_for_days
+}
+
+import {
+  to = msexchangeonline_cas_mailbox_plan.enterprise
+  id = "ExchangeOnlineEnterprise"
+}
+
+resource "msexchangeonline_cas_mailbox_plan" "enterprise" {
+  name        = "ExchangeOnlineEnterprise"
+  pop_enabled = var.cas_mailbox_plan_pop_enabled
+}
+
 import {
   to = msexchangeonline_transport_config.this
   id = "default"
@@ -215,6 +263,15 @@ import {
 resource "msexchangeonline_transport_config" "this" {
   reply_all_storm_block_duration_hours = var.reply_all_storm_block_duration_hours
 }
+
+# Read only: turning the audit log on or off takes up to an hour and changes
+# what the tenant records, so the suite never writes it.
+import {
+  to = msexchangeonline_admin_audit_log_config.this
+  id = "default"
+}
+
+resource "msexchangeonline_admin_audit_log_config" "this" {}
 
 # ---------------------------------------------------------------------------
 # Mail flow
@@ -492,6 +549,84 @@ resource "msexchangeonline_retention_policy_tag" "test" {
 resource "msexchangeonline_retention_policy" "test" {
   name                       = "TF-CI-Retention"
   retention_policy_tag_links = local.updated ? ["1 Week Delete", msexchangeonline_retention_policy_tag.test.name] : ["1 Week Delete"]
+}
+
+# Assigned to no mailbox: it has no effect. The update adds a domain with two
+# actions, the case most likely to come back from Exchange in another form.
+resource "msexchangeonline_sharing_policy" "test" {
+  name = "TF-CI-SharingPolicy"
+  domains = local.updated ? [
+    "tf-ci-test.example:CalendarSharingFreeBusySimple",
+    "tf-ci-partner.example:CalendarSharingFreeBusyDetail,ContactsSharing",
+  ] : ["tf-ci-test.example:CalendarSharingFreeBusySimple"]
+  enabled = !local.updated
+}
+
+# Matches a device model no phone reports: it applies to no device.
+resource "msexchangeonline_activesync_device_access_rule" "test" {
+  query_string   = "TF-CI-Device"
+  characteristic = "DeviceModel"
+  access_level   = local.updated ? "Quarantine" : "Block"
+}
+
+# Points to a domain that does not exist: Exchange stores the relationship
+# without contacting the other organization.
+resource "msexchangeonline_organization_relationship" "test" {
+  name                     = "TF-CI-OrgRelationship"
+  domain_names             = local.updated ? ["tf-ci-partner.example", "tf-ci-test.example"] : ["tf-ci-partner.example"]
+  enabled                  = false
+  free_busy_access_enabled = true
+  free_busy_access_level   = local.updated ? "LimitedDetails" : "AvailabilityOnly"
+  target_application_uri   = "outlook.com"
+}
+
+# ---------------------------------------------------------------------------
+# Address book segmentation: every list selects CustomAttribute15 =
+# "TF-CI-NOBODY", which no recipient has, so the lists stay empty. The filters
+# are written without parentheses, which Exchange adds: the drift checks show
+# that the configured text is kept.
+# ---------------------------------------------------------------------------
+
+resource "msexchangeonline_address_list" "test" {
+  name         = "TF-CI-AddressList"
+  display_name = local.updated ? "TF-CI Address List (updated)" : null
+  recipient_filter = local.updated ? (
+    "CustomAttribute15 -eq 'TF-CI-NOBODY' -and Department -eq 'TF-CI'"
+  ) : "CustomAttribute15 -eq 'TF-CI-NOBODY'"
+}
+
+resource "msexchangeonline_address_list" "child" {
+  name             = "TF-CI-AddressList-Child"
+  container        = msexchangeonline_address_list.test.name
+  recipient_filter = "CustomAttribute15 -eq 'TF-CI-NOBODY' -and City -eq 'TF-CI'"
+}
+
+resource "msexchangeonline_address_list" "rooms" {
+  name             = "TF-CI-Rooms"
+  recipient_filter = "RecipientDisplayType -eq 'ConferenceRoomMailbox' -and CustomAttribute15 -eq 'TF-CI-NOBODY'"
+}
+
+resource "msexchangeonline_global_address_list" "test" {
+  name = "TF-CI-GAL"
+  recipient_filter = local.updated ? (
+    "CustomAttribute15 -eq 'TF-CI-NOBODY' -or CustomAttribute14 -eq 'TF-CI-NOBODY'"
+  ) : "CustomAttribute15 -eq 'TF-CI-NOBODY'"
+}
+
+resource "msexchangeonline_offline_address_book" "test" {
+  name          = "TF-CI-OAB"
+  address_lists = [msexchangeonline_global_address_list.test.name]
+}
+
+resource "msexchangeonline_address_book_policy" "test" {
+  name                 = "TF-CI-ABP"
+  global_address_list  = msexchangeonline_global_address_list.test.name
+  offline_address_book = msexchangeonline_offline_address_book.test.name
+  room_list            = msexchangeonline_address_list.rooms.name
+  address_lists = local.updated ? [
+    msexchangeonline_address_list.test.name,
+    msexchangeonline_address_list.child.name,
+  ] : [msexchangeonline_address_list.test.name]
 }
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,1 @@
+terraform import msexchangeonline_sharing_policy.partners "Partners"

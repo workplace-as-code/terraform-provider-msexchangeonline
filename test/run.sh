@@ -153,11 +153,20 @@ CREATED=(
   "msexchangeonline_email_address_policy.test=TF-CI-AddressPolicy"
   "msexchangeonline_retention_policy.test=TF-CI-Retention"
   "msexchangeonline_retention_policy_tag.test=TF-CI-RetentionTag"
+  "msexchangeonline_sharing_policy.test=TF-CI-SharingPolicy"
+  "msexchangeonline_organization_relationship.test=TF-CI-OrgRelationship"
+  "msexchangeonline_activesync_device_access_rule.test=TF-CI-Device (DeviceModel)"
   "msexchangeonline_hosted_outbound_spam_filter_rule.test=TF-CI-OutboundSpamRule"
   "msexchangeonline_outbound_spam_filter_policy.unscoped=TF-CI-OutboundSpam-Unscoped"
   "msexchangeonline_journal_rule.test=TF-CI-Journal"
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
+  "msexchangeonline_address_book_policy.test=TF-CI-ABP"
+  "msexchangeonline_offline_address_book.test=TF-CI-OAB"
+  "msexchangeonline_global_address_list.test=TF-CI-GAL"
+  "msexchangeonline_address_list.child=TF-CI-AddressList-Child"
+  "msexchangeonline_address_list.test=TF-CI-AddressList"
+  "msexchangeonline_address_list.rooms=TF-CI-Rooms"
 )
 if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   export TF_VAR_test_defender=true
@@ -195,6 +204,10 @@ KEEP=(
   "msexchangeonline_hosted_connection_filter_policy.this"
   "msexchangeonline_external_in_outlook.this"
   "msexchangeonline_transport_config.this"
+  "msexchangeonline_admin_audit_log_config.this"
+  "msexchangeonline_activesync_organization_settings.this"
+  "msexchangeonline_mailbox_plan.enterprise"
+  "msexchangeonline_cas_mailbox_plan.enterprise"
   "msexchangeonline_remote_domain.default"
   "msexchangeonline_hosted_content_filter_policy.default"
   "msexchangeonline_mobile_device_mailbox_policy.default"
@@ -365,6 +378,18 @@ if [[ "$(state_value msexchangeonline_external_in_outlook.this allow_list)" != *
 else
   info "Skipped External tag: the tenant already has an allow list"
 fi
+pop="$(state_value msexchangeonline_cas_mailbox_plan.enterprise pop_enabled)"
+write_and_restore msexchangeonline_cas_mailbox_plan.enterprise pop_enabled \
+  cas_mailbox_plan_pop_enabled "$([[ "$pop" == true ]] && echo false || echo true)" "$pop"
+days="$(state_value msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days)"
+write_and_restore msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days \
+  mailbox_plan_retain_deleted_items_for_days "$(( days == 30 ? 29 : days + 1 ))" "$days"
+if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admin_mail_recipients)" != *'"'* ]]; then
+  write_and_restore msexchangeonline_activesync_organization_settings.this admin_mail_recipients \
+    activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
+else
+  info "Skipped ActiveSync settings: the tenant already has admin mail recipients"
+fi
 expect_no_changes "Drift check after restore" -var phase=update
 
 # ---------------------------------------------------------------------------
@@ -390,6 +415,12 @@ for addr in "${PRESET[@]}"; do
   terraform import -no-color -var phase=update "$addr" "Standard Preset Security Policy" > /dev/null || fail "Import of $addr failed"
 done
 pass "${#CREATED[@]} resources imported"
+# An imported filter holds Exchange's text, with parentheses: the first apply
+# writes the same filter in the configured form.
+terraform apply -auto-approve -no-color -var phase=update \
+  -target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child \
+  -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test > /dev/null ||
+  fail "Recording the filters after import failed"
 expect_no_changes "Drift check after import" -var phase=update
 
 # ---------------------------------------------------------------------------
@@ -471,7 +502,7 @@ echo "  Resources created, updated, imported and destroyed: ${#CREATED[@]}"
 echo "  Imported read-only: organization_config"
 echo "  Adopted on create, forgotten on destroy: accepted_domain"
 echo "  Adopted with a minimal configuration, no change planned: remote_domain, hosted_content_filter_policy and mobile_device_mailbox_policy Default"
-echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook"
+echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings, mailbox plans"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"

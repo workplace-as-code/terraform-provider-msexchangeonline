@@ -268,3 +268,18 @@ func TestRunScriptNeverRetriesAWrite(t *testing.T) {
 		t.Errorf("runs = %s, want 1: a write must never be run twice", got)
 	}
 }
+
+func TestTransientErrors(t *testing.T) {
+	for _, msg := range []string{
+		"tenant_allow_block_list_item Get failed: ||Error sending HTTP request",
+		"The server is temporarily unavailable",
+		"A task was canceled.",
+	} {
+		if !transientError.MatchString(msg) {
+			t.Errorf("%q must be transient", msg)
+		}
+	}
+	if transientError.MatchString("The operation couldn't be performed because object 'x' couldn't be found") {
+		t.Error("a missing object is not transient")
+	}
+}

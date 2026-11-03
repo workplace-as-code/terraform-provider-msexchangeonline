@@ -7,9 +7,9 @@
 .DESCRIPTION
     The role group gets the management roles listed in $ProviderRoles, chosen
     by hand: the narrowest roles that contain the cmdlets the bridge scripts
-    run. Retention Management is replaced by a custom child role that keeps
-    only the cmdlets in $RetentionCmdlets: the built-in role can also lift
-    litigation holds and disable accounts. The script does not pick roles
+    run. When the narrowest built-in role grants much more than the provider
+    needs, the group gets a custom child role instead, which keeps only the
+    cmdlets listed in $CustomRoles. The script does not pick roles
     itself: it checks with Exchange Online that these roles still contain
     every cmdlet of the provider, and stops if one is missing.
 
@@ -29,14 +29,26 @@
 .PARAMETER RoleGroupName
     Name of the role group to create.
 
+.PARAMETER CustomRolePrefix
+    Prefix of the custom role names, followed by the name of each role in
+    $CustomRoles (for example CR-EXO-TF- gives CR-EXO-TF-Retention).
+    Without it, the custom roles are named "<RoleGroupName> <name>".
+
+.PARAMETER CustomRoleNames
+    Name of each custom role, by its name in $CustomRoles, for naming
+    conventions: @{ Retention = "CR-EXO-TF-RET"; Sharing = "CR-EXO-TF-SHARE" }.
+    It takes precedence over -CustomRolePrefix; the roles it does not list use
+    the prefix.
+
 .PARAMETER Apply
     Create the role group, or add the missing roles to it, and add the
     service principal. Without it, the script only shows what it would do.
 
 .PARAMETER RemoveExtraRoles
     With -Apply, also remove from an existing role group the roles that are
-    not in $ProviderRoles nor the custom retention role. Without it, the
-    script only lists them.
+    not in $ProviderRoles nor $CustomRoles. Without it, the script only lists
+    them. A custom role that this script created and that nothing else is
+    assigned is then deleted: after a rename, the old roles go away.
 
 .EXAMPLE
     ./new_role_group.ps1
@@ -45,12 +57,19 @@
 
 .EXAMPLE
     ./new_role_group.ps1 -AppId <client-id> -ServicePrincipalObjectId <object-id> -Apply
+
+.EXAMPLE
+    ./new_role_group.ps1 -RoleGroupName RG-EXO-TERRAFORM -CustomRolePrefix CR-EXO-TF- -CustomRoleNames @{ Retention = "CR-EXO-TF-RET" }
+
+    Checks the roles with the naming convention of the organization.
 #>
 [CmdletBinding()]
 param(
     [string]$AppId = "",
     [string]$ServicePrincipalObjectId = "",
     [string]$RoleGroupName = "terraform-msexchangeonline",
+    [string]$CustomRolePrefix = "",
+    [hashtable]$CustomRoleNames = @{},
     [switch]$Apply,
     [switch]$RemoveExtraRoles
 )
@@ -63,6 +82,7 @@ $ErrorActionPreference = "Stop"
 # same roles (a unit test compares them). Get-Recipient comes with Journaling:
 # no recipient management role is needed.
 $ProviderRoles = @(
+    "Address Lists",
     "E-Mail Address Policies",
     "Journaling",
     "Organization Configuration",
@@ -73,22 +93,71 @@ $ProviderRoles = @(
     "Transport Rules"
 )
 
-# The custom role that replaces Retention Management: a child of it that keeps
-# only these cmdlets. The built-in role also grants Set-Mailbox for litigation
-# holds, hold exclusions and AccountDisabled, which the provider never uses.
-$RetentionParent = "Retention Management"
-$RetentionRole = "$RoleGroupName Retention"
-$RetentionCmdlets = @(
-    "Get-Mailbox",
-    "Get-RetentionPolicy",
-    "Get-RetentionPolicyTag",
-    "New-RetentionPolicy",
-    "New-RetentionPolicyTag",
-    "Remove-RetentionPolicy",
-    "Remove-RetentionPolicyTag",
-    "Set-RetentionPolicy",
-    "Set-RetentionPolicyTag"
+# The custom roles: each one is a child of the Parent built-in role that keeps
+# only Cmdlets, and is named after the role group followed by Name. A unit test
+# checks that each list holds every cmdlet the bridge runs on its nouns. What
+# each built-in role grants beyond the provider's needs:
+# - Retention Management: Set-Mailbox for litigation holds, hold exclusions
+#   and AccountDisabled.
+# - Mail Recipients: changes every mailbox, user and group.
+# - Organization Client Access: the protocols of each mailbox (Set-CASMailbox)
+#   and OAuth trusts with partner applications.
+# - Federated Sharing: the federation trust and the hybrid free/busy settings.
+# - Audit Logs: reads the whole audit log and can exclude a mailbox from it.
+$CustomRoles = @(
+    @{ Name = "Retention"; Parent = "Retention Management"; Cmdlets = @(
+        "Get-Mailbox",
+        "Get-RetentionPolicy",
+        "Get-RetentionPolicyTag",
+        "New-RetentionPolicy",
+        "New-RetentionPolicyTag",
+        "Remove-RetentionPolicy",
+        "Remove-RetentionPolicyTag",
+        "Set-RetentionPolicy",
+        "Set-RetentionPolicyTag"
+    ) },
+    @{ Name = "Mailbox Plans"; Parent = "Mail Recipients"; Cmdlets = @(
+        "Get-CASMailboxPlan",
+        "Get-MailboxPlan",
+        "Set-CASMailboxPlan",
+        "Set-MailboxPlan"
+    ) },
+    @{ Name = "ActiveSync"; Parent = "Organization Client Access"; Cmdlets = @(
+        "Get-ActiveSyncDeviceAccessRule",
+        "Get-ActiveSyncOrganizationSettings",
+        "New-ActiveSyncDeviceAccessRule",
+        "Remove-ActiveSyncDeviceAccessRule",
+        "Set-ActiveSyncDeviceAccessRule",
+        "Set-ActiveSyncOrganizationSettings"
+    ) },
+    @{ Name = "Sharing"; Parent = "Federated Sharing"; Cmdlets = @(
+        "Get-OrganizationRelationship",
+        "Get-SharingPolicy",
+        "New-OrganizationRelationship",
+        "New-SharingPolicy",
+        "Remove-OrganizationRelationship",
+        "Remove-SharingPolicy",
+        "Set-OrganizationRelationship",
+        "Set-SharingPolicy"
+    ) },
+    @{ Name = "Audit Log"; Parent = "Audit Logs"; Cmdlets = @(
+        "Get-AdminAuditLogConfig",
+        "Set-AdminAuditLogConfig"
+    ) }
 )
+# The name of each custom role in the organization: -CustomRoleNames, then
+# -CustomRolePrefix, then "<RoleGroupName> <name>".
+$unknownNames = @($CustomRoleNames.Keys | Where-Object { @($CustomRoles | ForEach-Object { $_.Name }) -notcontains $_ })
+if ($unknownNames.Count -gt 0) {
+    throw "-CustomRoleNames: unknown custom roles $($unknownNames -join ', '). Valid names: $(($CustomRoles | ForEach-Object { $_.Name }) -join ', ')."
+}
+foreach ($custom in $CustomRoles) {
+    $custom.Role = if ($CustomRoleNames.ContainsKey($custom.Name)) { [string]$CustomRoleNames[$custom.Name] }
+                   elseif ($CustomRolePrefix) { "$CustomRolePrefix$($custom.Name)" }
+                   else { "$RoleGroupName $($custom.Name)" }
+}
+$duplicates = @($CustomRoles | Group-Object { $_.Role } | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
+if ($duplicates.Count -gt 0) { throw "Several custom roles would have the same name: $($duplicates -join ', ')." }
 
 # Every Exchange cmdlet run by the provider's bridge scripts (bridge/scripts).
 # A unit test (tools/tools_test.go) fails when this list drifts from the scripts.
@@ -118,13 +187,20 @@ $ProviderCmdlets = @(
     "Enable-TransportRule",
     "Get-ATPProtectionPolicyRule",
     "Get-AcceptedDomain",
+    "Get-ActiveSyncDeviceAccessRule",
+    "Get-ActiveSyncOrganizationSettings",
+    "Get-AddressBookPolicy",
+    "Get-AddressList",
+    "Get-AdminAuditLogConfig",
     "Get-AntiPhishPolicy",
     "Get-AntiPhishRule",
     "Get-ApplicationAccessPolicy",
+    "Get-CASMailboxPlan",
     "Get-DkimSigningConfig",
     "Get-EOPProtectionPolicyRule",
     "Get-EmailAddressPolicy",
     "Get-ExternalInOutlook",
+    "Get-GlobalAddressList",
     "Get-HostedConnectionFilterPolicy",
     "Get-HostedContentFilterPolicy",
     "Get-HostedContentFilterRule",
@@ -133,10 +209,13 @@ $ProviderCmdlets = @(
     "Get-InboundConnector",
     "Get-JournalRule",
     "Get-Mailbox",
+    "Get-MailboxPlan",
     "Get-MalwareFilterPolicy",
     "Get-MalwareFilterRule",
     "Get-MobileDeviceMailboxPolicy",
+    "Get-OfflineAddressBook",
     "Get-OrganizationConfig",
+    "Get-OrganizationRelationship",
     "Get-OutboundConnector",
     "Get-OwaMailboxPolicy",
     "Get-QuarantinePolicy",
@@ -148,16 +227,21 @@ $ProviderCmdlets = @(
     "Get-SafeAttachmentRule",
     "Get-SafeLinksPolicy",
     "Get-SafeLinksRule",
+    "Get-SharingPolicy",
     "Get-TenantAllowBlockListItems",
     "Get-TransportConfig",
     "Get-TransportRule",
     "New-ATPProtectionPolicyRule",
+    "New-ActiveSyncDeviceAccessRule",
+    "New-AddressBookPolicy",
+    "New-AddressList",
     "New-AntiPhishPolicy",
     "New-AntiPhishRule",
     "New-ApplicationAccessPolicy",
     "New-DkimSigningConfig",
     "New-EOPProtectionPolicyRule",
     "New-EmailAddressPolicy",
+    "New-GlobalAddressList",
     "New-HostedContentFilterPolicy",
     "New-HostedContentFilterRule",
     "New-HostedOutboundSpamFilterPolicy",
@@ -167,6 +251,8 @@ $ProviderCmdlets = @(
     "New-MalwareFilterPolicy",
     "New-MalwareFilterRule",
     "New-MobileDeviceMailboxPolicy",
+    "New-OfflineAddressBook",
+    "New-OrganizationRelationship",
     "New-OutboundConnector",
     "New-OwaMailboxPolicy",
     "New-QuarantinePolicy",
@@ -177,14 +263,19 @@ $ProviderCmdlets = @(
     "New-SafeAttachmentRule",
     "New-SafeLinksPolicy",
     "New-SafeLinksRule",
+    "New-SharingPolicy",
     "New-TenantAllowBlockListItems",
     "New-TransportRule",
     "Remove-ATPProtectionPolicyRule",
+    "Remove-ActiveSyncDeviceAccessRule",
+    "Remove-AddressBookPolicy",
+    "Remove-AddressList",
     "Remove-AntiPhishPolicy",
     "Remove-AntiPhishRule",
     "Remove-ApplicationAccessPolicy",
     "Remove-EOPProtectionPolicyRule",
     "Remove-EmailAddressPolicy",
+    "Remove-GlobalAddressList",
     "Remove-HostedContentFilterPolicy",
     "Remove-HostedContentFilterRule",
     "Remove-HostedOutboundSpamFilterPolicy",
@@ -194,6 +285,8 @@ $ProviderCmdlets = @(
     "Remove-MalwareFilterPolicy",
     "Remove-MalwareFilterRule",
     "Remove-MobileDeviceMailboxPolicy",
+    "Remove-OfflineAddressBook",
+    "Remove-OrganizationRelationship",
     "Remove-OutboundConnector",
     "Remove-OwaMailboxPolicy",
     "Remove-QuarantinePolicy",
@@ -204,17 +297,25 @@ $ProviderCmdlets = @(
     "Remove-SafeAttachmentRule",
     "Remove-SafeLinksPolicy",
     "Remove-SafeLinksRule",
+    "Remove-SharingPolicy",
     "Remove-TenantAllowBlockListItems",
     "Remove-TransportRule",
     "Set-ATPProtectionPolicyRule",
     "Set-AcceptedDomain",
+    "Set-ActiveSyncDeviceAccessRule",
+    "Set-ActiveSyncOrganizationSettings",
+    "Set-AddressBookPolicy",
+    "Set-AddressList",
+    "Set-AdminAuditLogConfig",
     "Set-AntiPhishPolicy",
     "Set-AntiPhishRule",
     "Set-ApplicationAccessPolicy",
+    "Set-CASMailboxPlan",
     "Set-DkimSigningConfig",
     "Set-EOPProtectionPolicyRule",
     "Set-EmailAddressPolicy",
     "Set-ExternalInOutlook",
+    "Set-GlobalAddressList",
     "Set-HostedConnectionFilterPolicy",
     "Set-HostedContentFilterPolicy",
     "Set-HostedContentFilterRule",
@@ -222,10 +323,13 @@ $ProviderCmdlets = @(
     "Set-HostedOutboundSpamFilterRule",
     "Set-InboundConnector",
     "Set-JournalRule",
+    "Set-MailboxPlan",
     "Set-MalwareFilterPolicy",
     "Set-MalwareFilterRule",
     "Set-MobileDeviceMailboxPolicy",
+    "Set-OfflineAddressBook",
     "Set-OrganizationConfig",
+    "Set-OrganizationRelationship",
     "Set-OutboundConnector",
     "Set-OwaMailboxPolicy",
     "Set-QuarantinePolicy",
@@ -236,6 +340,7 @@ $ProviderCmdlets = @(
     "Set-SafeAttachmentRule",
     "Set-SafeLinksPolicy",
     "Set-SafeLinksRule",
+    "Set-SharingPolicy",
     "Set-TenantAllowBlockListItems",
     "Set-TransportConfig",
     "Set-TransportRule"
@@ -259,7 +364,7 @@ if (-not (Get-Command Get-ManagementRole -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Checking that the roles contain the $($ProviderCmdlets.Count) cmdlets of the provider..."
-$unknownRoles = @(@($ProviderRoles) + $RetentionParent | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
+$unknownRoles = @(@($ProviderRoles) + @($CustomRoles | ForEach-Object { $_.Parent }) | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
 if ($unknownRoles.Count -gt 0) {
     throw "These roles do not exist in this organization: $($unknownRoles -join ', ')"
 }
@@ -278,17 +383,19 @@ if ($skipped.Count -gt 0) {
         "(Safe Links and Safe Attachments need Defender for Office 365): run the script again after adding the license.")
 }
 
-# The custom retention role contains the cmdlets of $RetentionCmdlets that its
-# parent contains, whether it exists yet or not.
-$parentCmdlets = @(Get-ManagementRoleEntry "$RetentionParent\*" | ForEach-Object { [string]$_.Name })
-$missingFromParent = @($RetentionCmdlets | Where-Object { $parentCmdlets -notcontains $_ })
-if ($missingFromParent.Count -gt 0) {
-    throw "$RetentionParent no longer contains: $($missingFromParent -join ', '). Please open an issue on the provider, with this output."
+# Each custom role contains the cmdlets of its list that its parent contains,
+# whether it exists yet or not.
+foreach ($custom in $CustomRoles) {
+    $parentCmdlets = @(Get-ManagementRoleEntry "$($custom.Parent)\*" | ForEach-Object { [string]$_.Name })
+    $missingFromParent = @($custom.Cmdlets | Where-Object { $parentCmdlets -notcontains $_ })
+    if ($missingFromParent.Count -gt 0) {
+        throw "$($custom.Parent) no longer contains: $($missingFromParent -join ', '). Please open an issue on the provider, with this output."
+    }
+    foreach ($cmdlet in $custom.Cmdlets) {
+        if ($rolesByCmdlet.ContainsKey($cmdlet)) { $rolesByCmdlet[$cmdlet] = @($rolesByCmdlet[$cmdlet]) + $custom.Role }
+    }
 }
-foreach ($cmdlet in $RetentionCmdlets) {
-    if ($rolesByCmdlet.ContainsKey($cmdlet)) { $rolesByCmdlet[$cmdlet] = @($rolesByCmdlet[$cmdlet]) + $RetentionRole }
-}
-$groupRoles = @($ProviderRoles) + $RetentionRole
+$groupRoles = @($ProviderRoles) + @($CustomRoles | ForEach-Object { $_.Role })
 $uncovered = @(Find-UncoveredCmdlets -RolesByCmdlet $rolesByCmdlet -Roles $groupRoles)
 if ($uncovered.Count -gt 0) {
     $details = $uncovered | ForEach-Object { "  - $_ (in: $(@($rolesByCmdlet[$_]) -join ', '))" }
@@ -299,19 +406,25 @@ if ($uncovered.Count -gt 0) {
 Write-Host ""
 Write-Host "Management roles of '$RoleGroupName':"
 $ProviderRoles | ForEach-Object { Write-Host "  - $_" }
-Write-Host "  - $RetentionRole (custom role from ${RetentionParent}: $($RetentionCmdlets -join ', '))"
+$CustomRoles | ForEach-Object { Write-Host "  - $($_.Role) (custom role from $($_.Parent): $($_.Cmdlets -join ', '))" }
 
-# The custom retention role: entries to add or remove to match $RetentionCmdlets.
-$retentionExists = [bool](Get-ManagementRole -Identity $RetentionRole -ErrorAction SilentlyContinue)
-$retentionEntries = @()
-if ($retentionExists) { $retentionEntries = @(Get-ManagementRoleEntry "$RetentionRole\*" | ForEach-Object { [string]$_.Name }) }
-$entriesToRemove = @($retentionEntries | Where-Object { $RetentionCmdlets -notcontains $_ })
-$entriesToAdd = @($RetentionCmdlets | Where-Object { $retentionEntries -notcontains $_ })
-if (-not $retentionExists) {
-    Write-Host "The custom role '$RetentionRole' will be created."
-} elseif ($entriesToRemove.Count + $entriesToAdd.Count -gt 0) {
-    Write-Host "The custom role '$RetentionRole' will be updated: add $($entriesToAdd.Count) and remove $($entriesToRemove.Count) cmdlets."
+# Each custom role: entries to add or remove to match its list.
+foreach ($custom in $CustomRoles) {
+    $custom.Exists = [bool](Get-ManagementRole -Identity $custom.Role -ErrorAction SilentlyContinue)
+    $entries = @()
+    if ($custom.Exists) { $entries = @(Get-ManagementRoleEntry "$($custom.Role)\*" | ForEach-Object { [string]$_.Name }) }
+    $custom.ToRemove = @($entries | Where-Object { $custom.Cmdlets -notcontains $_ })
+    $custom.ToAdd = @($custom.Cmdlets | Where-Object { $entries -notcontains $_ })
+    if (-not $custom.Exists) {
+        Write-Host "The custom role '$($custom.Role)' will be created."
+    } elseif ($custom.ToRemove.Count + $custom.ToAdd.Count -gt 0) {
+        Write-Host "The custom role '$($custom.Role)' will be updated: add $($custom.ToAdd.Count) and remove $($custom.ToRemove.Count) cmdlets."
+    }
 }
+
+# The description of the custom roles: it marks the roles this script created,
+# which -RemoveExtraRoles may delete.
+$CustomRoleDescription = "for the workplace-as-code/msexchangeonline Terraform provider"
 
 # Roles of an existing role group that are not in the list, for example Mail
 # Recipient Creation, granted by versions before 0.3.1.
@@ -335,22 +448,25 @@ if (-not $AppId -or -not $ServicePrincipalObjectId) {
     throw "-Apply needs -AppId and -ServicePrincipalObjectId."
 }
 
-# The custom role first, so that the role group never misses its cmdlets. A
-# child role starts with every entry of its parent: the unneeded ones are removed.
-if (-not $retentionExists) {
-    New-ManagementRole -Name $RetentionRole -Parent $RetentionParent -Description "Retention policy cmdlets for the workplace-as-code/msexchangeonline Terraform provider" | Out-Null
-    Write-Host "Created the custom role '$RetentionRole'."
-    $entriesToRemove = @(Get-ManagementRoleEntry "$RetentionRole\*" | ForEach-Object { [string]$_.Name } | Where-Object { $RetentionCmdlets -notcontains $_ })
-    $entriesToAdd = @()
-}
-foreach ($cmdlet in $entriesToRemove) {
-    Remove-ManagementRoleEntry -Identity "$RetentionRole\$cmdlet" -Confirm:$false
-}
-foreach ($cmdlet in $entriesToAdd) {
-    Add-ManagementRoleEntry -Identity "$RetentionRole\$cmdlet" | Out-Null
-}
-if ($entriesToRemove.Count + $entriesToAdd.Count -gt 0) {
-    Write-Host "'$RetentionRole' now contains: $($RetentionCmdlets -join ', ')."
+# The custom roles first, so that the role group never misses their cmdlets. A
+# child role starts with every entry of its parent: the unneeded ones are
+# removed, one call each (Mail Recipients has hundreds: this takes minutes).
+foreach ($custom in $CustomRoles) {
+    if (-not $custom.Exists) {
+        New-ManagementRole -Name $custom.Role -Parent $custom.Parent -Description "Cmdlets of $($custom.Parent) $CustomRoleDescription" | Out-Null
+        Write-Host "Created the custom role '$($custom.Role)'."
+        $custom.ToRemove = @(Get-ManagementRoleEntry "$($custom.Role)\*" | ForEach-Object { [string]$_.Name } | Where-Object { $custom.Cmdlets -notcontains $_ })
+        $custom.ToAdd = @()
+    }
+    foreach ($cmdlet in $custom.ToRemove) {
+        Remove-ManagementRoleEntry -Identity "$($custom.Role)\$cmdlet" -Confirm:$false
+    }
+    foreach ($cmdlet in $custom.ToAdd) {
+        Add-ManagementRoleEntry -Identity "$($custom.Role)\$cmdlet" | Out-Null
+    }
+    if ($custom.ToRemove.Count + $custom.ToAdd.Count -gt 0) {
+        Write-Host "'$($custom.Role)' now contains: $($custom.Cmdlets -join ', ')."
+    }
 }
 
 $sp = Get-ServicePrincipal -Identity $ServicePrincipalObjectId -ErrorAction SilentlyContinue
@@ -371,6 +487,14 @@ if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
                 Where-Object { $_.RoleAssigneeName -eq $RoleGroupName } |
                 Remove-ManagementRoleAssignment -Confirm:$false
             Write-Host "Removed role '$role' from '$RoleGroupName'."
+            # A custom role of this script that nothing else uses, such as the
+            # old name of a renamed role.
+            $old = Get-ManagementRole -Identity $role
+            if (-not $old.IsRootRole -and "$($old.Description)" -like "*$CustomRoleDescription" -and
+                @(Get-ManagementRoleAssignment -Role $role -Delegating:$false).Count -eq 0) {
+                Remove-ManagementRole -Identity $role -Confirm:$false
+                Write-Host "Deleted the custom role '$role'."
+            }
         }
     }
 } else {
