@@ -153,6 +153,7 @@ CREATED=(
   "msexchangeonline_email_address_policy.test=TF-CI-AddressPolicy"
   "msexchangeonline_retention_policy.test=TF-CI-Retention"
   "msexchangeonline_retention_policy_tag.test=TF-CI-RetentionTag"
+  "msexchangeonline_sharing_policy.test=TF-CI-SharingPolicy"
   "msexchangeonline_hosted_outbound_spam_filter_rule.test=TF-CI-OutboundSpamRule"
   "msexchangeonline_outbound_spam_filter_policy.unscoped=TF-CI-OutboundSpam-Unscoped"
   "msexchangeonline_journal_rule.test=TF-CI-Journal"

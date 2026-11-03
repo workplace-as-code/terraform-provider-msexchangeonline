@@ -504,6 +504,17 @@ resource "msexchangeonline_retention_policy" "test" {
   retention_policy_tag_links = local.updated ? ["1 Week Delete", msexchangeonline_retention_policy_tag.test.name] : ["1 Week Delete"]
 }
 
+# Assigned to no mailbox: it has no effect. The update adds a domain with two
+# actions, the case most likely to come back from Exchange in another form.
+resource "msexchangeonline_sharing_policy" "test" {
+  name = "TF-CI-SharingPolicy"
+  domains = local.updated ? [
+    "tf-ci-test.example:CalendarSharingFreeBusySimple",
+    "tf-ci-partner.example:CalendarSharingFreeBusyDetail,ContactsSharing",
+  ] : ["tf-ci-test.example:CalendarSharingFreeBusySimple"]
+  enabled = !local.updated
+}
+
 # ---------------------------------------------------------------------------
 # Outputs — visible after apply to confirm data sources work
 # ---------------------------------------------------------------------------

@@ -90,6 +90,23 @@ var objectSpecs = []objectSpec{
 		},
 	},
 	{
+		typeName: "sharing_policy",
+		noun:     "SharingPolicy",
+		description: "Manages a sharing policy, which sets the calendar and contact information users can share with people " +
+			"outside the organization",
+		notes: "`domains` is required to create a policy. Mailboxes without a sharing policy of their own use the " +
+			"default one, `Default Sharing Policy`: import it to restrict sharing for the whole organization.",
+		fields: []field{
+			listAttr("domains", "Domains", "Domains and what users can share with them, as `domain:Action` or "+
+				"`domain:Action,Action` without spaces. The domain is a domain name (subdomains are not included), `*` "+
+				"for every federated organization or `Anonymous` for anyone with a link. Actions: "+
+				"`CalendarSharingFreeBusySimple`, `CalendarSharingFreeBusyDetail`, `CalendarSharingFreeBusyReviewer`, "+
+				"`ContactsSharing`."),
+			boolAttr("enabled", "Enabled", "Whether the policy applies. Mailboxes keep sharing until the sharing "+
+				"policy assistant next processes them."),
+		},
+	},
+	{
 		typeName: "hosted_outbound_spam_filter_rule",
 		noun:     "HostedOutboundSpamFilterRule",
 		script:   "exo_rule.ps1",

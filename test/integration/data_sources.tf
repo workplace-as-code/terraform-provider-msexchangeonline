@@ -234,3 +234,15 @@ data "msexchangeonline_atp_protection_policy_rule" "standard" {
     }
   }
 }
+
+data "msexchangeonline_sharing_policy" "test" {
+  name       = msexchangeonline_sharing_policy.test.name
+  depends_on = [msexchangeonline_sharing_policy.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == msexchangeonline_sharing_policy.test.id
+      error_message = "The data source read another object than the test one."
+    }
+  }
+}
