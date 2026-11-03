@@ -152,12 +152,13 @@ var objectSpecs = []objectSpec{
 	{
 		typeName: "sharing_policy",
 		noun:     "SharingPolicy",
+		script:   "sharing_policy.ps1",
 		description: "Manages a sharing policy, which sets the calendar and contact information users can share with people " +
 			"outside the organization",
 		notes: "`domains` is required to create a policy. Mailboxes without a sharing policy of their own use the " +
 			"default one, `Default Sharing Policy`: import it to restrict sharing for the whole organization.",
 		fields: []field{
-			listAttr("domains", "Domains", "Domains and what users can share with them, as `domain:Action` or "+
+			setAttr("domains", "Domains", "Domains and what users can share with them, as `domain:Action` or "+
 				"`domain:Action,Action` without spaces. The domain is a domain name (subdomains are not included), `*` "+
 				"for every federated organization or `Anonymous` for anyone with a link. Actions: "+
 				"`CalendarSharingFreeBusySimple`, `CalendarSharingFreeBusyDetail`, `CalendarSharingFreeBusyReviewer`, "+
@@ -174,7 +175,7 @@ var objectSpecs = []objectSpec{
 		notes: "`domain_names` is required to create a relationship. Get the `target_*` values of the other organization with " +
 			"`Get-FederationInformation -DomainName <domain>`. The mailbox move settings of cross-tenant migrations are not managed.",
 		fields: []field{
-			listAttr("domain_names", "DomainNames", "Domains of the other organization."),
+			setAttr("domain_names", "DomainNames", "Domains of the other organization."),
 			boolAttr("enabled", "Enabled", "Whether the relationship is used."),
 			boolAttr("free_busy_access_enabled", "FreeBusyAccessEnabled", "Share free/busy information with the other organization."),
 			enumAttr("free_busy_access_level", "FreeBusyAccessLevel", "Free/busy details shared when `free_busy_access_enabled` is `true`.",

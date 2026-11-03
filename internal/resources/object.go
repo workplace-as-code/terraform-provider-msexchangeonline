@@ -44,6 +44,7 @@ const (
 	enumField
 	listField
 	daysField // Exchange time span, exposed as a number of days
+	setField  // multi-valued property whose order Exchange does not keep
 )
 
 // field maps one Terraform attribute to one cmdlet parameter and property.
@@ -77,6 +78,13 @@ func daysAttr(name, param, desc string, validators ...validator.Int64) field {
 
 func listAttr(name, param, desc string) field {
 	return field{name: name, param: param, kind: listField, desc: desc}
+}
+
+// setAttr is a multi-valued property that Exchange returns in its own order
+// (domains of a sharing policy or an organization relationship): a set, so
+// that the order of the configuration never shows as a change.
+func setAttr(name, param, desc string) field {
+	return field{name: name, param: param, kind: setField, desc: desc}
 }
 
 // enumAttr is a string restricted to values, compared without regard to case.
@@ -144,6 +152,8 @@ func (f field) attrType() attr.Type {
 		return types.Int64Type
 	case listField:
 		return types.ListType{ElemType: types.StringType}
+	case setField:
+		return types.SetType{ElemType: types.StringType}
 	default:
 		return types.StringType
 	}
@@ -167,6 +177,8 @@ func (f field) schemaAttribute() schema.Attribute {
 		return a
 	case listField:
 		return optionalList(f.desc)
+	case setField:
+		return optionalSet(f.desc)
 	default:
 		a := optionalString(f.desc)
 		if f.forceNew {
@@ -411,6 +423,10 @@ func (r *objectResource) write(ctx context.Context, action string, plan, config 
 			items := []string{}
 			diags.Append(tv.ElementsAs(ctx, &items, false)...)
 			values[f.param] = items
+		case types.Set:
+			items := []string{}
+			diags.Append(tv.ElementsAs(ctx, &items, false)...)
+			values[f.param] = items
 		}
 	}
 	if diags.HasError() {
@@ -464,6 +480,8 @@ func (r *objectResource) fromAPI(prior types.Object, output []byte) (types.Objec
 			values[f.name] = types.Int64Value(timeSpanDays(raw))
 		case listField:
 			values[f.name] = listValue(toStrings(raw))
+		case setField:
+			values[f.name] = setValue(toStrings(raw))
 		case enumField:
 			s, _ := raw.(string)
 			priorValue, _ := priorAttrs[f.name].(types.String)

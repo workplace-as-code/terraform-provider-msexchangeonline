@@ -33,7 +33,7 @@ output "fabrikam_free_busy_level" {
 
 - `archive_access_enabled` (Boolean) The other organization hosts the cloud archives of this organization's mailboxes (hybrid).
 - `delivery_report_enabled` (Boolean) Share delivery reports with the other organization.
-- `domain_names` (List of String) Domains of the other organization.
+- `domain_names` (Set of String) Domains of the other organization.
 - `enabled` (Boolean) Whether the relationship is used.
 - `free_busy_access_enabled` (Boolean) Share free/busy information with the other organization.
 - `free_busy_access_level` (String) Free/busy details shared when `free_busy_access_enabled` is `true`. Valid values: `None`, `AvailabilityOnly`, `LimitedDetails` (case-insensitive).

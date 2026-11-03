@@ -31,7 +31,7 @@ output "default_sharing_domains" {
 
 ### Read-Only
 
-- `domains` (List of String) Domains and what users can share with them, as `domain:Action` or `domain:Action,Action` without spaces. The domain is a domain name (subdomains are not included), `*` for every federated organization or `Anonymous` for anyone with a link. Actions: `CalendarSharingFreeBusySimple`, `CalendarSharingFreeBusyDetail`, `CalendarSharingFreeBusyReviewer`, `ContactsSharing`.
+- `domains` (Set of String) Domains and what users can share with them, as `domain:Action` or `domain:Action,Action` without spaces. The domain is a domain name (subdomains are not included), `*` for every federated organization or `Anonymous` for anyone with a link. Actions: `CalendarSharingFreeBusySimple`, `CalendarSharingFreeBusyDetail`, `CalendarSharingFreeBusyReviewer`, `ContactsSharing`.
 - `enabled` (Boolean) Whether the policy applies. Mailboxes keep sharing until the sharing policy assistant next processes them.
 - `id` (String) The object name (same as `name`).
 
