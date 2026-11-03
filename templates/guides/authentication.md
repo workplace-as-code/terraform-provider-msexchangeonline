@@ -67,6 +67,8 @@ When a built-in role grants much more than the provider needs, the script create
 | `terraform-msexchangeonline Sharing` | **Federated Sharing** | Sharing policy and organization relationship cmdlets | Change the federation trust and hybrid free/busy settings |
 | `terraform-msexchangeonline Audit Log` | **Audit Logs** | `Get-` and `Set-AdminAuditLogConfig` | Search the whole audit log and exclude a mailbox from it |
 
+The names above are the defaults, `<role group> <name>`. For a naming convention, `-RoleGroupName` names the role group, `-CustomRolePrefix` replaces the prefix of the custom roles (`-CustomRolePrefix CR-EXO-TF-` gives `CR-EXO-TF-Retention`), and `-CustomRoleNames` names each custom role (`-CustomRoleNames @{ Retention = "CR-EXO-TF-RET" }`). The provider does not depend on these names. After a rename, `-Apply -RemoveExtraRoles` deletes the old custom roles.
+
 The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one. Run it as an administrator who can manage roles (Organization Management).
 
 You need the Object ID of the app's **service principal**: **Entra admin center → Enterprise applications → terraform-msexchangeonline → Object ID**. It differs from the Object ID shown under App registrations.

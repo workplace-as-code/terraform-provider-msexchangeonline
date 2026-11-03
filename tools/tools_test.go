@@ -188,6 +188,36 @@ $none = Find-UncoveredCmdlets -RolesByCmdlet $byCmdlet -Roles @("Transport Rules
 	}
 }
 
+func TestCustomRoleNames(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	run := func(args string) (string, error) {
+		script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + ` ` + args + `
+($CustomRoles | ForEach-Object { "$($_.Name)=$($_.Role)" }) -join "|"
+`
+		out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
+
+	out, err := run(`-RoleGroupName RG-TF`)
+	if err != nil || !strings.Contains(out, "Retention=RG-TF Retention") {
+		t.Errorf("default names: %v %s", err, out)
+	}
+	out, err = run(`-CustomRolePrefix CR-TF- -CustomRoleNames @{ Retention = "CR-RET" }`)
+	if err != nil || !strings.Contains(out, "Retention=CR-RET") || !strings.Contains(out, "Sharing=CR-TF-Sharing") {
+		t.Errorf("prefix and names: %v %s", err, out)
+	}
+	if out, err = run(`-CustomRoleNames @{ Retentions = "CR-RET" }`); err == nil {
+		t.Errorf("an unknown custom role name must fail: %s", out)
+	}
+	if out, err = run(`-CustomRoleNames @{ Retention = "CR-X"; Sharing = "CR-X" }`); err == nil {
+		t.Errorf("two custom roles with the same name must fail: %s", out)
+	}
+}
+
 // TestGuideListsTheProviderRoles keeps the role list of the authentication
 // guide in line with $ProviderRoles, so that the docs say exactly what the
 // role group grants.
