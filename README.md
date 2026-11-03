@@ -79,6 +79,7 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 | Defender for Office 365 | `msexchangeonline_safe_links_policy`, `msexchangeonline_safe_links_rule`, `msexchangeonline_safe_attachment_policy`, `msexchangeonline_safe_attachment_rule` |
 | Clients and devices | `msexchangeonline_owa_mailbox_policy`, `msexchangeonline_mobile_device_mailbox_policy`, `msexchangeonline_activesync_organization_settings`, `msexchangeonline_activesync_device_access_rule`, `msexchangeonline_cas_mailbox_plan` |
 | Organization | `msexchangeonline_organization_config`, `msexchangeonline_email_address_policy`, `msexchangeonline_retention_policy`, `msexchangeonline_retention_policy_tag`, `msexchangeonline_application_access_policy`, `msexchangeonline_admin_audit_log_config`, `msexchangeonline_sharing_policy`, `msexchangeonline_organization_relationship`, `msexchangeonline_mailbox_plan` |
+| Address book | `msexchangeonline_address_list`, `msexchangeonline_global_address_list`, `msexchangeonline_offline_address_book`, `msexchangeonline_address_book_policy` |
 
 Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Two more read the tenant: `msexchangeonline_accepted_domains` and `msexchangeonline_mailbox`. Full reference in [docs/data-sources](docs/data-sources/).
 

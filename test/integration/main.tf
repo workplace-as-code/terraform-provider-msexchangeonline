@@ -581,6 +581,55 @@ resource "msexchangeonline_organization_relationship" "test" {
 }
 
 # ---------------------------------------------------------------------------
+# Address book segmentation: every list selects CustomAttribute15 =
+# "TF-CI-NOBODY", which no recipient has, so the lists stay empty. The filters
+# are written without parentheses, which Exchange adds: the drift checks show
+# that the configured text is kept.
+# ---------------------------------------------------------------------------
+
+resource "msexchangeonline_address_list" "test" {
+  name         = "TF-CI-AddressList"
+  display_name = local.updated ? "TF-CI Address List (updated)" : null
+  recipient_filter = local.updated ? (
+    "CustomAttribute15 -eq 'TF-CI-NOBODY' -and Department -eq 'TF-CI'"
+  ) : "CustomAttribute15 -eq 'TF-CI-NOBODY'"
+}
+
+resource "msexchangeonline_address_list" "child" {
+  name             = "TF-CI-AddressList-Child"
+  container        = msexchangeonline_address_list.test.name
+  recipient_filter = "CustomAttribute15 -eq 'TF-CI-NOBODY' -and City -eq 'TF-CI'"
+}
+
+resource "msexchangeonline_address_list" "rooms" {
+  name             = "TF-CI-Rooms"
+  recipient_filter = "RecipientDisplayType -eq 'ConferenceRoomMailbox' -and CustomAttribute15 -eq 'TF-CI-NOBODY'"
+}
+
+resource "msexchangeonline_global_address_list" "test" {
+  name = "TF-CI-GAL"
+  recipient_filter = local.updated ? (
+    "CustomAttribute15 -eq 'TF-CI-NOBODY' -or CustomAttribute14 -eq 'TF-CI-NOBODY'"
+  ) : "CustomAttribute15 -eq 'TF-CI-NOBODY'"
+}
+
+resource "msexchangeonline_offline_address_book" "test" {
+  name          = "TF-CI-OAB"
+  address_lists = [msexchangeonline_global_address_list.test.name]
+}
+
+resource "msexchangeonline_address_book_policy" "test" {
+  name                 = "TF-CI-ABP"
+  global_address_list  = msexchangeonline_global_address_list.test.name
+  offline_address_book = msexchangeonline_offline_address_book.test.name
+  room_list            = msexchangeonline_address_list.rooms.name
+  address_lists = local.updated ? [
+    msexchangeonline_address_list.test.name,
+    msexchangeonline_address_list.child.name,
+  ] : [msexchangeonline_address_list.test.name]
+}
+
+# ---------------------------------------------------------------------------
 # Outputs — visible after apply to confirm data sources work
 # ---------------------------------------------------------------------------
 

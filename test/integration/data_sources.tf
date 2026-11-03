@@ -258,3 +258,15 @@ data "msexchangeonline_organization_relationship" "test" {
     }
   }
 }
+
+data "msexchangeonline_address_book_policy" "test" {
+  name       = msexchangeonline_address_book_policy.test.name
+  depends_on = [msexchangeonline_address_book_policy.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.global_address_list == msexchangeonline_global_address_list.test.name
+      error_message = "The data source read another policy than the test one, or without its GAL."
+    }
+  }
+}

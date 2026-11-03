@@ -69,6 +69,10 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_mailbox_plan`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/mailbox_plan) | Adopted: size limits of new mailboxes, per license |
 | [`msexchangeonline_cas_mailbox_plan`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/cas_mailbox_plan) | Adopted: client protocols of new mailboxes, per license |
 | [`msexchangeonline_admin_audit_log_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/admin_audit_log_config) | Singleton: unified audit log on or off |
+| [`msexchangeonline_address_list`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/address_list) | Address book segmentation: filtered list of recipients |
+| [`msexchangeonline_global_address_list`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/global_address_list) | Custom GAL of an address book policy |
+| [`msexchangeonline_offline_address_book`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/offline_address_book) | Offline address book of an address book policy |
+| [`msexchangeonline_address_book_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/address_book_policy) | Assigning it to mailboxes is not managed |
 
 ## Data sources
 

@@ -161,6 +161,12 @@ CREATED=(
   "msexchangeonline_journal_rule.test=TF-CI-Journal"
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
+  "msexchangeonline_address_book_policy.test=TF-CI-ABP"
+  "msexchangeonline_offline_address_book.test=TF-CI-OAB"
+  "msexchangeonline_global_address_list.test=TF-CI-GAL"
+  "msexchangeonline_address_list.child=TF-CI-AddressList-Child"
+  "msexchangeonline_address_list.test=TF-CI-AddressList"
+  "msexchangeonline_address_list.rooms=TF-CI-Rooms"
 )
 if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   export TF_VAR_test_defender=true
@@ -409,6 +415,12 @@ for addr in "${PRESET[@]}"; do
   terraform import -no-color -var phase=update "$addr" "Standard Preset Security Policy" > /dev/null || fail "Import of $addr failed"
 done
 pass "${#CREATED[@]} resources imported"
+# An imported filter holds Exchange's text, with parentheses: the first apply
+# writes the same filter in the configured form.
+terraform apply -auto-approve -no-color -var phase=update \
+  -target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child \
+  -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test > /dev/null ||
+  fail "Recording the filters after import failed"
 expect_no_changes "Drift check after import" -var phase=update
 
 # ---------------------------------------------------------------------------

@@ -15,7 +15,7 @@ Manages an organization relationship, which shares free/busy information, MailTi
 # Free/busy times with a subsidiary on another Microsoft 365 tenant. The target
 # values come from Get-FederationInformation -DomainName fabrikam.com.
 locals {
-  fabrikam_autodiscover = "https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc/WSSecurity"
+  autodiscover = "https://autodiscover-s.outlook.com/autodiscover/autodiscover.svc/WSSecurity"
 }
 
 resource "msexchangeonline_organization_relationship" "fabrikam" {
@@ -24,7 +24,7 @@ resource "msexchangeonline_organization_relationship" "fabrikam" {
   free_busy_access_enabled = true
   free_busy_access_level   = "AvailabilityOnly"
   target_application_uri   = "outlook.com"
-  target_autodiscover_epr  = local.fabrikam_autodiscover
+  target_autodiscover_epr  = local.autodiscover
 }
 ```
 

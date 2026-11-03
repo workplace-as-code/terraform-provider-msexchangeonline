@@ -49,7 +49,7 @@ func TestObjectSpecs(t *testing.T) {
 func TestFromAPIConvertsTimeSpansAndKeepsCase(t *testing.T) {
 	r := &objectResource{spec: objectSpecs[0]} // retention_policy_tag
 	plan, diags := r.fromAPI(mustObject(t, r, map[string]string{"name": "Archive", "retention_action": "movetoarchive"}),
-		[]byte(`{"Name":"Archive","RetentionAction":"MoveToArchive","AgeLimitForRetention":"730.00:00:00","RetentionEnabled":true}`))
+		[]byte(`{"Name":"Archive","RetentionAction":"MoveToArchive","AgeLimitForRetention":"730.00:00:00","RetentionEnabled":true}`), nil)
 	if diags.HasError() {
 		t.Fatal(diags)
 	}
@@ -111,6 +111,38 @@ func TestToStrings(t *testing.T) {
 	for name, tc := range cases {
 		if got := toStrings(tc.raw); len(got) != tc.want {
 			t.Errorf("%s: toStrings(%v) = %v, want %d elements", name, tc.raw, got, tc.want)
+		}
+	}
+}
+
+func TestFromAPIKeepsTheConfiguredFilter(t *testing.T) {
+	var spec objectSpec
+	for _, s := range objectSpecs {
+		if s.typeName == "address_list" {
+			spec = s
+		}
+	}
+	r := &objectResource{spec: spec}
+	configured := "CustomAttribute1 -eq 'Contoso' -and Department -eq 'Sales'"
+	rewritten := "((CustomAttribute1 -eq 'Contoso') -and (Department -eq 'Sales'))"
+	prior := mustObject(t, r, map[string]string{"name": "Sales", "recipient_filter": configured})
+	output := []byte(`{"Name":"Sales","RecipientFilter":"` + rewritten + `","Container":""}`)
+
+	// Exchange returns what it returned after the last write: the configured text stays.
+	state, diags := r.fromAPI(prior, output, map[string]string{"recipient_filter": rewritten})
+	if diags.HasError() {
+		t.Fatal(diags)
+	}
+	if got := state.Attributes()["recipient_filter"].(types.String).ValueString(); got != configured {
+		t.Errorf("recipient_filter = %q, want the configured text", got)
+	}
+
+	// The filter was changed outside Terraform, or nothing was recorded (import):
+	// Exchange's text shows.
+	for _, recorded := range []map[string]string{{"recipient_filter": "((Department -eq 'Other'))"}, nil} {
+		state, _ = r.fromAPI(prior, output, recorded)
+		if got := state.Attributes()["recipient_filter"].(types.String).ValueString(); got != rewritten {
+			t.Errorf("recipient_filter = %q, want Exchange's text", got)
 		}
 	}
 }

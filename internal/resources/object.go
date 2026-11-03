@@ -45,6 +45,10 @@ const (
 	listField
 	daysField // Exchange time span, exposed as a number of days
 	setField  // multi-valued property whose order Exchange does not keep
+	// filterField is an OPATH recipient filter, which Exchange rewrites (it adds
+	// parentheses): the state keeps the configured text while Exchange returns
+	// the text it returned after the last write, recorded in private state.
+	filterField
 )
 
 // field maps one Terraform attribute to one cmdlet parameter and property.
@@ -85,6 +89,11 @@ func listAttr(name, param, desc string) field {
 // that the order of the configuration never shows as a change.
 func setAttr(name, param, desc string) field {
 	return field{name: name, param: param, kind: setField, desc: desc}
+}
+
+// filterAttr is an OPATH recipient filter such as RecipientFilter.
+func filterAttr(name, param, desc string) field {
+	return field{name: name, param: param, kind: filterField, desc: desc}
 }
 
 // enumAttr is a string restricted to values, compared without regard to case.
@@ -272,12 +281,13 @@ func (r *objectResource) Create(ctx context.Context, req resource.CreateRequest,
 	if r.spec.singleton || r.spec.adopted {
 		action = "Update"
 	}
-	state, diags := r.write(ctx, action, plan, config, r.identity(plan))
+	state, written, diags := r.write(ctx, action, plan, config, r.identity(plan))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(r.recordFilters(ctx, resp.Private, written)...)
 }
 
 func (r *objectResource) Read(ctx context.Context, req resource.ReadRequest, resp *resource.ReadResponse) {
@@ -295,7 +305,9 @@ func (r *objectResource) Read(ctx context.Context, req resource.ReadRequest, res
 		resp.State.RemoveResource(ctx)
 		return
 	}
-	state, diags := r.fromAPI(prior, output)
+	recorded, diags := r.recordedFilters(ctx, req.Private)
+	resp.Diagnostics.Append(diags...)
+	state, diags := r.fromAPI(prior, output, recorded)
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -311,12 +323,48 @@ func (r *objectResource) Update(ctx context.Context, req resource.UpdateRequest,
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	state, diags := r.write(ctx, "Update", plan, config, r.identity(prior))
+	state, written, diags := r.write(ctx, "Update", plan, config, r.identity(prior))
 	resp.Diagnostics.Append(diags...)
 	if resp.Diagnostics.HasError() {
 		return
 	}
 	resp.Diagnostics.Append(resp.State.Set(ctx, state)...)
+	resp.Diagnostics.Append(r.recordFilters(ctx, resp.Private, written)...)
+}
+
+// privateState is the private state of a response or request (resp.Private).
+type privateState interface {
+	GetKey(ctx context.Context, key string) ([]byte, diag.Diagnostics)
+	SetKey(ctx context.Context, key string, value []byte) diag.Diagnostics
+}
+
+// recordFilters saves the filters as Exchange returned them after a write.
+func (r *objectResource) recordFilters(ctx context.Context, private privateState, filters map[string]string) diag.Diagnostics {
+	var diags diag.Diagnostics
+	for name, value := range filters {
+		raw, _ := json.Marshal(value)
+		diags.Append(private.SetKey(ctx, "filter_"+name, raw)...)
+	}
+	return diags
+}
+
+// recordedFilters returns the filters saved by recordFilters; none after an
+// import, or when the request has no private state (terraform query).
+func (r *objectResource) recordedFilters(ctx context.Context, private privateState) (map[string]string, diag.Diagnostics) {
+	var diags diag.Diagnostics
+	recorded := map[string]string{}
+	for _, f := range r.spec.fields {
+		if f.kind != filterField || private == nil {
+			continue
+		}
+		raw, d := private.GetKey(ctx, "filter_"+f.name)
+		diags.Append(d...)
+		var value string
+		if len(raw) > 0 && json.Unmarshal(raw, &value) == nil {
+			recorded[f.name] = value
+		}
+	}
+	return recorded, diags
 }
 
 // Delete removes the object. Tenant-wide settings and adopted objects cannot be
@@ -388,7 +436,9 @@ func (r *objectResource) params(action, identity string, values map[string]any) 
 // Only the attributes set in the configuration are sent: the plan also holds
 // the current value of the others (UseStateForUnknown), and writing them back
 // could fail (an empty address) or overwrite a change made in the meantime.
-func (r *objectResource) write(ctx context.Context, action string, plan, config types.Object, identity string) (types.Object, diag.Diagnostics) {
+//
+// It also returns the filters as Exchange wrote them, to record.
+func (r *objectResource) write(ctx context.Context, action string, plan, config types.Object, identity string) (types.Object, map[string]string, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	values := map[string]any{}
 	attrs, configured := plan.Attributes(), config.Attributes()
@@ -430,22 +480,39 @@ func (r *objectResource) write(ctx context.Context, action string, plan, config 
 		}
 	}
 	if diags.HasError() {
-		return plan, diags
+		return plan, nil, diags
 	}
 	output, err := r.client.RunScript(ctx, r.spec.scriptName(), r.params(action, identity, values))
 	if err != nil {
 		diags.AddError(fmt.Sprintf("Failed to write %s", r.spec.typeName), err.Error())
-		return plan, diags
+		return plan, nil, diags
 	}
-	state, d := r.fromAPI(plan, output)
+	// The filters just written are the ones to keep in their configured form.
+	written := r.filtersOf(output)
+	state, d := r.fromAPI(plan, output, written)
 	diags.Append(d...)
-	return state, diags
+	return state, written, diags
+}
+
+// filtersOf returns the filter fields of a bridge response.
+func (r *objectResource) filtersOf(output []byte) map[string]string {
+	var api map[string]any
+	_ = json.Unmarshal(output, &api)
+	filters := map[string]string{}
+	for _, f := range r.spec.fields {
+		if f.kind == filterField {
+			s, _ := api[f.param].(string)
+			filters[f.name] = s
+		}
+	}
+	return filters
 }
 
 // fromAPI builds the state from the JSON object returned by the bridge. prior
 // is the plan or previous state: it supplies the name and keeps the configured
-// case of enum values.
-func (r *objectResource) fromAPI(prior types.Object, output []byte) (types.Object, diag.Diagnostics) {
+// case of enum values, and the configured text of the filters that Exchange
+// returns as recorded.
+func (r *objectResource) fromAPI(prior types.Object, output []byte, recorded map[string]string) (types.Object, diag.Diagnostics) {
 	var diags diag.Diagnostics
 	var api map[string]any
 	if err := json.Unmarshal(output, &api); err != nil {
@@ -486,6 +553,13 @@ func (r *objectResource) fromAPI(prior types.Object, output []byte) (types.Objec
 			s, _ := raw.(string)
 			priorValue, _ := priorAttrs[f.name].(types.String)
 			values[f.name] = foldString(priorValue, s)
+		case filterField:
+			s, _ := raw.(string)
+			priorValue, _ := priorAttrs[f.name].(types.String)
+			values[f.name] = types.StringValue(s)
+			if last, ok := recorded[f.name]; ok && last == s && known(priorValue) && priorValue.ValueString() != "" {
+				values[f.name] = priorValue
+			}
 		default:
 			s, _ := raw.(string)
 			values[f.name] = types.StringValue(s)

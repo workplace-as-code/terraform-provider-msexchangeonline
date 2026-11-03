@@ -269,4 +269,66 @@ var objectSpecs = []objectSpec{
 			listAttr("except_if_recipient_domain_is", "ExceptIfRecipientDomainIs", "Exception: the recipient's domain is one of these accepted domains."),
 		},
 	},
+	{
+		typeName: "address_list",
+		noun:     "AddressList",
+		script:   "address_book.ps1",
+		description: "Manages an address list: the recipients that match a filter, shown to users through an address book " +
+			"policy",
+		notes: "In Exchange Online, users only see an address list through an address book policy. Exchange Online cannot " +
+			"recalculate the members of a list: after a change of `recipient_filter`, a recipient enters or leaves the list when " +
+			"its own object next changes. Precanned filters (`-IncludedRecipients` and `-Conditional*`) are not managed: an " +
+			"imported precanned list shows the equivalent filter in `recipient_filter`, and applying writes it as a custom filter.",
+		fields: []field{
+			stringAttr("display_name", "DisplayName", "The name shown in Outlook. Defaults to `name`."),
+			{
+				name: "container", param: "Container", kind: stringField, forceNew: true,
+				desc: "Name of the parent address list, for a list nested in another one. Empty for a top-level list. " +
+					"Changing it creates a new list.",
+			},
+			filterAttr("recipient_filter", "RecipientFilter", "OPATH filter of the recipients in the list, for example "+
+				"`Company -eq 'Contoso' -and RecipientType -eq 'UserMailbox'`. Exchange rewrites it with parentheses: the "+
+				"configured text is kept as long as Exchange returns the text it wrote."),
+		},
+	},
+	{
+		typeName:    "global_address_list",
+		noun:        "GlobalAddressList",
+		description: "Manages a global address list (GAL), the main address list of an address book policy",
+		notes: "Manage a custom GAL for each entity of the organization; the default GAL, `Default Global Address List`, " +
+			"can be imported but not changed. Exchange Online cannot recalculate the members of a GAL: after a change of " +
+			"`recipient_filter`, a recipient enters or leaves it when its own object next changes.",
+		fields: []field{
+			filterAttr("recipient_filter", "RecipientFilter", "OPATH filter of the recipients in the GAL, for example "+
+				"`CustomAttribute1 -eq 'Contoso'`. Exchange rewrites it with parentheses: the configured text is kept as long "+
+				"as Exchange returns the text it wrote."),
+		},
+	},
+	{
+		typeName:    "offline_address_book",
+		noun:        "OfflineAddressBook",
+		script:      "address_book.ps1",
+		description: "Manages an offline address book (OAB), the address lists Outlook downloads for offline use",
+		notes:       "Which offline address book is the default is not managed.",
+		fields: []field{
+			setAttr("address_lists", "AddressLists", "Names of the address lists in the offline address book, usually the "+
+				"GAL of an address book policy. Required to create it."),
+		},
+	},
+	{
+		typeName: "address_book_policy",
+		noun:     "AddressBookPolicy",
+		script:   "address_book.ps1",
+		description: "Manages an address book policy (ABP), which gives the mailboxes it is assigned to their own GAL, " +
+			"address lists, offline address book and room list",
+		notes: "All four references are required to create a policy; they are names of the corresponding resources. " +
+			"Assigning the policy to mailboxes (`Set-Mailbox -AddressBookPolicy`) is not managed.",
+		fields: []field{
+			stringAttr("global_address_list", "GlobalAddressList", "Name of the global address list."),
+			stringAttr("offline_address_book", "OfflineAddressBook", "Name of the offline address book."),
+			stringAttr("room_list", "RoomList", "Name of the address list of the rooms users can book, an address list "+
+				"whose filter selects room mailboxes."),
+			setAttr("address_lists", "AddressLists", "Names of the address lists users see besides the GAL."),
+		},
+	},
 }
