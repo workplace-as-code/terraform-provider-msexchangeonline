@@ -47,6 +47,7 @@ Choose one option.
 
 [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) creates a role group with only the management roles that contain the cmdlets the provider runs, and adds the app to it. Unlike Exchange Administrator, the group cannot create, delete or change mailboxes and other recipients. Its roles:
 
+- **Address Lists**
 - **E-Mail Address Policies**
 - **Journaling**
 - **Organization Configuration**
@@ -55,7 +56,16 @@ Choose one option.
 - **Remote and Accepted Domains**
 - **Transport Hygiene**
 - **Transport Rules**
-- `terraform-msexchangeonline Retention`, a custom role that the script creates from **Retention Management** with only the retention policy and tag cmdlets and `Get-Mailbox`. The built-in role can also lift litigation holds and disable accounts.
+
+When a built-in role grants much more than the provider needs, the script creates a custom role from it that keeps only the provider's cmdlets:
+
+| Custom role | From | Keeps | The built-in role can also |
+|---|---|---|---|
+| `terraform-msexchangeonline Retention` | **Retention Management** | Retention policy and tag cmdlets, `Get-Mailbox` | Lift litigation holds and disable accounts |
+| `terraform-msexchangeonline Mailbox Plans` | **Mail Recipients** | Mailbox plan and CAS mailbox plan cmdlets | Change every mailbox, user and group |
+| `terraform-msexchangeonline ActiveSync` | **Organization Client Access** | ActiveSync organization settings and device access rule cmdlets | Change the protocols of each mailbox and trust partner applications |
+| `terraform-msexchangeonline Sharing` | **Federated Sharing** | Sharing policy and organization relationship cmdlets | Change the federation trust and hybrid free/busy settings |
+| `terraform-msexchangeonline Audit Log` | **Audit Logs** | `Get-` and `Set-AdminAuditLogConfig` | Search the whole audit log and exclude a mailbox from it |
 
 The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one. Run it as an administrator who can manage roles (Organization Management).
 
