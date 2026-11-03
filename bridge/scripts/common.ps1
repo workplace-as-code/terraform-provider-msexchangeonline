@@ -144,10 +144,11 @@ function Invoke-BridgeRetry {
         } catch {
             $message = $_.Exception.Message
             $transient = $message -match 'server side error|try again|throttl|\b429\b|\b503\b|timed out|temporarily unavailable'
-            # "A task was canceled" is a client-side timeout: the request may
-            # have been processed. Reads and updates can be sent again, a
-            # creation would then fail on a duplicate.
-            if (-not $Create -and $message -match 'task was canceled') { $transient = $true }
+            # "A task was canceled" is a client-side timeout, and "Error sending
+            # HTTP request" a lost connection: the request may have been
+            # processed. Reads and updates can be sent again, a creation would
+            # then fail on a duplicate.
+            if (-not $Create -and $message -match 'task was canceled|error sending http request') { $transient = $true }
             if (-not $transient -or $attempt -ge $MaxAttempts) { throw }
             Start-Sleep -Seconds (5 * $attempt)
         }

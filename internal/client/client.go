@@ -174,8 +174,9 @@ var (
 )
 
 // transientError matches the Exchange Online errors that go away when the
-// request is sent again: server-side errors, throttling, timeouts.
-var transientError = regexp.MustCompile(`(?i)server side error|try again|throttl|\b429\b|\b503\b|timed out|temporarily unavailable|task was canceled`)
+// request is sent again: server-side errors, throttling, timeouts, and a
+// request that did not get through ("Error sending HTTP request").
+var transientError = regexp.MustCompile(`(?i)server side error|try again|throttl|\b429\b|\b503\b|timed out|temporarily unavailable|task was canceled|error sending http request`)
 
 // isRead reports whether a script call only reads: a Get action, or the
 // listing of the existing objects for terraform query.
