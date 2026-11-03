@@ -216,6 +216,16 @@ resource "msexchangeonline_transport_config" "this" {
   reply_all_storm_block_duration_hours = var.reply_all_storm_block_duration_hours
 }
 
+# Only sets the default value: the suite never turns the audit log off.
+import {
+  to = msexchangeonline_admin_audit_log_config.this
+  id = "default"
+}
+
+resource "msexchangeonline_admin_audit_log_config" "this" {
+  unified_audit_log_ingestion_enabled = true
+}
+
 # ---------------------------------------------------------------------------
 # Mail flow
 # ---------------------------------------------------------------------------

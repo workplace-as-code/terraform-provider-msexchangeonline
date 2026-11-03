@@ -195,6 +195,7 @@ KEEP=(
   "msexchangeonline_hosted_connection_filter_policy.this"
   "msexchangeonline_external_in_outlook.this"
   "msexchangeonline_transport_config.this"
+  "msexchangeonline_admin_audit_log_config.this"
   "msexchangeonline_remote_domain.default"
   "msexchangeonline_hosted_content_filter_policy.default"
   "msexchangeonline_mobile_device_mailbox_policy.default"

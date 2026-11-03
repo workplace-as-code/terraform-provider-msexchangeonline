@@ -62,6 +62,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_retention_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy) | Messaging records management |
 | [`msexchangeonline_retention_policy_tag`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy_tag) |  |
 | [`msexchangeonline_application_access_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/application_access_policy) | Limits the mailboxes a Microsoft Graph app can access |
+| [`msexchangeonline_admin_audit_log_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/admin_audit_log_config) | Singleton: unified audit log on or off |
 
 ## Data sources
 
@@ -74,7 +75,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 
 ## Singletons
 
-Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
+Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
 
 ```terraform
 import {

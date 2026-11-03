@@ -80,6 +80,16 @@ var objectSpecs = []objectSpec{
 		},
 	},
 	{
+		typeName:    "admin_audit_log_config",
+		noun:        "AdminAuditLogConfig",
+		singleton:   true,
+		description: "Manages the recording of user and admin activities in the Microsoft 365 unified audit log",
+		fields: []field{
+			boolAttr("unified_audit_log_ingestion_enabled", "UnifiedAuditLogIngestionEnabled",
+				"Record user and admin activities in the unified audit log. A change can take up to 60 minutes to apply."),
+		},
+	},
+	{
 		typeName: "hosted_outbound_spam_filter_rule",
 		noun:     "HostedOutboundSpamFilterRule",
 		script:   "exo_rule.ps1",
