@@ -50,6 +50,18 @@ variable "activesync_admin_mail_recipients" {
   default     = null
 }
 
+variable "cas_mailbox_plan_pop_enabled" {
+  description = "Set by test/run.sh to test a write to a CAS mailbox plan, then to restore it. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
+variable "mailbox_plan_retain_deleted_items_for_days" {
+  description = "Set by test/run.sh to test a write to a mailbox plan, then to restore it. null leaves it unmanaged."
+  type        = number
+  default     = null
+}
+
 variable "reply_all_storm_block_duration_hours" {
   description = "Set by test/run.sh to test a write to the transport config, then to restore it. null leaves it unmanaged."
   type        = number
@@ -220,6 +232,27 @@ import {
 
 resource "msexchangeonline_mobile_device_mailbox_policy" "default" {
   name = "Default"
+}
+
+# Mailbox plans come with the licenses: adopted by display name, never created.
+import {
+  to = msexchangeonline_mailbox_plan.enterprise
+  id = "ExchangeOnlineEnterprise"
+}
+
+resource "msexchangeonline_mailbox_plan" "enterprise" {
+  name                          = "ExchangeOnlineEnterprise"
+  retain_deleted_items_for_days = var.mailbox_plan_retain_deleted_items_for_days
+}
+
+import {
+  to = msexchangeonline_cas_mailbox_plan.enterprise
+  id = "ExchangeOnlineEnterprise"
+}
+
+resource "msexchangeonline_cas_mailbox_plan" "enterprise" {
+  name        = "ExchangeOnlineEnterprise"
+  pop_enabled = var.cas_mailbox_plan_pop_enabled
 }
 
 import {

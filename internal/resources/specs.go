@@ -105,6 +105,51 @@ var objectSpecs = []objectSpec{
 		},
 	},
 	{
+		typeName: "mailbox_plan",
+		noun:     "MailboxPlan",
+		script:   "mailbox_plan.ps1",
+		adopted:  true,
+		description: "Manages a mailbox plan: the size limits and deleted item retention that new mailboxes get from " +
+			"their license. Existing mailboxes keep their settings",
+		notes: "`name` is the display name of the plan, the same in every tenant, for example `ExchangeOnlineEnterprise` " +
+			"(Exchange Online Plan 2), `ExchangeOnline` (Plan 1), `ExchangeOnlineDeskless` (Kiosk) or `ExchangeOnlineEssentials`. " +
+			"Sizes are in megabytes and cannot exceed what the license allows.",
+		fields: []field{
+			int64Attr("max_send_size_mb", "MaxSendSize", "Largest message a new mailbox can send, in MB (up to 150).",
+				int64validator.Between(1, 150)),
+			int64Attr("max_receive_size_mb", "MaxReceiveSize", "Largest message a new mailbox can receive, in MB (up to 150).",
+				int64validator.Between(1, 150)),
+			int64Attr("issue_warning_quota_mb", "IssueWarningQuota", "Mailbox size, in MB, at which the user is warned.",
+				int64validator.AtLeast(1)),
+			int64Attr("prohibit_send_quota_mb", "ProhibitSendQuota", "Mailbox size, in MB, at which the user can no longer send.",
+				int64validator.AtLeast(1)),
+			int64Attr("prohibit_send_receive_quota_mb", "ProhibitSendReceiveQuota",
+				"Mailbox size, in MB, at which the mailbox can no longer send or receive.", int64validator.AtLeast(1)),
+			daysAttr("retain_deleted_items_for_days", "RetainDeletedItemsFor", "Days deleted items can be recovered (up to 30).",
+				int64validator.Between(1, 30)),
+			stringAttr("retention_policy", "RetentionPolicy", "Retention policy of new mailboxes, by name."),
+		},
+	},
+	{
+		typeName: "cas_mailbox_plan",
+		noun:     "CASMailboxPlan",
+		script:   "mailbox_plan.ps1",
+		adopted:  true,
+		description: "Manages a CAS mailbox plan: the client protocols that new mailboxes get from their license. " +
+			"Existing mailboxes keep their settings",
+		notes: "`name` is the display name of the plan, the same in every tenant, for example `ExchangeOnlineEnterprise` " +
+			"(Exchange Online Plan 2), `ExchangeOnline` (Plan 1), `ExchangeOnlineDeskless` (Kiosk) or `ExchangeOnlineEssentials`.",
+		fields: []field{
+			boolAttr("pop_enabled", "PopEnabled", "Allow POP3."),
+			boolAttr("imap_enabled", "ImapEnabled", "Allow IMAP4."),
+			boolAttr("active_sync_enabled", "ActiveSyncEnabled", "Allow Exchange ActiveSync."),
+			boolAttr("ews_enabled", "EwsEnabled", "Allow Exchange Web Services."),
+			boolAttr("mapi_enabled", "MAPIEnabled", "Allow MAPI clients such as Outlook for Windows."),
+			boolAttr("owa_enabled", "OWAEnabled", "Allow Outlook on the web."),
+			stringAttr("owa_mailbox_policy", "OwaMailboxPolicy", "Outlook on the web mailbox policy, by name."),
+		},
+	},
+	{
 		typeName: "sharing_policy",
 		noun:     "SharingPolicy",
 		description: "Manages a sharing policy, which sets the calendar and contact information users can share with people " +

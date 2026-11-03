@@ -45,6 +45,7 @@ var presetVerbs = []string{"Get", "Set", "Enable", "Disable"}
 var (
 	specNounRe      = regexp.MustCompile(`noun:\s*"([A-Za-z]+)"`)
 	specSingletonRe = regexp.MustCompile(`singleton:\s*true`)
+	specAdoptedRe   = regexp.MustCompile(`adopted:\s*true`)
 	specRuleRe      = regexp.MustCompile(`script:\s*"exo_rule\.ps1"`)
 )
 
@@ -64,7 +65,7 @@ func specCmdlets(t *testing.T) []string {
 		}
 		verbs := []string{"Get", "New", "Set", "Remove"}
 		switch {
-		case specSingletonRe.MatchString(block):
+		case specSingletonRe.MatchString(block), specAdoptedRe.MatchString(block):
 			verbs = []string{"Get", "Set"}
 		case specRuleRe.MatchString(block):
 			verbs = ruleVerbs

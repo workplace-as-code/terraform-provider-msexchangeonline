@@ -200,6 +200,8 @@ KEEP=(
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
   "msexchangeonline_activesync_organization_settings.this"
+  "msexchangeonline_mailbox_plan.enterprise"
+  "msexchangeonline_cas_mailbox_plan.enterprise"
   "msexchangeonline_remote_domain.default"
   "msexchangeonline_hosted_content_filter_policy.default"
   "msexchangeonline_mobile_device_mailbox_policy.default"
@@ -370,6 +372,12 @@ if [[ "$(state_value msexchangeonline_external_in_outlook.this allow_list)" != *
 else
   info "Skipped External tag: the tenant already has an allow list"
 fi
+pop="$(state_value msexchangeonline_cas_mailbox_plan.enterprise pop_enabled)"
+write_and_restore msexchangeonline_cas_mailbox_plan.enterprise pop_enabled \
+  cas_mailbox_plan_pop_enabled "$([[ "$pop" == true ]] && echo false || echo true)" "$pop"
+days="$(state_value msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days)"
+write_and_restore msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days \
+  mailbox_plan_retain_deleted_items_for_days "$(( days == 30 ? 29 : days + 1 ))" "$days"
 if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admin_mail_recipients)" != *'"'* ]]; then
   write_and_restore msexchangeonline_activesync_organization_settings.this admin_mail_recipients \
     activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
@@ -482,7 +490,7 @@ echo "  Resources created, updated, imported and destroyed: ${#CREATED[@]}"
 echo "  Imported read-only: organization_config"
 echo "  Adopted on create, forgotten on destroy: accepted_domain"
 echo "  Adopted with a minimal configuration, no change planned: remote_domain, hosted_content_filter_policy and mobile_device_mailbox_policy Default"
-echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings"
+echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings, mailbox plans"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"

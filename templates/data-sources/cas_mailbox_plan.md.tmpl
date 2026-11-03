@@ -1,0 +1,24 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Clients and devices"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the mailbox plan cmdlets of the **Mail Recipients** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) grants them through a custom role that holds only the `Get-` and `Set-` cmdlets of mailbox plans and CAS mailbox plans: the built-in role can also change every mailbox, user and group. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`Get-CASMailboxPlan`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-casmailboxplan?view=exchange-ps)
