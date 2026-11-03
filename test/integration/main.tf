@@ -515,6 +515,17 @@ resource "msexchangeonline_sharing_policy" "test" {
   enabled = !local.updated
 }
 
+# Points to a domain that does not exist: Exchange stores the relationship
+# without contacting the other organization.
+resource "msexchangeonline_organization_relationship" "test" {
+  name                     = "TF-CI-OrgRelationship"
+  domain_names             = local.updated ? ["tf-ci-partner.example", "tf-ci-test.example"] : ["tf-ci-partner.example"]
+  enabled                  = false
+  free_busy_access_enabled = true
+  free_busy_access_level   = local.updated ? "LimitedDetails" : "AvailabilityOnly"
+  target_application_uri   = "outlook.com"
+}
+
 # ---------------------------------------------------------------------------
 # Outputs — visible after apply to confirm data sources work
 # ---------------------------------------------------------------------------

@@ -246,3 +246,15 @@ data "msexchangeonline_sharing_policy" "test" {
     }
   }
 }
+
+data "msexchangeonline_organization_relationship" "test" {
+  name       = msexchangeonline_organization_relationship.test.name
+  depends_on = [msexchangeonline_organization_relationship.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == msexchangeonline_organization_relationship.test.id
+      error_message = "The data source read another object than the test one."
+    }
+  }
+}

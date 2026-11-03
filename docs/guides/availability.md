@@ -63,6 +63,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_retention_policy_tag`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy_tag) |  |
 | [`msexchangeonline_application_access_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/application_access_policy) | Limits the mailboxes a Microsoft Graph app can access |
 | [`msexchangeonline_sharing_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/sharing_policy) | Calendar and contact sharing with external domains |
+| [`msexchangeonline_organization_relationship`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/organization_relationship) | Free/busy, MailTips and photos with another organization |
 | [`msexchangeonline_admin_audit_log_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/admin_audit_log_config) | Singleton: unified audit log on or off |
 
 ## Data sources

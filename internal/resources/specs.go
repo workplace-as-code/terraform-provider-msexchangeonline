@@ -107,6 +107,35 @@ var objectSpecs = []objectSpec{
 		},
 	},
 	{
+		typeName: "organization_relationship",
+		noun:     "OrganizationRelationship",
+		description: "Manages an organization relationship, which shares free/busy information, MailTips and photos " +
+			"with another Microsoft 365 organization or an on-premises Exchange organization",
+		notes: "`domain_names` is required to create a relationship. Get the `target_*` values of the other organization with " +
+			"`Get-FederationInformation -DomainName <domain>`. The mailbox move settings of cross-tenant migrations are not managed.",
+		fields: []field{
+			listAttr("domain_names", "DomainNames", "Domains of the other organization."),
+			boolAttr("enabled", "Enabled", "Whether the relationship is used."),
+			boolAttr("free_busy_access_enabled", "FreeBusyAccessEnabled", "Share free/busy information with the other organization."),
+			enumAttr("free_busy_access_level", "FreeBusyAccessLevel", "Free/busy details shared when `free_busy_access_enabled` is `true`.",
+				"None", "AvailabilityOnly", "LimitedDetails"),
+			boolAttr("mail_tips_access_enabled", "MailTipsAccessEnabled", "Share MailTips with the other organization."),
+			enumAttr("mail_tips_access_level", "MailTipsAccessLevel", "MailTips shared when `mail_tips_access_enabled` is `true`.",
+				"None", "Limited", "All"),
+			boolAttr("photos_enabled", "PhotosEnabled", "Share user photos with the other organization."),
+			boolAttr("archive_access_enabled", "ArchiveAccessEnabled", "The other organization hosts the cloud archives of "+
+				"this organization's mailboxes (hybrid)."),
+			boolAttr("delivery_report_enabled", "DeliveryReportEnabled", "Share delivery reports with the other organization."),
+			stringAttr("organization_contact", "OrganizationContact", "Email address of a contact in the other organization."),
+			stringAttr("target_application_uri", "TargetApplicationUri", "Application URI of the other organization, "+
+				"for example `outlook.com` for Microsoft 365."),
+			stringAttr("target_autodiscover_epr", "TargetAutodiscoverEpr", "Autodiscover endpoint of the other organization."),
+			stringAttr("target_sharing_epr", "TargetSharingEpr", "Exchange Web Services endpoint of the other organization, "+
+				"when Autodiscover cannot find it."),
+			stringAttr("target_owa_url", "TargetOwaURL", "Outlook on the web URL of the other organization."),
+		},
+	},
+	{
 		typeName: "hosted_outbound_spam_filter_rule",
 		noun:     "HostedOutboundSpamFilterRule",
 		script:   "exo_rule.ps1",

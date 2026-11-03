@@ -1,0 +1,24 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Organization"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the organization relationship cmdlets of the **Federated Sharing** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) grants them through a custom role that holds only the sharing policy and organization relationship cmdlets: the built-in role can also change the federation trust. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`Get-OrganizationRelationship`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-organizationrelationship?view=exchange-ps)
