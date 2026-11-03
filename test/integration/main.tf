@@ -44,6 +44,12 @@ variable "external_tag_allow_list" {
   default     = null
 }
 
+variable "activesync_admin_mail_recipients" {
+  description = "Set by test/run.sh to test a write to the ActiveSync settings, then to restore them. null leaves them unmanaged."
+  type        = list(string)
+  default     = null
+}
+
 variable "reply_all_storm_block_duration_hours" {
   description = "Set by test/run.sh to test a write to the transport config, then to restore it. null leaves it unmanaged."
   type        = number
@@ -175,6 +181,15 @@ import {
 
 resource "msexchangeonline_external_in_outlook" "this" {
   allow_list = var.external_tag_allow_list
+}
+
+import {
+  to = msexchangeonline_activesync_organization_settings.this
+  id = "default"
+}
+
+resource "msexchangeonline_activesync_organization_settings" "this" {
+  admin_mail_recipients = var.activesync_admin_mail_recipients
 }
 
 # Built-in objects adopted with a minimal configuration: the plan must show no
@@ -513,6 +528,13 @@ resource "msexchangeonline_sharing_policy" "test" {
     "tf-ci-partner.example:CalendarSharingFreeBusyDetail,ContactsSharing",
   ] : ["tf-ci-test.example:CalendarSharingFreeBusySimple"]
   enabled = !local.updated
+}
+
+# Matches a device model no phone reports: it applies to no device.
+resource "msexchangeonline_activesync_device_access_rule" "test" {
+  query_string   = "TF-CI-Device"
+  characteristic = "DeviceModel"
+  access_level   = local.updated ? "Quarantine" : "Block"
 }
 
 # Points to a domain that does not exist: Exchange stores the relationship

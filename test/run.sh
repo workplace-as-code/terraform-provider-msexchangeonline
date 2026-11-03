@@ -155,6 +155,7 @@ CREATED=(
   "msexchangeonline_retention_policy_tag.test=TF-CI-RetentionTag"
   "msexchangeonline_sharing_policy.test=TF-CI-SharingPolicy"
   "msexchangeonline_organization_relationship.test=TF-CI-OrgRelationship"
+  "msexchangeonline_activesync_device_access_rule.test=TF-CI-Device (DeviceModel)"
   "msexchangeonline_hosted_outbound_spam_filter_rule.test=TF-CI-OutboundSpamRule"
   "msexchangeonline_outbound_spam_filter_policy.unscoped=TF-CI-OutboundSpam-Unscoped"
   "msexchangeonline_journal_rule.test=TF-CI-Journal"
@@ -198,6 +199,7 @@ KEEP=(
   "msexchangeonline_external_in_outlook.this"
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
+  "msexchangeonline_activesync_organization_settings.this"
   "msexchangeonline_remote_domain.default"
   "msexchangeonline_hosted_content_filter_policy.default"
   "msexchangeonline_mobile_device_mailbox_policy.default"
@@ -368,6 +370,12 @@ if [[ "$(state_value msexchangeonline_external_in_outlook.this allow_list)" != *
 else
   info "Skipped External tag: the tenant already has an allow list"
 fi
+if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admin_mail_recipients)" != *'"'* ]]; then
+  write_and_restore msexchangeonline_activesync_organization_settings.this admin_mail_recipients \
+    activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
+else
+  info "Skipped ActiveSync settings: the tenant already has admin mail recipients"
+fi
 expect_no_changes "Drift check after restore" -var phase=update
 
 # ---------------------------------------------------------------------------
@@ -474,7 +482,7 @@ echo "  Resources created, updated, imported and destroyed: ${#CREATED[@]}"
 echo "  Imported read-only: organization_config"
 echo "  Adopted on create, forgotten on destroy: accepted_domain"
 echo "  Adopted with a minimal configuration, no change planned: remote_domain, hosted_content_filter_policy and mobile_device_mailbox_policy Default"
-echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook"
+echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"

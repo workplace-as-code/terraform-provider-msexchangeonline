@@ -90,6 +90,21 @@ var objectSpecs = []objectSpec{
 		},
 	},
 	{
+		typeName:    "activesync_organization_settings",
+		noun:        "ActiveSyncOrganizationSettings",
+		singleton:   true,
+		description: "Manages the Exchange ActiveSync settings of the organization: what happens to mobile devices that match no device access rule",
+		fields: []field{
+			enumAttr("default_access_level", "DefaultAccessLevel", "Access of the devices that match no "+
+				"`msexchangeonline_activesync_device_access_rule`.", "Allow", "Block", "Quarantine"),
+			listAttr("admin_mail_recipients", "AdminMailRecipients", "Email addresses notified when a device is quarantined."),
+			stringAttr("user_mail_insert", "UserMailInsert", "Text added to the message sent to users whose device is quarantined, "+
+				"up to 256 characters."),
+			boolAttr("allow_access_for_unsupported_platform", "AllowAccessForUnSupportedPlatform",
+				"Let devices that do not support ActiveSync policies connect."),
+		},
+	},
+	{
 		typeName: "sharing_policy",
 		noun:     "SharingPolicy",
 		description: "Manages a sharing policy, which sets the calendar and contact information users can share with people " +

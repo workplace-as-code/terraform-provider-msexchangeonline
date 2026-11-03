@@ -58,6 +58,8 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_organization_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/organization_config) | Singleton |
 | [`msexchangeonline_owa_mailbox_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/owa_mailbox_policy) | Outlook on the web |
 | [`msexchangeonline_mobile_device_mailbox_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/mobile_device_mailbox_policy) | Exchange ActiveSync devices |
+| [`msexchangeonline_activesync_organization_settings`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/activesync_organization_settings) | Singleton: default access of mobile devices |
+| [`msexchangeonline_activesync_device_access_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/activesync_device_access_rule) | Allow, block or quarantine devices by type, model or OS |
 | [`msexchangeonline_email_address_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/email_address_policy) | Microsoft 365 Groups only |
 | [`msexchangeonline_retention_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy) | Messaging records management |
 | [`msexchangeonline_retention_policy_tag`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/retention_policy_tag) |  |
@@ -77,7 +79,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 
 ## Singletons
 
-Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
+Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
 
 ```terraform
 import {
