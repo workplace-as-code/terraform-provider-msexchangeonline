@@ -80,7 +80,8 @@ import {
 Or with the CLI:
 
 ```shell
-terraform import msexchangeonline_tenant_allow_block_list_item.example "Sender:contoso-billing.example"
+terraform import msexchangeonline_tenant_allow_block_list_item.example \
+  "Sender:contoso-billing.example"
 ```
 
 To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

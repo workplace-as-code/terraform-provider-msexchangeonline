@@ -165,5 +165,5 @@ output "primary_domain" {
 
 output "primary_domain_type" {
   value       = data.msexchangeonline_accepted_domain.primary.domain_type
-  description = "The type of the primary accepted domain (Authoritative, ExternalRelay, InternalRelay)."
+  description = "Type of the primary domain: Authoritative, ExternalRelay or InternalRelay."
 }

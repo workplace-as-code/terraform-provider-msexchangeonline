@@ -1,1 +1,2 @@
-terraform import msexchangeonline_tenant_allow_block_list_item.example "Sender:contoso-billing.example"
+terraform import msexchangeonline_tenant_allow_block_list_item.example \
+  "Sender:contoso-billing.example"

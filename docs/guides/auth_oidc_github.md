@@ -116,7 +116,9 @@ jobs:
 
       - name: Install the ExchangeOnlineManagement module
         shell: pwsh
-        run: Install-PSResource -Name ExchangeOnlineManagement -Scope CurrentUser -TrustRepository -Quiet
+        run: |
+          Install-PSResource -Name ExchangeOnlineManagement -Scope CurrentUser `
+            -TrustRepository -Quiet
 
       - name: Terraform apply
         env:

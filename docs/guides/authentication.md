@@ -80,7 +80,8 @@ Connect-ExchangeOnline   # as an Exchange or Global administrator
 ./tools/new_role_group.ps1
 
 # 2. Create the "terraform-msexchangeonline" role group and add the app
-./tools/new_role_group.ps1 -AppId "<client-id>" -ServicePrincipalObjectId "<enterprise-app-object-id>" -Apply
+./tools/new_role_group.ps1 -AppId "<client-id>" `
+    -ServicePrincipalObjectId "<enterprise-app-object-id>" -Apply
 ```
 
 Run the script again after upgrading the provider: it adds the roles a new version needs to the existing group, and lists the roles of the group that are not in the list above: `-Apply -RemoveExtraRoles` removes them. Versions before 0.3.1 granted Mail Recipient Creation, which can create and delete mailboxes, and Retention Management: run the script with `-Apply -RemoveExtraRoles` to replace them.
