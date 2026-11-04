@@ -72,7 +72,8 @@ import {
 Or with the CLI:
 
 ```shell
-terraform import msexchangeonline_application_access_policy.example "00000000-0000-0000-0000-000000000000\\11111111-1111-1111-1111-111111111111"
+terraform import msexchangeonline_application_access_policy.example \
+  "00000000-0000-0000-0000-000000000000\\11111111-1111-1111-1111-111111111111"
 ```
 
 To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

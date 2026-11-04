@@ -75,7 +75,9 @@ apply:
     EXCHANGE_AUTH_METHOD: oidc
     EXCHANGE_TENANT_ID: contoso.onmicrosoft.com
   script:
-    - pwsh -c "Install-PSResource -Name ExchangeOnlineManagement -Scope CurrentUser -TrustRepository -Quiet"
+    - >-
+      pwsh -c "Install-PSResource -Name ExchangeOnlineManagement
+      -Scope CurrentUser -TrustRepository -Quiet"
     - terraform init
     - terraform apply -auto-approve
 ```
