@@ -302,7 +302,10 @@ func (c *Client) buildEnv(ctx context.Context) ([]string, time.Time, error) {
 	env := make([]string, 0, len(os.Environ())+4)
 	for _, kv := range os.Environ() {
 		name, _, _ := strings.Cut(kv, "=")
-		if strings.HasPrefix(name, envBridgePrefix) || slices.Contains(hiddenFromBridge, name) {
+		// Windows variable names ignore case: exchange_oidc_token is the
+		// same variable as EXCHANGE_OIDC_TOKEN there.
+		upper := strings.ToUpper(name)
+		if strings.HasPrefix(upper, envBridgePrefix) || slices.Contains(hiddenFromBridge, upper) {
 			continue
 		}
 		env = append(env, kv)

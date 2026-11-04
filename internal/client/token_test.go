@@ -117,7 +117,9 @@ func (offlineTransport) Do(*http.Request) (*http.Response, error) {
 	return nil, errors.New("offline")
 }
 
-func TestOIDCTokenSourceErrorCarriesHint(t *testing.T) {
+// The hint is only added to an expired token (TestExpiredAssertionOnlyMatchesExpiry):
+// an offline endpoint is another cause.
+func TestOIDCTokenSourceErrorHintOnlyOnExpiry(t *testing.T) {
 	previous := oidcCredentialOptions
 	oidcCredentialOptions = &azidentity.ClientAssertionCredentialOptions{ClientOptions: azcore.ClientOptions{
 		Transport: offlineTransport{},
@@ -134,7 +136,7 @@ func TestOIDCTokenSourceErrorCarriesHint(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	if msg := err.Error(); !strings.Contains(msg, "with OIDC failed") || !strings.Contains(msg, "use the file") {
+	if msg := err.Error(); !strings.Contains(msg, "with OIDC failed") || strings.Contains(msg, "use the file") {
 		t.Errorf("error = %s", msg)
 	}
 }
@@ -427,5 +429,22 @@ func TestManagedIdentityErrorHidesToken(t *testing.T) {
 	}
 	if strings.Contains(err.Error(), "at-secret-value") {
 		t.Errorf("the error contains the token: %s", err)
+	}
+}
+
+// The hint about fixed OIDC tokens is only added when Entra ID says the
+// token expired: other failures have another cause.
+func TestExpiredAssertionOnlyMatchesExpiry(t *testing.T) {
+	expired := "AADSTS700024: Client assertion is not within its valid time range. Current time: ..."
+	if !expiredAssertion.MatchString(expired) {
+		t.Error("an expired assertion must get the hint")
+	}
+	for _, other := range []string{
+		"AADSTS70021: No matching federated identity record found for presented assertion.",
+		"AADSTS700016: Application with identifier 'x' was not found in the directory.",
+	} {
+		if expiredAssertion.MatchString(other) {
+			t.Errorf("%q must not get the hint", other)
+		}
 	}
 }
