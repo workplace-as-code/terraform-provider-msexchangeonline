@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -137,11 +138,17 @@ func NewOIDCTokenSource(organization, clientID string, assertion AssertionFunc, 
 	return &oidcTokenSource{credential: credential, hint: hint}, nil
 }
 
+// expiredAssertion matches the Entra ID error of an expired OIDC token
+// (AADSTS700024: the client assertion is not within its valid time range).
+// The hint about fixed tokens only helps then: other failures, such as a
+// subject that no federated credential matches, have another cause.
+var expiredAssertion = regexp.MustCompile(`AADSTS700024|(?i)assertion is (expired|not within its valid time range)`)
+
 func (s *oidcTokenSource) Token(ctx context.Context) (AccessToken, error) {
 	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
 	if err != nil {
 		msg := "obtaining an Exchange Online access token with OIDC failed: " + err.Error()
-		if s.hint != "" {
+		if s.hint != "" && expiredAssertion.MatchString(err.Error()) {
 			msg += ". " + s.hint
 		}
 		return AccessToken{}, errors.New(msg)

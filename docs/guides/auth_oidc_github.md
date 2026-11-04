@@ -89,7 +89,9 @@ Then add the context:
 
 For example, with immutable subjects: `repo:contoso@123456/exchange-config@987654:environment:production`.
 
-A job that declares an environment always gets the environment subject, whatever its branch. An organization or a repository can also customize the claims of the subject: the same API shows it.
+A job that declares an environment always gets the environment subject, whatever its branch.
+
+An organization or a repository can also customize the subject: the same API then answers `"use_default": false` with the list `include_claim_keys`. The subject is made of these claims, in that order, each written `<claim>:<value>`; the `context` claim is written as in the table above. For example, `["repo", "context", "job_workflow_ref"]` gives, for a job in the `production` environment, `repo:contoso/exchange-config:environment:production:job_workflow_ref:contoso/exchange-config/.github/workflows/terraform.yml@refs/heads/main`. Copy the subject of a failed run from the Entra ID error (`AADSTS70021`) when in doubt.
 
 ## Step 2 — Configure the Workflow
 

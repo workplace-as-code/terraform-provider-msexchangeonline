@@ -283,3 +283,20 @@ func TestTransientErrors(t *testing.T) {
 		t.Error("a missing object is not transient")
 	}
 }
+
+// Windows variable names ignore case: a secret inherited in lower case must
+// be dropped too.
+func TestBridgeEnvDropsSecretsWhateverTheCase(t *testing.T) {
+	t.Setenv("exchange_oidc_token", "jwt")
+	t.Setenv("Exchange_Bridge_Access_Token", "stale")
+	c := &Client{config: Config{CertificatePath: "/x.pfx"}}
+	env, _, err := c.buildEnv(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, kv := range env {
+		if strings.HasPrefix(kv, "exchange_oidc_token=") || strings.HasPrefix(kv, "Exchange_Bridge_Access_Token=") {
+			t.Errorf("the bridge environment still contains %s", kv)
+		}
+	}
+}
