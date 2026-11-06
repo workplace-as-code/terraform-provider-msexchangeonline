@@ -14,7 +14,10 @@ $global:Entries = @{ "Mail Recipients" = [ordered]@{
 function global:Get-ManagementRole {
     param($Identity)
     if (-not $global:Roles.ContainsKey($Identity)) { throw "The operation couldn't be performed because object '$Identity' couldn't be found." }
-    $global:Roles[$Identity]
+    # Exchange Online returns the parent with the tenant in front of it.
+    $r = $global:Roles[$Identity]
+    if ($r.Parent) { $r = $r.PSObject.Copy(); $r.Parent = "contoso.onmicrosoft.com\$($r.Parent)" }
+    $r
 }
 function global:Get-ManagementRoleEntry {
     param($Identity)

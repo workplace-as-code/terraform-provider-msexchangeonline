@@ -18,16 +18,24 @@ function global:RoleGroups {
     [pscustomobject]@{ Name = "HelpdeskAdmins_-7654321"; WellKnownObject = "" }
     [pscustomobject]@{ Name = "RIM-MailboxAdmins8f3c2a"; WellKnownObject = "" }
     [pscustomobject]@{ Name = "ISVMailboxUsers_-998877"; WellKnownObject = "" }
+    # Seen on a real tenant: Entra-linked groups without a dash, partner-managed
+    # groups, and Purview role groups.
+    [pscustomobject]@{ Name = "GlobalReaders_556165548"; WellKnownObject = "GlobalReaders"; Capabilities = @("Partner_Managed") }
+    [pscustomobject]@{ Name = "SomePartnerGroup"; WellKnownObject = ""; Capabilities = @("Partner_Managed") }
+    [pscustomobject]@{ Name = "Information Protection Analysts"; WellKnownObject = ""; Capabilities = @() }
+    [pscustomobject]@{ Name = "Places Administrator"; WellKnownObject = ""; Capabilities = @() }
     [pscustomobject]@{ Name = "TF-CI-RoleGroup"; WellKnownObject = "" }
 }
 function global:Get-ManagementRole {
     [pscustomobject]@{ Name = "Mail Recipients"; IsRootRole = $true }
     [pscustomobject]@{ Name = "TF-CI-Role"; IsRootRole = $false }
+    # Microsoft derives some end-user roles from other roles.
+    [pscustomobject]@{ Name = "MyAddressInformation"; IsRootRole = $false }
 }
 function global:Get-ManagementRoleAssignment {
     [pscustomobject]@{ Name = "Mail Recipients-Organization Management"; RoleAssigneeType = "RoleGroup"; RoleAssigneeName = "Organization Management"; Delegating = $false }
     [pscustomobject]@{ Name = "TF-CI-Role-TF-CI-RoleGroup"; RoleAssigneeType = "RoleGroup"; RoleAssigneeName = "TF-CI-RoleGroup"; Delegating = $false }
-    [pscustomobject]@{ Name = "TF-CI-Role-TF-CI-RoleGroup-Delegating"; RoleAssigneeType = "RoleGroup"; RoleAssigneeName = "TF-CI-RoleGroup"; Delegating = $true }
+    [pscustomobject]@{ Name = "TF-CI-Role-TF-CI-RoleGroup-Delegating"; RoleAssigneeType = "RoleGroup"; RoleAssigneeName = "TF-CI-RoleGroup"; RoleAssignmentDelegationType = "DelegatingOrgWide" }
     [pscustomobject]@{ Name = "Application Mail.Read-TF-CI-App"; RoleAssigneeType = "ServicePrincipal"; RoleAssigneeName = "TF-CI-App"; Delegating = $false }
     [pscustomobject]@{ Name = "MyBaseOptions-Default Role Assignment Policy"; RoleAssigneeType = "RoleAssignmentPolicy"; RoleAssigneeName = "Default Role Assignment Policy"; Delegating = $false }
 }

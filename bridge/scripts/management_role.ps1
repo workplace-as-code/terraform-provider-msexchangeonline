@@ -41,6 +41,12 @@ function Get-BridgeRoleEntries([string]$Role) {
     $entries
 }
 
+# Get-BridgeLeafName returns the role name of an identity: Exchange Online
+# returns the parent as "<tenant>\<role>".
+function Get-BridgeLeafName([string]$Value) {
+    @($Value -split '\\' | Where-Object { $_ })[-1]
+}
+
 # Find-BridgeKey returns the key of $Map equal to $Name whatever the case, or $null.
 function Find-BridgeKey($Map, [string]$Name) {
     foreach ($k in $Map.Keys) { if ($k -ieq $Name) { return $k } }
@@ -62,6 +68,7 @@ function Read-BridgeRole {
         throw "$Identity is a built-in role: only custom roles can be managed."
     }
     $parent = [string](Get-BridgeProp $role "Parent" "")
+    if ($parent) { $parent = Get-BridgeLeafName $parent }
     $entries = Get-BridgeRoleEntries $Identity
     $parentEntries = if ($parent) { Get-BridgeRoleEntries $parent } else { [ordered]@{} }
     $restricted = [ordered]@{}
@@ -132,7 +139,8 @@ try {
 
         "Update" {
             $role = Invoke-BridgeRetry { Get-ManagementRole -Identity $Identity }
-            $parentEntries = Get-BridgeRoleEntries ([string]$role.Parent)
+            $parentName = Get-BridgeLeafName ([string]$role.Parent)
+            $parentEntries = Get-BridgeRoleEntries $parentName
             if ($null -ne $wanted.PSObject.Properties["Description"] -and
                 [string](Get-BridgeProp $role "Description" "") -ne $wanted.Description) {
                 Invoke-BridgeRetry { Set-ManagementRole -Identity $Identity -Description $wanted.Description }
@@ -141,7 +149,7 @@ try {
             foreach ($c in @($wanted.Cmdlets)) {
                 if ($null -ne (Find-BridgeKey $entries $c)) { continue }
                 $k = Find-BridgeKey $parentEntries $c
-                if ($null -eq $k) { throw "$c is not in the parent role $($role.Parent)." }
+                if ($null -eq $k) { throw "$c is not in the parent role $parentName." }
                 Invoke-BridgeRetry { Add-ManagementRoleEntry -Identity "$Identity\$k" | Out-Null }
             }
             foreach ($c in @($entries.Keys)) {
