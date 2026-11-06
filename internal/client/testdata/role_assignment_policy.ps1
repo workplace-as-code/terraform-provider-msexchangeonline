@@ -25,7 +25,16 @@ function global:New-ManagementRoleAssignment {
 }
 function global:Get-ManagementRoleAssignment {
     param($RoleAssignee, $Role)
-    [pscustomobject]@{ Name = "$Role-$RoleAssignee"; Role = $Role; RoleAssigneeName = $RoleAssignee; RoleAssigneeType = "RoleAssignmentPolicy" }
+    $roles = if ($Role) { @($Role) } else { @($global:Policy.AssignedRoles) }
+    foreach ($r in $roles) {
+        [pscustomobject]@{ Name = "$r-$RoleAssignee"; Role = $r; RoleAssigneeName = $RoleAssignee; RoleAssigneeType = "RoleAssignmentPolicy" }
+    }
+}
+# Exchange refuses to remove a policy that still has role assignments.
+function global:Remove-RoleAssignmentPolicy {
+    param($Identity)
+    if (@($global:Policy.AssignedRoles).Count -gt 0) { throw "There is at least one role assignment for this assignment policy." }
+    $global:Calls.Add("RemovePolicy $Identity")
 }
 function global:Remove-ManagementRoleAssignment {
     param([Parameter(ValueFromPipeline)]$InputObject, $Identity)
@@ -43,3 +52,6 @@ function ConvertTo-B64($Object) {
 $global:Calls.Clear()
 "update: " + (& $Script -Action Update -Identity TF-CI-Policy -Values (ConvertTo-B64 @{ Roles = @("mybaseoptions", "MyTextMessaging") }))
 "update calls: " + ($global:Calls -join "; ")
+$global:Calls.Clear()
+"delete: " + (& $Script -Action Delete -Identity TF-CI-Policy 2>&1)
+"delete calls: " + ($global:Calls -join "; ")

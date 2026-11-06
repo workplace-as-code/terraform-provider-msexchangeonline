@@ -107,6 +107,8 @@ func TestRoleAssignmentPolicyRoles(t *testing.T) {
 		`"Roles":["MyBaseOptions","MyVoiceMail"]`,
 		"update calls: Add MyTextMessaging; Remove MyVoiceMail",
 		`"Roles":["MyBaseOptions","MyTextMessaging"]`,
+		"delete: {}",
+		"delete calls: Remove MyBaseOptions; Remove MyTextMessaging; RemovePolicy TF-CI-Policy",
 	)
 }
 

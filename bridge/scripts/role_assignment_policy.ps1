@@ -94,7 +94,12 @@ try {
         }
 
         "Delete" {
+            # Exchange refuses to remove a policy that still has role
+            # assignments: remove them first.
             try {
+                $assignments = @(Invoke-BridgeRetry { Get-ManagementRoleAssignment -RoleAssignee $Identity } |
+                    Where-Object { [string](Get-BridgeProp $_ "RoleAssigneeType" "") -eq "RoleAssignmentPolicy" })
+                foreach ($a in $assignments) { Invoke-BridgeRetry { $a | Remove-ManagementRoleAssignment } }
                 Remove-RoleAssignmentPolicy -Identity $Identity
             } catch {
                 if (-not (Test-BridgeNotFound $_.Exception.Message)) { throw }
