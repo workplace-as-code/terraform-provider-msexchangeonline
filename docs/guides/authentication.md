@@ -77,7 +77,8 @@ administrator rights. Give it only to the app of the pipeline that manages the E
 
 Exchange also requires a **delegating assignment** of each role the app hands out: to create a custom role from
 a parent, or to assign a role to a role group, an application or a role assignment policy. List these roles
-with `-DelegatingRoles`, which makes them an explicit, auditable choice:
+with `-DelegatingRoles`, which makes them an explicit, auditable choice. The script gives the Application roles
+(RBAC for Applications) to the app's service principal, since Exchange refuses them on a role group:
 
 ```powershell
 ./tools/new_role_group.ps1 -AppId "<client-id>" -ServicePrincipalObjectId "<object-id>" -Apply `

@@ -55,7 +55,9 @@
     a delegating assignment. Exchange requires it to create a custom role
     from a role (or one of its parents) and to assign a role to a role group,
     an application or a role assignment policy, for example "Mail Recipients",
-    "Distribution Groups", "MyBaseOptions" or "Application Mail.Send".
+    "Distribution Groups", "MyBaseOptions" or "Application Mail.Send". The
+    Application roles are delegated to the app's service principal: Exchange
+    refuses them on a role group.
 
 .PARAMETER RemoveExtraRoles
     With -Apply, also remove from an existing role group the roles that are
@@ -411,6 +413,14 @@ if ($IncludeRoleManagement) {
     $ProviderCmdlets = @($ProviderCmdlets) + $RoleManagementCmdlets
 }
 
+# Get-DelegationTarget tells who gets the delegating assignment of a role:
+# Exchange refuses an Application role (RBAC for Applications, a name that
+# starts or ends with "Application") on a role group, even as a delegation, so
+# the app's service principal gets it; the role group gets the other roles.
+function Get-DelegationTarget([string]$Role) {
+    if ($Role -like "Application *" -or $Role -like "* Application") { "App" } else { "SecurityGroup" }
+}
+
 # Find-UncoveredCmdlets returns the cmdlets that none of $Roles contains.
 # $RolesByCmdlet maps each cmdlet to the names of the roles containing it.
 function Find-UncoveredCmdlets {
@@ -578,13 +588,17 @@ if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
     Write-Host "Created role group '$RoleGroupName'."
 }
 
-# The roles the app may hand out: one delegating assignment each.
+# The roles the app may hand out: one delegating assignment each, on the role
+# group, or on the app's service principal for the Application roles.
 foreach ($role in $DelegatingRoles) {
-    $delegating = @(Get-ManagementRoleAssignment -RoleAssignee $RoleGroupName -Role $role -Delegating $true -ErrorAction SilentlyContinue |
-        Where-Object { $_.RoleAssigneeName -eq $RoleGroupName })
+    $target = Get-DelegationTarget $role
+    $assignee = if ($target -eq "App") { [string]$sp.Identity } else { $RoleGroupName }
+    $delegating = @(Get-ManagementRoleAssignment -RoleAssignee $assignee -Role $role -Delegating $true -ErrorAction SilentlyContinue |
+        Where-Object { [string]$_.RoleAssigneeName -eq $assignee })
     if ($delegating.Count -eq 0) {
-        New-ManagementRoleAssignment -SecurityGroup $RoleGroupName -Role $role -Delegating | Out-Null
-        Write-Host "'$RoleGroupName' can now hand out the role '$role' (delegating assignment)."
+        $to = @{ $target = $assignee }
+        New-ManagementRoleAssignment @to -Role $role -Delegating | Out-Null
+        Write-Host "The app can now hand out the role '$role' (delegating assignment to $assignee)."
     }
 }
 

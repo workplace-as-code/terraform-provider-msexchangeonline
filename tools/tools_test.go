@@ -366,3 +366,23 @@ $DelegatingRoles -join "|"
 		t.Errorf("with -IncludeRoleManagement: %v %s", err, out)
 	}
 }
+
+// TestDelegationTarget: Exchange refuses an Application role on a role group,
+// even as a delegation: the app's service principal gets it instead.
+func TestDelegationTarget(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + `
+@("Mail Recipients", "MyBaseOptions", "Application Mail.Send", "Exchange Application") | ForEach-Object { Get-DelegationTarget $_ }
+`
+	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	if err != nil {
+		t.Fatalf("pwsh: %v\n%s", err, out)
+	}
+	if got := strings.Join(strings.Fields(string(out)), ","); got != "SecurityGroup,SecurityGroup,App,App" {
+		t.Errorf("got %s", got)
+	}
+}
