@@ -290,6 +290,8 @@ resource "msexchangeonline_transport_rule" "test" {
 resource "msexchangeonline_transport_rule" "scope" {
   name    = "TF-CI-Rule-Scope"
   enabled = false
+  # Created after TF-CI-Rule: two rules created at once race for priority 0.
+  depends_on = [msexchangeonline_transport_rule.test]
 
   sent_to_scope                  = "NotInOrganization"
   recipient_domain_is            = local.updated ? ["tf-ci-test.example", "tf-ci-other.example"] : ["tf-ci-test.example"]

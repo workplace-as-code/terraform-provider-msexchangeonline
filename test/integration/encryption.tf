@@ -17,6 +17,8 @@ resource "msexchangeonline_transport_rule" "encrypt" {
   count   = local.encryption
   name    = "TF-CI-Rule-Encrypt"
   enabled = false
+  # Created after the other rules: two rules created at once race for priority 0.
+  depends_on = [msexchangeonline_transport_rule.scope]
 
   sent_to_scope                                  = "NotInOrganization"
   recipient_domain_is                            = ["tf-ci-test.example"]

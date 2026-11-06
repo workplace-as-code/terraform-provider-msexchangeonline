@@ -57,6 +57,13 @@ Assignments to role assignment policies are managed by
 [`msexchangeonline_role_assignment_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/role_assignment_policy).
 Role assignments to users are not managed.
 
+
+## Roles the app can hand out
+
+Exchange refuses to create or assign a role unless the app has a delegating assignment of that role or of one of
+its parents. Grant it with `tools/new_role_group.ps1 -IncludeRoleManagement -DelegatingRoles "<role>", ...`: see
+the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
 ## Permissions
 
 The provider's app registration needs the **Role Management** Exchange management role, which lets it grant itself any other role: give it only to the pipeline that manages the Exchange delegation. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it with `-IncludeRoleManagement`. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).

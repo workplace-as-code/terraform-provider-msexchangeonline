@@ -50,6 +50,13 @@ cmdlets and parameters of the parent role. Built-in roles cannot be managed or i
 still assigned cannot be deleted: refer to it from `msexchangeonline_management_role_assignment` by
 `msexchangeonline_management_role.<name>.name`, so that Terraform removes the assignments first.
 
+
+## Roles the app can hand out
+
+Exchange refuses to create or assign a role unless the app has a delegating assignment of that role or of one of
+its parents. Grant it with `tools/new_role_group.ps1 -IncludeRoleManagement -DelegatingRoles "<role>", ...`: see
+the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
 ## Permissions
 
 The provider's app registration needs the **Role Management** Exchange management role, which lets it grant itself any other role: give it only to the pipeline that manages the Exchange delegation. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it with `-IncludeRoleManagement`. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).

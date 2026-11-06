@@ -50,6 +50,13 @@
     service principals). It lets the app grant itself any other role: use it
     only for the pipeline that manages the Exchange delegation.
 
+.PARAMETER DelegatingRoles
+    With -IncludeRoleManagement, the roles the app may hand out: each one gets
+    a delegating assignment. Exchange requires it to create a custom role
+    from a role (or one of its parents) and to assign a role to a role group,
+    an application or a role assignment policy, for example "Mail Recipients",
+    "Distribution Groups", "MyBaseOptions" or "Application Mail.Send".
+
 .PARAMETER RemoveExtraRoles
     With -Apply, also remove from an existing role group the roles that are
     not in $ProviderRoles nor $CustomRoles. Without it, the script only lists
@@ -78,6 +85,7 @@ param(
     [hashtable]$CustomRoleNames = @{},
     [switch]$Apply,
     [switch]$IncludeRoleManagement,
+    [string[]]$DelegatingRoles = @(),
     [switch]$RemoveExtraRoles
 )
 
@@ -395,6 +403,9 @@ $RoleManagementCmdlets = @(
     "Set-RoleGroup",
     "Set-ServicePrincipal"
 )
+if ($DelegatingRoles.Count -gt 0 -and -not $IncludeRoleManagement) {
+    throw "-DelegatingRoles needs -IncludeRoleManagement: only the Exchange RBAC resources hand out roles."
+}
 if ($IncludeRoleManagement) {
     $ProviderRoles = @($ProviderRoles) + "Role Management"
     $ProviderCmdlets = @($ProviderCmdlets) + $RoleManagementCmdlets
@@ -418,7 +429,7 @@ if (-not (Get-Command Get-ManagementRole -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Checking that the roles contain the $($ProviderCmdlets.Count) cmdlets of the provider..."
-$unknownRoles = @(@($ProviderRoles) + @($CustomRoles | ForEach-Object { $_.Parent }) | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
+$unknownRoles = @(@($ProviderRoles) + @($CustomRoles | ForEach-Object { $_.Parent }) + @($DelegatingRoles) | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
 if ($unknownRoles.Count -gt 0) {
     throw "These roles do not exist in this organization: $($unknownRoles -join ', ')"
 }
@@ -485,7 +496,7 @@ $CustomRoleDescription = "for the workplace-as-code/msexchangeonline Terraform p
 $extra = @()
 if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
     $current = @((Get-RoleGroup -Identity $RoleGroupName).Roles | ForEach-Object { (Get-ManagementRole -Identity $_).Name })
-    $extra = @($current | Where-Object { $groupRoles -notcontains $_ } | Sort-Object)
+    $extra = @($current | Where-Object { $groupRoles -notcontains $_ -and $DelegatingRoles -notcontains $_ } | Sort-Object)
 }
 if ($extra.Count -gt 0 -and -not ($Apply -and $RemoveExtraRoles)) {
     Write-Host ""
@@ -493,6 +504,11 @@ if ($extra.Count -gt 0 -and -not ($Apply -and $RemoveExtraRoles)) {
         "Remove them with -Apply -RemoveExtraRoles.")
 }
 
+if ($IncludeRoleManagement) {
+    Write-Host ""
+    $list = if ($DelegatingRoles.Count -gt 0) { $DelegatingRoles -join ", " } else { "none (use -DelegatingRoles)" }
+    Write-Host "Roles the app may hand out (delegating assignments): $list"
+}
 if (-not $IncludeRoleManagement) {
     Write-Host ""
     Write-Host ("Role Management is not granted: the Exchange RBAC resources (management scopes, roles, role groups, " +
@@ -560,6 +576,16 @@ if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
 } else {
     New-RoleGroup -Name $RoleGroupName -Roles $groupRoles -Description "Least-privilege roles for the workplace-as-code/msexchangeonline Terraform provider" | Out-Null
     Write-Host "Created role group '$RoleGroupName'."
+}
+
+# The roles the app may hand out: one delegating assignment each.
+foreach ($role in $DelegatingRoles) {
+    $delegating = @(Get-ManagementRoleAssignment -RoleAssignee $RoleGroupName -Role $role -Delegating $true -ErrorAction SilentlyContinue |
+        Where-Object { $_.RoleAssigneeName -eq $RoleGroupName })
+    if ($delegating.Count -eq 0) {
+        New-ManagementRoleAssignment -SecurityGroup $RoleGroupName -Role $role -Delegating | Out-Null
+        Write-Host "'$RoleGroupName' can now hand out the role '$role' (delegating assignment)."
+    }
 }
 
 $members = @(Get-RoleGroupMember -Identity $RoleGroupName | ForEach-Object { [string]$_.Identity })

@@ -75,6 +75,16 @@ The names above are the defaults, `<role group> <name>`. For a naming convention
 principals) need it, but it lets the app grant itself any other role, which amounts to Exchange
 administrator rights. Give it only to the app of the pipeline that manages the Exchange delegation.
 
+Exchange also requires a **delegating assignment** of each role the app hands out: to create a custom role from
+a parent, or to assign a role to a role group, an application or a role assignment policy. List these roles
+with `-DelegatingRoles`, which makes them an explicit, auditable choice:
+
+```powershell
+./tools/new_role_group.ps1 -AppId "<client-id>" -ServicePrincipalObjectId "<object-id>" -Apply `
+    -IncludeRoleManagement `
+    -DelegatingRoles "Mail Recipients", "Distribution Groups", "MyBaseOptions"
+```
+
 The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one. Run it as an administrator who can manage roles (Organization Management).
 
 You need the Object ID of the app's **service principal**: **Entra admin center → Enterprise applications → terraform-msexchangeonline → Object ID**. It differs from the Object ID shown under App registrations.

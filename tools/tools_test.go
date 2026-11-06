@@ -341,3 +341,28 @@ $env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
 		t.Errorf("with -IncludeRoleManagement: %s, want True True", out)
 	}
 }
+
+// TestDelegatingRoles: the roles the app may hand out get a delegating
+// assignment, only with -IncludeRoleManagement (Exchange requires both to
+// derive or assign a role).
+func TestDelegatingRoles(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	run := func(args string) (string, error) {
+		script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + ` ` + args + `
+$DelegatingRoles -join "|"
+`
+		out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
+	if out, err := run(`-DelegatingRoles "Mail Recipients"`); err == nil {
+		t.Errorf("-DelegatingRoles without -IncludeRoleManagement must fail: %s", out)
+	}
+	out, err := run(`-IncludeRoleManagement -DelegatingRoles "Mail Recipients","MyBaseOptions"`)
+	if err != nil || out != "Mail Recipients|MyBaseOptions" {
+		t.Errorf("with -IncludeRoleManagement: %v %s", err, out)
+	}
+}
