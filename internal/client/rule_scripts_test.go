@@ -85,4 +85,11 @@ func TestTransportRuleScript(t *testing.T) {
 			t.Errorf("missing %q in:\n%s", want, out)
 		}
 	}
+	// An attribute Exchange has no value for is not sent on update: clearing it
+	// would be a no-op, and some tenants refuse the encryption parameters.
+	for _, unwanted := range []string{"FromScope=<null>", "SenderDomainIs=<null>", "SubjectOrBodyContainsWords=<null>"} {
+		if strings.Contains(string(out), unwanted) {
+			t.Errorf("unexpected %q in:\n%s", unwanted, out)
+		}
+	}
 }

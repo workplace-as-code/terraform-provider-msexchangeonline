@@ -33,7 +33,6 @@ output "organization_management_description" {
 - `description` (String) Description of the role group.
 - `display_name` (String) Name shown in the Exchange admin center. Defaults to `name`.
 - `id` (String) The object name (same as `name`).
-- `managed_by` (Set of String) Users or groups that can change the members of the role group.
 
 ## Permissions
 

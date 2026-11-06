@@ -32,7 +32,7 @@ output "france_filter" {
 
 - `exclusive` (Boolean) An exclusive scope: only the assignments that use it can change its recipients, even for administrators with organization-wide roles. Changing it creates a new scope.
 - `id` (String) The object name (same as `name`).
-- `recipient_restriction_filter` (String) OPATH filter of the recipients in the scope, for example `CustomAttribute1 -eq 'France'`. Exchange rewrites it with parentheses: the configured text is kept as long as Exchange returns the text it wrote.
+- `recipient_restriction_filter` (String) OPATH filter of the recipients in the scope, for example `CustomAttribute1 -eq 'France'`. Exchange may rewrite it with parentheses: the configured text is kept as long as Exchange returns the text it wrote.
 - `recipient_root` (String) Organizational unit the filter applies to. Empty for the whole organization.
 
 ## Permissions

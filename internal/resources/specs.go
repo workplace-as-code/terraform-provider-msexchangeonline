@@ -340,9 +340,13 @@ var objectSpecs = []objectSpec{
 		notes: "Use it in `msexchangeonline_management_role_assignment` (`custom_recipient_write_scope`, or " +
 			"`custom_resource_scope` for an application).",
 		fields: []field{
-			filterAttr("recipient_restriction_filter", "RecipientRestrictionFilter", "OPATH filter of the recipients "+
-				"in the scope, for example `CustomAttribute1 -eq 'France'`. Exchange rewrites it with parentheses: the "+
-				"configured text is kept as long as Exchange returns the text it wrote."),
+			{
+				name: "recipient_restriction_filter", param: "RecipientRestrictionFilter", property: "RecipientFilter",
+				kind: filterField,
+				desc: "OPATH filter of the recipients in the scope, for example `CustomAttribute1 -eq 'France'`. " +
+					"Exchange may rewrite it with parentheses: the configured text is kept as long as Exchange returns " +
+					"the text it wrote.",
+			},
 			stringAttr("recipient_root", "RecipientRoot", "Organizational unit the filter applies to. Empty for the "+
 				"whole organization."),
 			{
@@ -358,13 +362,12 @@ var objectSpecs = []objectSpec{
 		script:   "role_group.ps1",
 		description: "Manages a custom role group: an Exchange administration role group whose roles and scopes " +
 			"come from `msexchangeonline_management_role_assignment`",
-		notes: "Members are not managed: they come from your identity management process, and a member added or " +
-			"removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) " +
+		notes: "Members and the managers of the membership (ManagedBy) are not managed: they come from your identity " +
+			"management process, and a member added or removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) " +
 			"cannot be managed; read them with the data source.",
 		fields: []field{
 			stringAttr("display_name", "DisplayName", "Name shown in the Exchange admin center. Defaults to `name`."),
 			stringAttr("description", "Description", "Description of the role group."),
-			setAttr("managed_by", "ManagedBy", "Users or groups that can change the members of the role group."),
 		},
 	},
 	{

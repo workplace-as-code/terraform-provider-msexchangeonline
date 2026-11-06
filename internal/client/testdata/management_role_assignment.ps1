@@ -64,3 +64,12 @@ function Merge($Extra) { $h = $empty.Clone(); foreach ($k in $Extra.Keys) { $h[$
 Invoke-Step "group" Create "" (Merge @{ Role = "TF-CI-Role"; RoleGroup = "TF-CI-RoleGroup"; CustomRecipientWriteScope = "TF-CI-Scope" })
 Invoke-Step "app" Create "" (Merge @{ Role = "Application Mail.Read"; App = "11111111-2222-3333-4444-555555555555"; CustomResourceScope = "TF-CI-Scope" })
 Invoke-Step "unscope" Update "TF-CI-Role-TF-CI-RoleGroup" (Merge @{ Role = "TF-CI-Role"; RoleGroup = "TF-CI-RoleGroup"; Enabled = $false })
+
+# Exchange may report an administrative unit or group scope as the custom
+# recipient scope, with RecipientWriteScope saying which kind it is.
+$global:Assignments["TF-CI-AU"] = [pscustomobject]@{ Name = "TF-CI-AU"; Role = "Mail Recipients"; RoleAssigneeName = "TF-CI-RoleGroup"
+    RoleAssigneeType = "RoleGroup"; Enabled = $true; CustomRecipientWriteScope = "au-1111"; RecipientWriteScope = "AdministrativeUnit" }
+$global:Assignments["TF-CI-Group"] = [pscustomobject]@{ Name = "TF-CI-Group"; Role = "Mail Recipients"; RoleAssigneeName = "TF-CI-RoleGroup"
+    RoleAssigneeType = "RoleGroup"; Enabled = $true; CustomRecipientWriteScope = "Helpdesk Users"; RecipientWriteScope = "Group" }
+"au: " + (& $Script -Action Get -Identity TF-CI-AU)
+"group: " + (& $Script -Action Get -Identity TF-CI-Group)

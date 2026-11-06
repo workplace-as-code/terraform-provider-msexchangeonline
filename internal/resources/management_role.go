@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 
@@ -22,8 +23,9 @@ import (
 )
 
 var (
-	_ resource.Resource                = &managementRoleResource{}
-	_ resource.ResourceWithImportState = &managementRoleResource{}
+	_ resource.Resource                   = &managementRoleResource{}
+	_ resource.ResourceWithImportState    = &managementRoleResource{}
+	_ resource.ResourceWithValidateConfig = &managementRoleResource{}
 )
 
 // managementRoleResource manages a custom management role: a copy of a
@@ -106,6 +108,30 @@ func (r *managementRoleResource) Schema(_ context.Context, _ resource.SchemaRequ
 					"`Identity`. The cmdlets of `cmdlets` that are not in the map keep all the parameters of the parent.",
 			},
 		},
+	}
+}
+
+// ValidateConfig refuses parameters for a cmdlet the role does not keep: the
+// script would ignore them.
+func (r *managementRoleResource) ValidateConfig(ctx context.Context, req resource.ValidateConfigRequest, resp *resource.ValidateConfigResponse) {
+	var cfg managementRoleModel
+	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	if resp.Diagnostics.HasError() || cfg.Cmdlets.IsUnknown() || cfg.CmdletParameters.IsNull() || cfg.CmdletParameters.IsUnknown() {
+		return
+	}
+	kept := map[string]bool{}
+	for _, v := range cfg.Cmdlets.Elements() {
+		s, ok := v.(types.String)
+		if !ok || s.IsUnknown() {
+			return
+		}
+		kept[strings.ToLower(s.ValueString())] = true
+	}
+	for cmdlet := range cfg.CmdletParameters.Elements() {
+		if !kept[strings.ToLower(cmdlet)] {
+			resp.Diagnostics.AddAttributeError(path.Root("cmdlet_parameters"), "cmdlet_parameters names a cmdlet the role does not keep",
+				fmt.Sprintf("%s is in cmdlet_parameters but not in cmdlets: add it to cmdlets.", cmdlet))
+		}
 	}
 }
 
@@ -248,6 +274,14 @@ func managementRoleFromAPI(prior managementRoleModel, output []byte) (management
 		}
 	}
 	elems := map[string]attr.Value{}
+	// Exchange only reports the entries whose parameters differ from the
+	// parent's: a configured entry with all of them is kept as configured, as
+	// long as the role keeps the cmdlet.
+	for k, s := range priorParams {
+		if _, reported := findFold(a.CmdletParameters, k); !reported && containsFold(a.Cmdlets, k) {
+			elems[k] = s
+		}
+	}
 	for cmdlet, params := range a.CmdletParameters {
 		key, set := cmdlet, types.SetNull(types.StringType)
 		for k, s := range priorParams {
@@ -259,6 +293,25 @@ func managementRoleFromAPI(prior managementRoleModel, output []byte) (management
 	}
 	m.CmdletParameters = types.MapValueMust(cmdletParametersType, elems)
 	return m, nil
+}
+
+// findFold returns the key of m equal to key whatever the case.
+func findFold(m map[string][]string, key string) (string, bool) {
+	for k := range m {
+		if strings.EqualFold(k, key) {
+			return k, true
+		}
+	}
+	return "", false
+}
+
+func containsFold(values []string, v string) bool {
+	for _, s := range values {
+		if strings.EqualFold(s, v) {
+			return true
+		}
+	}
+	return false
 }
 
 // foldSet returns the values from Exchange as a set, spelled as in prior when

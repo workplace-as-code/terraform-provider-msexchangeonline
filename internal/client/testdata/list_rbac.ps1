@@ -14,6 +14,10 @@ function global:RoleGroups {
     [pscustomobject]@{ Name = "Organization Management"; WellKnownObject = "ExOrgAdmin" }
     [pscustomobject]@{ Name = "ExchangeServiceAdmins_-1234567890"; WellKnownObject = "" }
     [pscustomobject]@{ Name = "Compliance Management"; WellKnownObject = "" }
+    [pscustomobject]@{ Name = "TenantAdmins_-1234567"; WellKnownObject = "" }
+    [pscustomobject]@{ Name = "HelpdeskAdmins_-7654321"; WellKnownObject = "" }
+    [pscustomobject]@{ Name = "RIM-MailboxAdmins8f3c2a"; WellKnownObject = "" }
+    [pscustomobject]@{ Name = "ISVMailboxUsers_-998877"; WellKnownObject = "" }
     [pscustomobject]@{ Name = "TF-CI-RoleGroup"; WellKnownObject = "" }
 }
 function global:Get-ManagementRole {

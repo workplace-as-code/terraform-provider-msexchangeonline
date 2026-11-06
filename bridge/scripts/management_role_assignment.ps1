@@ -55,6 +55,14 @@ function Read-BridgeAssignment([string]$Name) {
     }
     foreach ($p in $ScopeParams) { $out[$p] = [string](Get-BridgeProp $a $p "") }
     $out.RecipientRelativeWriteScope = [string](Get-BridgeProp $a "RecipientWriteScope" "")
+    # Exchange may report an administrative unit or group scope as the custom
+    # recipient scope, with RecipientWriteScope naming its kind.
+    $kinds = @{ AdministrativeUnit = "RecipientAdministrativeUnitScope"; Group = "RecipientGroupScope" }
+    $kind = $kinds[$out.RecipientRelativeWriteScope]
+    if ($kind -and -not $out[$kind] -and $out.CustomRecipientWriteScope) {
+        $out[$kind] = $out.CustomRecipientWriteScope
+        $out.CustomRecipientWriteScope = ""
+    }
     $out.Enabled = [bool](Get-BridgeProp $a "Enabled" $true)
     ConvertTo-Json -Compress -InputObject $out
 }

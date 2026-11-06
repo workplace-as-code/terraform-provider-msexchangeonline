@@ -81,7 +81,7 @@ $StringParams = [ordered]@{
 # Get-BridgeRuleString reads a rule property as text: the rights protection
 # template is an object whose TemplateName is the name the configuration uses.
 function Get-BridgeRuleString($Rule, [string]$Property) {
-    if ($null -eq $Rule.PSObject.Properties[$Property]) { return "" }
+    if ($null -eq $Rule -or $null -eq $Rule.PSObject.Properties[$Property]) { return "" }
     $v = $Rule.$Property
     if ($null -eq $v) { return "" }
     if ($null -ne $v.PSObject.Properties["TemplateName"]) { return "$($v.TemplateName)" }
@@ -118,7 +118,7 @@ function ConvertTo-BridgeRule {
 
 # Builds the action and condition parameters. On Update, removed conditions and
 # previous actions are explicitly cleared with $null so Exchange matches the plan.
-function Get-RuleParams([bool]$IsUpdate) {
+function Get-RuleParams([bool]$IsUpdate, $Current = $null) {
     $p = @{}
 
     switch ($RuleAction) {
@@ -143,13 +143,17 @@ function Get-RuleParams([bool]$IsUpdate) {
     if ($AttachmentIsExecutableBool)  { $p["AttachmentHasExecutableContent"] = $true }
     elseif ($IsUpdate)                { $p["AttachmentHasExecutableContent"] = $false }
 
+    # The attributes added in v0.5.0 are only cleared when the rule has a value:
+    # clearing an empty one is a no-op, and tenants without Purview Message
+    # Encryption may refuse the encryption parameters.
     foreach ($name in $StringParams.Keys) {
         if ($StringParams[$name]) { $p[$name] = $StringParams[$name] }
-        elseif ($IsUpdate)        { $p[$name] = $null }
+        elseif ($IsUpdate -and (Get-BridgeRuleString $Current $name)) { $p[$name] = $null }
     }
     foreach ($name in $ListParams.Keys) {
         if ($ListParams[$name].Count -gt 0) { $p[$name] = [string[]]$ListParams[$name] }
-        elseif ($IsUpdate)                  { $p[$name] = $null }
+        elseif ($IsUpdate -and $null -ne $Current -and $null -ne $Current.PSObject.Properties[$name] -and
+            @($Current.$name | Where-Object { $_ }).Count -gt 0) { $p[$name] = $null }
     }
 
     # Safety net, duplicated from the provider's plan-time validation: a rule
@@ -188,7 +192,8 @@ try {
         }
 
         "Update" {
-            $params = Get-RuleParams -IsUpdate $true
+            $current = Get-TransportRule -Identity $Identity -ErrorAction Stop
+            $params = Get-RuleParams -IsUpdate $true -Current $current
             $params["Identity"] = $Identity
             if ($Name -and $Name -ne $Identity) { $params["Name"] = $Name }
             if ($Priority -ne "") { $params["Priority"] = [int]$Priority }

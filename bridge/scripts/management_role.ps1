@@ -115,6 +115,14 @@ try {
                 if ($null -eq $k) { throw "$_ is not in the parent role $($wanted.Parent)." }
                 $k
             } | Sort-Object)
+            # Check the parameters before creating the role: a failed create must
+            # not leave a role behind.
+            foreach ($c in $cmdlets) {
+                $want = Get-BridgeWantedParameters $c
+                if ($null -eq $want) { continue }
+                $extra = @($want | Where-Object { $parentEntries[$c] -notcontains $_ })
+                if ($extra.Count -gt 0) { throw "$c in the parent role has no parameter $($extra -join ', ')." }
+            }
             $new = @{ Name = $Identity; Parent = $wanted.Parent; EnabledCmdlets = $cmdlets }
             if ($null -ne $wanted.PSObject.Properties["Description"]) { $new["Description"] = $wanted.Description }
             Invoke-BridgeRetry -Create { New-ManagementRole @new | Out-Null }

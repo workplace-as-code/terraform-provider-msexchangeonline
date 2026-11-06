@@ -54,6 +54,8 @@ func TestManagementRoleScript(t *testing.T) {
 		"Mail Recipients is a built-in role: only custom roles can be managed",
 		"New-Mailbox is not in the parent role Mail Recipients",
 		"notinparent calls: \n",
+		"Set-User in the parent role has no parameter Bogus",
+		"badparam calls: []",
 	)
 }
 
@@ -68,6 +70,12 @@ func TestRoleAssignmentScript(t *testing.T) {
 		`"App":"11111111-2222-3333-4444-555555555555"`,
 		"unscope calls: Set Enabled=False,RecipientRelativeWriteScope=Organization",
 		`"RecipientRelativeWriteScope":"Organization"`,
+		`au: {"Name":"TF-CI-AU","Role":"Mail Recipients","RoleGroup":"TF-CI-RoleGroup","App":"","CustomRecipientWriteScope":"",`+
+			`"ExclusiveRecipientWriteScope":"","CustomResourceScope":"","RecipientAdministrativeUnitScope":"au-1111",`+
+			`"RecipientGroupScope":""`,
+		`group: {"Name":"TF-CI-Group","Role":"Mail Recipients","RoleGroup":"TF-CI-RoleGroup","App":"","CustomRecipientWriteScope":"",`+
+			`"ExclusiveRecipientWriteScope":"","CustomResourceScope":"","RecipientAdministrativeUnitScope":"",`+
+			`"RecipientGroupScope":"Helpdesk Users"`,
 	)
 }
 

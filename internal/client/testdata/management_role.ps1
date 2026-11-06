@@ -72,3 +72,6 @@ $global:Roles.Remove("TF-CI-Role")
 $global:Calls.Clear()
 "notinparent: " + (& $Script -Action Create -Identity TF-CI-Role -Values (ConvertTo-B64 @{ Parent = "Mail Recipients"; Cmdlets = @("New-Mailbox"); CmdletParameters = @{} }) 2>&1)
 "notinparent calls: $($global:Calls -join '; ')"
+$global:Calls.Clear()
+"badparam: " + (& $Script -Action Create -Identity TF-CI-Role -Values (ConvertTo-B64 @{ Parent = "Mail Recipients"; Cmdlets = @("Set-User"); CmdletParameters = @{ "Set-User" = @("Identity", "Bogus") } }) 2>&1)
+"badparam calls: [$($global:Calls -join '; ')]"

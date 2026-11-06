@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
 func TestManagementRoleSchema(t *testing.T) {
@@ -85,5 +86,64 @@ func TestManagementRoleReadsRestrictedParameters(t *testing.T) {
 	}
 	if len(m.CmdletParameters.Elements()) != 1 {
 		t.Fatalf("cmdlet_parameters: got %v", m.CmdletParameters)
+	}
+}
+
+func paramsMap(cmdlet string, params ...string) tftypes.Value {
+	set := make([]tftypes.Value, len(params))
+	for i, p := range params {
+		set[i] = tftypes.NewValue(tftypes.String, p)
+	}
+	elem := tftypes.Set{ElementType: tftypes.String}
+	return tftypes.NewValue(tftypes.Map{ElementType: elem}, map[string]tftypes.Value{cmdlet: tftypes.NewValue(elem, set)})
+}
+
+func cmdletSet(items ...string) tftypes.Value {
+	vals := make([]tftypes.Value, len(items))
+	for i, s := range items {
+		vals[i] = tftypes.NewValue(tftypes.String, s)
+	}
+	return tftypes.NewValue(tftypes.Set{ElementType: tftypes.String}, vals)
+}
+
+// TestManagementRoleParametersNeedTheirCmdlet: a cmdlet of cmdlet_parameters
+// must be kept by cmdlets, or the script ignores it and the apply fails.
+func TestManagementRoleParametersNeedTheirCmdlet(t *testing.T) {
+	r := &managementRoleResource{}
+	d := validateResource(t, r, map[string]tftypes.Value{
+		"name": str("r"), "parent": str("Mail Recipients"), "cmdlets": cmdletSet("Get-Mailbox"),
+		"cmdlet_parameters": paramsMap("Set-User", "Identity"),
+	})
+	if !hasError(d, "cmdlet_parameters") {
+		t.Errorf("a cmdlet of cmdlet_parameters missing from cmdlets must be refused, got %v", d)
+	}
+	d = validateResource(t, r, map[string]tftypes.Value{
+		"name": str("r"), "parent": str("Mail Recipients"), "cmdlets": cmdletSet("set-user"),
+		"cmdlet_parameters": paramsMap("Set-User", "Identity"),
+	})
+	if d.HasError() {
+		t.Errorf("the case of the cmdlet does not matter, got %v", d)
+	}
+}
+
+// TestManagementRoleKeepsEntriesEqualToTheParent: Exchange only reports the
+// entries whose parameters differ from the parent's; an entry configured with
+// all of them stays in the state.
+func TestManagementRoleKeepsEntriesEqualToTheParent(t *testing.T) {
+	prior := managementRoleModel{
+		Name:    types.StringValue("TF-CI-Role"),
+		Parent:  types.StringValue("Mail Recipients"),
+		Cmdlets: stringSet("Get-User"),
+		CmdletParameters: types.MapValueMust(cmdletParametersType, map[string]attr.Value{
+			"Get-User": stringSet("Identity"),
+		}),
+	}
+	m, err := managementRoleFromAPI(prior, []byte(`{"Name":"TF-CI-Role","Parent":"Mail Recipients",`+
+		`"Cmdlets":["Get-User"],"CmdletParameters":{}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.CmdletParameters.Equal(prior.CmdletParameters) {
+		t.Errorf("got %v, want %v", m.CmdletParameters, prior.CmdletParameters)
 	}
 }

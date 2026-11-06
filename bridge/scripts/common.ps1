@@ -141,14 +141,17 @@ $BridgeBuiltInRoleGroups = @(
 $script:BridgeRoleGroupCache = @{}
 
 # Test-BridgeBuiltIn reports whether an RBAC object was created by Microsoft:
-# a role group with a well-known object, an ExchangeServiceAdmins_ group or a
+# a role group with a well-known object, linked to an Entra role or with a
 # known name; a root management role (custom roles are derived from a parent).
 function Test-BridgeBuiltIn {
     param([string]$Noun, $Object)
     $name = [string](Get-BridgeProp $Object "Name" "")
     switch ($Noun) {
         "RoleGroup" {
-            [bool](Get-BridgeProp $Object "WellKnownObject" "") -or $name -like "ExchangeServiceAdmins_*" -or
+            # Role groups linked to a Microsoft Entra role end in "_-<number>"
+            # (ExchangeServiceAdmins_-123..., TenantAdmins_-123...).
+            [bool](Get-BridgeProp $Object "WellKnownObject" "") -or $name -match '_-\d+$' -or
+                $name -like "RIM-MailboxAdmins*" -or $name -like "ISVMailboxUsers*" -or
                 $BridgeBuiltInRoleGroups -contains $name
         }
         "ManagementRole" { [bool](Get-BridgeProp $Object "IsRootRole" $true) }

@@ -14,6 +14,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/path"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource/schema/boolplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
@@ -60,6 +61,17 @@ type field struct {
 	values     []string // enumField only
 	validators []validator.Int64
 	forceNew   bool // changing the value replaces the object
+	// property is the object property Get- returns the value in, when it is not
+	// named like the parameter (RecipientRestrictionFilter comes back as RecipientFilter).
+	property string
+}
+
+// readProp is the property the script returns the value in.
+func (f field) readProp() string {
+	if f.property != "" {
+		return f.property
+	}
+	return f.param
 }
 
 func boolAttr(name, param, desc string) field {
@@ -176,7 +188,11 @@ func (f field) attrType() attr.Type {
 func (f field) schemaAttribute() schema.Attribute {
 	switch f.kind {
 	case boolField:
-		return optionalBool(f.desc)
+		a := optionalBool(f.desc)
+		if f.forceNew {
+			a.PlanModifiers = append(a.PlanModifiers, boolplanmodifier.RequiresReplaceIfConfigured())
+		}
+		return a
 	case int64Field, daysField:
 		a := optionalInt64(f.desc, f.validators...)
 		if f.forceNew {
@@ -423,7 +439,7 @@ func (r *objectResource) identity(o types.Object) string {
 func (r *objectResource) params(action, identity string, values map[string]any) map[string]string {
 	props := make([]string, 0, len(r.spec.fields))
 	for _, f := range r.spec.fields {
-		props = append(props, f.param)
+		props = append(props, f.readProp())
 	}
 	p := map[string]string{
 		"Action":     action,
@@ -506,7 +522,7 @@ func (r *objectResource) filtersOf(output []byte) map[string]string {
 	filters := map[string]string{}
 	for _, f := range r.spec.fields {
 		if f.kind == filterField {
-			s, _ := api[f.param].(string)
+			s, _ := api[f.readProp()].(string)
 			filters[f.name] = s
 		}
 	}
@@ -540,7 +556,7 @@ func (r *objectResource) fromAPI(prior types.Object, output []byte, recorded map
 	}
 
 	for _, f := range r.spec.fields {
-		raw := api[f.param]
+		raw := api[f.readProp()]
 		switch f.kind {
 		case boolField:
 			b, _ := raw.(bool)

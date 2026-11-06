@@ -2,12 +2,12 @@
 page_title: "msexchangeonline_role_group (Resource) - msexchangeonline"
 subcategory: "Administration"
 description: |-
-  Manages a custom role group: an Exchange administration role group whose roles and scopes come from msexchangeonline_management_role_assignment (New-RoleGroup). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. Members are not managed: they come from your identity management process, and a member added or removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) cannot be managed; read them with the data source.
+  Manages a custom role group: an Exchange administration role group whose roles and scopes come from msexchangeonline_management_role_assignment (New-RoleGroup). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. Members and the managers of the membership (ManagedBy) are not managed: they come from your identity management process, and a member added or removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) cannot be managed; read them with the data source.
 ---
 
 # msexchangeonline_role_group (Resource)
 
-Manages a custom role group: an Exchange administration role group whose roles and scopes come from `msexchangeonline_management_role_assignment` (`New-RoleGroup`). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. Members are not managed: they come from your identity management process, and a member added or removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) cannot be managed; read them with the data source.
+Manages a custom role group: an Exchange administration role group whose roles and scopes come from `msexchangeonline_management_role_assignment` (`New-RoleGroup`). Attributes left out of the configuration take the Exchange default when the object is created and are not managed afterwards. Members and the managers of the membership (ManagedBy) are not managed: they come from your identity management process, and a member added or removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) cannot be managed; read them with the data source.
 
 ## Example Usage
 
@@ -30,7 +30,6 @@ resource "msexchangeonline_role_group" "helpdesk_france" {
 
 - `description` (String) Description of the role group.
 - `display_name` (String) Name shown in the Exchange admin center. Defaults to `name`.
-- `managed_by` (Set of String) Users or groups that can change the members of the role group.
 
 ### Read-Only
 
