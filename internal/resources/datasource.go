@@ -28,29 +28,29 @@ import (
 // policies) have none; accepted domains and the organization config have
 // their own data source in internal/datasources.
 var dataSourceResources = []dataSourceResource{
-	{NewAntiPhishPolicyResource, "name"},
-	{NewAntiPhishRuleResource, "name"},
-	{NewDkimSigningConfigResource, "domain_name"},
-	{NewEmailAddressPolicyResource, "name"},
-	{NewHostedContentFilterPolicyResource, "name"},
-	{NewHostedContentFilterRuleResource, "name"},
-	{NewInboundConnectorResource, "name"},
-	{NewMalwareFilterPolicyResource, "name"},
-	{NewMalwareFilterRuleResource, "name"},
-	{NewMobileDeviceMailboxPolicyResource, "name"},
-	{NewOutboundConnectorResource, "name"},
-	{NewOutboundSpamFilterPolicyResource, "name"},
-	{NewOwaMailboxPolicyResource, "name"},
-	{NewQuarantinePolicyResource, "name"},
-	{NewRemoteDomainResource, "name"},
-	{NewRetentionPolicyResource, "name"},
-	{NewSafeAttachmentPolicyResource, "name"},
-	{NewSafeAttachmentRuleResource, "name"},
-	{NewSafeLinksPolicyResource, "name"},
-	{NewRoleAssignmentPolicyResource, "name"},
-	{NewSafeLinksRuleResource, "name"},
-	{NewServicePrincipalResource, "app_id"},
-	{NewTransportRuleResource, "name"},
+	{NewAntiPhishPolicyResource, "name", ""},
+	{NewAntiPhishRuleResource, "name", ""},
+	{NewDkimSigningConfigResource, "domain_name", ""},
+	{NewEmailAddressPolicyResource, "name", ""},
+	{NewHostedContentFilterPolicyResource, "name", ""},
+	{NewHostedContentFilterRuleResource, "name", ""},
+	{NewInboundConnectorResource, "name", ""},
+	{NewMalwareFilterPolicyResource, "name", ""},
+	{NewMalwareFilterRuleResource, "name", ""},
+	{NewMobileDeviceMailboxPolicyResource, "name", ""},
+	{NewOutboundConnectorResource, "name", ""},
+	{NewOutboundSpamFilterPolicyResource, "name", ""},
+	{NewOwaMailboxPolicyResource, "name", ""},
+	{NewQuarantinePolicyResource, "name", ""},
+	{NewRemoteDomainResource, "name", ""},
+	{NewRetentionPolicyResource, "name", ""},
+	{NewSafeAttachmentPolicyResource, "name", ""},
+	{NewSafeAttachmentRuleResource, "name", ""},
+	{NewSafeLinksPolicyResource, "name", ""},
+	{NewRoleAssignmentPolicyResource, "name", ""},
+	{NewSafeLinksRuleResource, "name", ""},
+	{NewServicePrincipalResource, "app_id", ""},
+	{NewTransportRuleResource, "name", ""},
 }
 
 // dataSourceResource pairs a resource with the argument of its data source,
@@ -58,6 +58,7 @@ var dataSourceResources = []dataSourceResource{
 type dataSourceResource struct {
 	newResource func() resource.Resource
 	key         string
+	description string // read-only objects: there is no resource page to point to
 }
 
 // allDataSourceResources adds the generic resources that are not tenant-wide
@@ -66,8 +67,14 @@ func allDataSourceResources() []dataSourceResource {
 	out := append([]dataSourceResource(nil), dataSourceResources...)
 	for _, spec := range objectSpecs {
 		if !spec.singleton {
-			out = append(out, dataSourceResource{newObjectResource(spec), "name"})
+			out = append(out, dataSourceResource{newObjectResource(spec), "name", ""})
 		}
+	}
+	// The read-only objects are data sources only: their resource is never registered.
+	for _, spec := range readOnlySpecs {
+		desc := fmt.Sprintf("%s (`Get-%s`), by `name`. Read only: the Hybrid Configuration Wizard manages it.",
+			spec.description, spec.noun)
+		out = append(out, dataSourceResource{newObjectResource(spec), "name", desc})
 	}
 	return out
 }
@@ -78,7 +85,7 @@ func DataSources() []func() datasource.DataSource {
 	out := make([]func() datasource.DataSource, 0, len(sources))
 	for _, source := range sources {
 		out = append(out, func() datasource.DataSource {
-			return &resourceDataSource{resource: source.newResource(), key: source.key}
+			return &resourceDataSource{resource: source.newResource(), key: source.key, description: source.description}
 		})
 	}
 	return out
@@ -86,8 +93,9 @@ func DataSources() []func() datasource.DataSource {
 
 // resourceDataSource is a data source that reads through a resource.
 type resourceDataSource struct {
-	resource resource.Resource
-	key      string
+	resource    resource.Resource
+	key         string
+	description string
 }
 
 var _ datasource.DataSourceWithConfigure = &resourceDataSource{}
@@ -118,12 +126,16 @@ func (d *resourceDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 		}
 		attrs[name] = converted
 	}
+	desc := fmt.Sprintf("Reads an existing object by `%[3]s`, with the attributes of the "+
+		"[`%[1]s`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/%[2]s) resource. "+
+		"Use it to reference an object that this configuration does not manage, such as a default policy.",
+		meta.TypeName, meta.TypeName[len("msexchangeonline_"):], d.key)
+	if d.description != "" {
+		desc = d.description
+	}
 	resp.Schema = dsschema.Schema{
-		MarkdownDescription: fmt.Sprintf("Reads an existing object by `%[3]s`, with the attributes of the "+
-			"[`%[1]s`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/%[2]s) resource. "+
-			"Use it to reference an object that this configuration does not manage, such as a default policy.",
-			meta.TypeName, meta.TypeName[len("msexchangeonline_"):], d.key),
-		Attributes: attrs,
+		MarkdownDescription: desc,
+		Attributes:          attrs,
 	}
 }
 

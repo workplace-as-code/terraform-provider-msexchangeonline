@@ -81,6 +81,14 @@ func specCmdlets(t *testing.T) []string {
 	if len(out) == 0 {
 		t.Fatal("no noun found in specs.go")
 	}
+	// The read-only objects (data sources only) are read with Get- only.
+	readOnly, err := os.ReadFile("../internal/resources/readonly_specs.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range specNounRe.FindAllStringSubmatch(string(readOnly), -1) {
+		out = append(out, "Get-"+m[1])
+	}
 	return out
 }
 

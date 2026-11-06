@@ -32,6 +32,9 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   TF_VAR_test_hybrid=true — also reads the hybrid data sources: an administrator
+#                           creates TF-CI-OnPrem (New-OnPremisesOrganization) and TF-CI-IOC
+#                           (New-IntraOrganizationConnector) once, with contoso values
 #   EXCHANGE_TEST_RBAC      (any value) — also tests the Exchange RBAC delegation
 #                           (test/integration/rbac.tf): scopes, roles, role groups, role
 #                           assignments and policies; the app needs Role Management
@@ -572,6 +575,11 @@ if [[ ${#PRESET[@]} -gt 0 ]]; then
   echo "  Adopted, turned off on destroy: ${PRESET[*]%%.standard*} (Standard preset)"
 else
   echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
+fi
+if [[ "${TF_VAR_test_hybrid:-}" == true ]]; then
+  echo "  Hybrid:           onpremises_organization and intra_organization_connector data sources"
+else
+  echo "  Not tested:       hybrid data sources (set TF_VAR_test_hybrid=true)"
 fi
 if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
   echo "  RBAC:             management scopes, role groups, custom roles, role assignments, service principals, role assignment policies"

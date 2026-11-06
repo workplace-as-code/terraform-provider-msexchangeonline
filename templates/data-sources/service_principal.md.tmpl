@@ -1,0 +1,24 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Administration"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Role Management** Exchange management role (`tools/new_role_group.ps1` grants it with `-IncludeRoleManagement`). See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`Get-ServicePrincipal`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-serviceprincipal?view=exchange-ps)

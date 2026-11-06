@@ -6,6 +6,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/resource"
 )
 
 // TestDataSourcesMirrorTheirResource checks every data source built from a
@@ -39,5 +40,31 @@ func TestDataSourcesMirrorTheirResource(t *testing.T) {
 				t.Errorf("type differs from the resource:\n%s\n%s", got, want)
 			}
 		})
+	}
+}
+
+// TestReadOnlySpecsAreDataSourcesOnly: the hybrid objects that the Hybrid
+// Configuration Wizard manages are data sources, never resources.
+func TestReadOnlySpecsAreDataSourcesOnly(t *testing.T) {
+	ctx := context.Background()
+	dataSources := map[string]bool{}
+	for _, newDataSource := range DataSources() {
+		var meta datasource.MetadataResponse
+		newDataSource().Metadata(ctx, datasource.MetadataRequest{ProviderTypeName: "msexchangeonline"}, &meta)
+		dataSources[meta.TypeName] = true
+	}
+	resources := map[string]bool{}
+	for _, newResource := range Resources() {
+		var meta resource.MetadataResponse
+		newResource().Metadata(ctx, resource.MetadataRequest{ProviderTypeName: "msexchangeonline"}, &meta)
+		resources[meta.TypeName] = true
+	}
+	for _, name := range []string{"msexchangeonline_onpremises_organization", "msexchangeonline_intra_organization_connector"} {
+		if !dataSources[name] {
+			t.Errorf("%s must be a data source", name)
+		}
+		if resources[name] {
+			t.Errorf("%s must not be a resource", name)
+		}
 	}
 }
