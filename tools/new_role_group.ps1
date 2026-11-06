@@ -91,6 +91,7 @@ $ErrorActionPreference = "Stop"
 $ProviderRoles = @(
     "Address Lists",
     "E-Mail Address Policies",
+    "Information Rights Management",
     "Journaling",
     "Organization Configuration",
     "Organization Transport Settings",
@@ -213,6 +214,7 @@ $ProviderCmdlets = @(
     "Get-HostedContentFilterRule",
     "Get-HostedOutboundSpamFilterPolicy",
     "Get-HostedOutboundSpamFilterRule",
+    "Get-IRMConfiguration",
     "Get-InboundConnector",
     "Get-JournalRule",
     "Get-Mailbox",
@@ -328,6 +330,7 @@ $ProviderCmdlets = @(
     "Set-HostedContentFilterRule",
     "Set-HostedOutboundSpamFilterPolicy",
     "Set-HostedOutboundSpamFilterRule",
+    "Set-IRMConfiguration",
     "Set-InboundConnector",
     "Set-JournalRule",
     "Set-MailboxPlan",

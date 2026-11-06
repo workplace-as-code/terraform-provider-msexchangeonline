@@ -367,4 +367,41 @@ var objectSpecs = []objectSpec{
 			setAttr("managed_by", "ManagedBy", "Users or groups that can change the members of the role group."),
 		},
 	},
+	{
+		typeName:  "irm_configuration",
+		noun:      "IRMConfiguration",
+		singleton: true,
+		description: "Manages the Information Rights Management (IRM) configuration of the organization: Microsoft " +
+			"Purview Message Encryption, and how Exchange decrypts protected messages",
+		notes: "It needs Microsoft Purview Message Encryption (Microsoft 365 E3 or E5, Office 365 E3 or E5, or Azure " +
+			"Information Protection Plan 1). Legacy AD RMS settings are not managed.",
+		fields: []field{
+			boolAttr("azure_rms_licensing_enabled", "AzureRMSLicensingEnabled", "Connect to Azure Rights Management: "+
+				"turns Microsoft Purview Message Encryption on."),
+			boolAttr("internal_licensing_enabled", "InternalLicensingEnabled", "Use IRM for messages sent inside the "+
+				"organization."),
+			boolAttr("simplified_client_access_enabled", "SimplifiedClientAccessEnabled", "Show the Protect button in "+
+				"Outlook on the web."),
+			boolAttr("simplified_client_access_encrypt_only_disabled", "SimplifiedClientAccessEncryptOnlyDisabled",
+				"Hide the Encrypt-Only option in Outlook on the web."),
+			boolAttr("simplified_client_access_do_not_forward_disabled", "SimplifiedClientAccessDoNotForwardDisabled",
+				"Hide the Do Not Forward option in Outlook on the web."),
+			enumAttr("transport_decryption_setting", "TransportDecryptionSetting", "Whether Exchange decrypts protected "+
+				"messages in transport, for example to scan them.", "Disabled", "Optional", "Mandatory"),
+			boolAttr("journal_report_decryption_enabled", "JournalReportDecryptionEnabled", "Add a decrypted copy of "+
+				"protected messages to journal reports."),
+			boolAttr("decrypt_attachment_for_encrypt_only", "DecryptAttachmentForEncryptOnly", "Give recipients "+
+				"unrestricted rights on the attachments of Encrypt-Only messages."),
+			boolAttr("enable_pdf_encryption", "EnablePdfEncryption", "Encrypt PDF attachments of encrypted messages."),
+			boolAttr("enable_portal_tracking_logs", "EnablePortalTrackingLogs", "Log the activity of the encrypted "+
+				"message portal (Advanced Message Encryption)."),
+			boolAttr("search_enabled", "SearchEnabled", "Let users search encrypted messages in Outlook on the web."),
+			boolAttr("ediscovery_super_user_enabled", "EDiscoverySuperUserEnabled", "Let eDiscovery searches read "+
+				"protected messages."),
+			boolAttr("reject_if_recipient_has_no_rights", "RejectIfRecipientHasNoRights", "Reject a protected message "+
+				"sent to a recipient who has no rights on it."),
+			boolAttr("automatic_service_update_enabled", "AutomaticServiceUpdateEnabled", "Let Microsoft add new "+
+				"Azure Information Protection features automatically."),
+		},
+	},
 }

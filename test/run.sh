@@ -242,6 +242,7 @@ KEEP=(
   "msexchangeonline_external_in_outlook.this"
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
+  "msexchangeonline_irm_configuration.this"
   "msexchangeonline_activesync_organization_settings.this"
   "msexchangeonline_mailbox_plan.enterprise"
   "msexchangeonline_cas_mailbox_plan.enterprise"
@@ -421,6 +422,11 @@ write_and_restore msexchangeonline_cas_mailbox_plan.enterprise pop_enabled \
 days="$(state_value msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days)"
 write_and_restore msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days \
   mailbox_plan_retain_deleted_items_for_days "$(( days == 30 ? 29 : days + 1 ))" "$days"
+if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
+  logs="$(state_value msexchangeonline_irm_configuration.this enable_portal_tracking_logs)"
+  write_and_restore msexchangeonline_irm_configuration.this enable_portal_tracking_logs \
+    irm_enable_portal_tracking_logs "$([[ "$logs" == true ]] && echo false || echo true)" "$logs"
+fi
 if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admin_mail_recipients)" != *'"'* ]]; then
   write_and_restore msexchangeonline_activesync_organization_settings.this admin_mail_recipients \
     activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
@@ -567,7 +573,7 @@ else
   echo "  Not tested:       Exchange RBAC (set EXCHANGE_TEST_RBAC)"
 fi
 if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
-  echo "  Encryption:       transport rule encryption actions"
+  echo "  Encryption:       transport rule encryption actions, IRM configuration written and restored"
 else
   echo "  Not tested:       message encryption (set EXCHANGE_TEST_ENCRYPTION)"
 fi

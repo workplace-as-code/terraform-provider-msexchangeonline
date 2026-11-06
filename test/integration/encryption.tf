@@ -23,3 +23,19 @@ resource "msexchangeonline_transport_rule" "encrypt" {
   apply_rights_protection_template               = local.updated ? "Do Not Forward" : "Encrypt"
   apply_rights_protection_customization_template = "OME Configuration"
 }
+
+variable "irm_enable_portal_tracking_logs" {
+  description = "Set by test/run.sh to test a write to the IRM configuration, then to restore it. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
+# Tenant-wide: imported, written and restored by test/run.sh, never destroyed.
+import {
+  to = msexchangeonline_irm_configuration.this
+  id = "default"
+}
+
+resource "msexchangeonline_irm_configuration" "this" {
+  enable_portal_tracking_logs = var.irm_enable_portal_tracking_logs
+}

@@ -49,6 +49,7 @@ Choose one option.
 
 - **Address Lists**
 - **E-Mail Address Policies**
+- **Information Rights Management**
 - **Journaling**
 - **Organization Configuration**
 - **Organization Transport Settings**
