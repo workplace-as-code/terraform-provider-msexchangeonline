@@ -35,6 +35,8 @@
 #   EXCHANGE_TEST_RBAC      (any value) — also tests the Exchange RBAC delegation
 #                           (test/integration/rbac.tf): scopes, roles, role groups, role
 #                           assignments and policies; the app needs Role Management
+#                           With TF_VAR_test_app_id and TF_VAR_test_app_object_id (the
+#                           enterprise application), also RBAC for Applications
 #   EXCHANGE_TEST_ENCRYPTION (any value) — also tests message encryption
 #                           (test/integration/encryption.tf): the encryption actions of
 #                           transport rules, the IRM configuration and the OME branding
@@ -188,12 +190,20 @@ if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
     "msexchangeonline_anti_phish_policy.defender[0]=TF-CI-AntiPhish-Defender"
   )
 fi
-RBAC_TYPES="management_scope role_group management_role management_role_assignment"
+RBAC_TYPES="management_scope role_group management_role management_role_assignment service_principal"
 ENCRYPTION_TYPES=""
 if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
   export TF_VAR_test_rbac=true
   CREATED+=(
     "msexchangeonline_management_role_assignment.scoped[0]=TF-CI-Assignment-Scoped"
+  )
+  if [[ -n "${TF_VAR_test_app_id:-}" && -n "${TF_VAR_test_app_object_id:-}" ]]; then
+    CREATED+=(
+      "msexchangeonline_management_role_assignment.app[0]=TF-CI-Assignment-App"
+      "msexchangeonline_service_principal.test[0]=$TF_VAR_test_app_id"
+    )
+  fi
+  CREATED+=(
     "msexchangeonline_management_role_assignment.builtin[0]=TF-CI-Assignment-Builtin"
     "msexchangeonline_role_group.test[0]=TF-CI-RoleGroup"
     "msexchangeonline_management_role.test[0]=TF-CI-Role"
@@ -551,7 +561,7 @@ else
   echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
 fi
 if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
-  echo "  RBAC:             management scopes, role groups, custom roles, role assignments"
+  echo "  RBAC:             management scopes, role groups, custom roles, role assignments, service principals"
 else
   echo "  Not tested:       Exchange RBAC (set EXCHANGE_TEST_RBAC)"
 fi

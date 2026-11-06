@@ -65,3 +65,29 @@ resource "msexchangeonline_management_role_assignment" "builtin" {
   role       = "Distribution Groups"
   role_group = msexchangeonline_role_group.test[0].name
 }
+
+variable "test_app_object_id" {
+  description = "Object ID of the enterprise application of test_app_id, to test RBAC for Applications."
+  type        = string
+  default     = ""
+}
+
+locals {
+  rbac_app = var.test_rbac && var.test_app_id != "" && var.test_app_object_id != "" ? 1 : 0
+}
+
+# RBAC for Applications: the test app can read the mailboxes of the scope only.
+resource "msexchangeonline_service_principal" "test" {
+  count        = local.rbac_app
+  app_id       = var.test_app_id
+  object_id    = var.test_app_object_id
+  display_name = local.updated ? "TF-CI-App-Updated" : "TF-CI-App"
+}
+
+resource "msexchangeonline_management_role_assignment" "app" {
+  count                 = local.rbac_app
+  name                  = "TF-CI-Assignment-App"
+  role                  = "Application Mail.Read"
+  app                   = msexchangeonline_service_principal.test[0].app_id
+  custom_resource_scope = msexchangeonline_management_scope.test[0].name
+}

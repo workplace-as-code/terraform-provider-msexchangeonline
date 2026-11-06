@@ -368,16 +368,19 @@ $RoleManagementCmdlets = @(
     "New-ManagementRoleAssignment",
     "New-ManagementScope",
     "New-RoleGroup",
+    "New-ServicePrincipal",
     "Remove-ManagementRole",
     "Remove-ManagementRoleAssignment",
     "Remove-ManagementRoleEntry",
     "Remove-ManagementScope",
     "Remove-RoleGroup",
+    "Remove-ServicePrincipal",
     "Set-ManagementRole",
     "Set-ManagementRoleAssignment",
     "Set-ManagementRoleEntry",
     "Set-ManagementScope",
-    "Set-RoleGroup"
+    "Set-RoleGroup",
+    "Set-ServicePrincipal"
 )
 if ($IncludeRoleManagement) {
     $ProviderRoles = @($ProviderRoles) + "Role Management"

@@ -48,6 +48,7 @@ var dataSourceResources = []dataSourceResource{
 	{NewSafeAttachmentRuleResource, "name"},
 	{NewSafeLinksPolicyResource, "name"},
 	{NewSafeLinksRuleResource, "name"},
+	{NewServicePrincipalResource, "app_id"},
 	{NewTransportRuleResource, "name"},
 }
 

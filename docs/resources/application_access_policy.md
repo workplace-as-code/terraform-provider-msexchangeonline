@@ -38,6 +38,9 @@ resource "msexchangeonline_application_access_policy" "reporting" {
 
 - `id` (String) The policy identity, `<tenant id>\<policy id>`.
 
+Microsoft replaces application access policies with RBAC for Applications: see
+[`msexchangeonline_service_principal`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/service_principal).
+
 ## Permissions
 
 The provider's app registration needs the **Organization Configuration** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).

@@ -53,8 +53,7 @@ Set at most one write scope. Without one, the role applies to the recipients of 
 `recipient_relative_write_scope` (the whole organization by default). The scopes are authoritative: removing
 a scope from the configuration gives the role back its built-in scope.
 
-Assignments to role assignment policies are managed by
-[`msexchangeonline_role_assignment_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/role_assignment_policy).
+Assignments to role assignment policies are not managed by this resource.
 Role assignments to users are not managed.
 
 ## Permissions
@@ -75,7 +74,7 @@ Import using the assignment name:
 ```terraform
 import {
   to = msexchangeonline_management_role_assignment.helpdesk
-  id = "Helpdesk Phone-Helpdesk France"
+  id = "Helpdesk Phone-Helpdesk"
 }
 ```
 
@@ -84,14 +83,14 @@ Or by identity (Terraform 1.12 and later):
 ```terraform
 import {
   to       = msexchangeonline_management_role_assignment.helpdesk
-  identity = { id = "Helpdesk Phone-Helpdesk France" }
+  identity = { id = "Helpdesk Phone-Helpdesk" }
 }
 ```
 
 Or with the CLI:
 
 ```shell
-terraform import msexchangeonline_management_role_assignment.helpdesk "Helpdesk Phone-Helpdesk France"
+terraform import msexchangeonline_management_role_assignment.helpdesk "Helpdesk Phone-Helpdesk"
 ```
 
 To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

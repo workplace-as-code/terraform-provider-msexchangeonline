@@ -77,3 +77,16 @@ func TestRoleAssignmentListSkipsBuiltIn(t *testing.T) {
 	out := runStub(t, "list_rbac.ps1", "list.ps1")
 	expectLines(t, out, `assignments: ["TF-CI-Role-TF-CI-RoleGroup","Application Mail.Read-TF-CI-App"]`)
 }
+
+// TestServicePrincipalScript guards service_principal.ps1.
+func TestServicePrincipalScript(t *testing.T) {
+	out := runStub(t, "service_principal.ps1", "service_principal.ps1")
+	expectLines(t, out,
+		"missing: []",
+		`create: {"AppId":"11111111-2222-3333-4444-555555555555","ObjectId":"obj-1","DisplayName":"TF-CI-App"}`,
+		`"DisplayName":"TF-CI-App-2"`,
+		"delete: {}",
+		"calls: New AppId=11111111-2222-3333-4444-555555555555,DisplayName=TF-CI-App,ObjectId=obj-1; "+
+			"Set sp-obj-1 DisplayName=TF-CI-App-2; Remove sp-obj-1",
+	)
+}
