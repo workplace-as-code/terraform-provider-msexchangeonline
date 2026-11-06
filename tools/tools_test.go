@@ -16,7 +16,7 @@ import (
 const roleGroupScript = "new_role_group.ps1"
 
 var (
-	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
+	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable|Add)-[A-Z][A-Za-z]+`)
 	functionRe = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
 	listRe     = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
 	rmListRe   = regexp.MustCompile(`(?s)\$RoleManagementCmdlets = @\((.*?)\n\)`)
@@ -93,7 +93,7 @@ var builtins = map[string]bool{
 	"New-Object": true, "New-PSSession": true, "New-PSSessionOption": true, "New-Guid": true,
 	"New-SelfSignedCertificate": true, "Remove-PSSession": true, "Remove-Variable": true, "Remove-Item": true,
 	"Set-StrictMode": true, "Set-Variable": true, "Set-Content": true, "Set-CASMailbox": true,
-	"New-AcceptedDomain": true, "Remove-AcceptedDomain": true,
+	"New-AcceptedDomain": true, "Remove-AcceptedDomain": true, "Add-Member": true,
 }
 
 func bridgeCmdlets(t *testing.T) []string {

@@ -1,0 +1,1 @@
+terraform import msexchangeonline_management_role.helpdesk_phone "Helpdesk Phone"

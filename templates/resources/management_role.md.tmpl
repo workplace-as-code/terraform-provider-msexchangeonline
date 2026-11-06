@@ -1,0 +1,54 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Administration"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Limitations
+
+A custom role can only remove rights from its parent: `cmdlets` and `cmdlet_parameters` can only name
+cmdlets and parameters of the parent role. Built-in roles cannot be managed or imported. A role that is
+still assigned cannot be deleted: refer to it from `msexchangeonline_management_role_assignment` by
+`msexchangeonline_management_role.<name>.name`, so that Terraform removes the assignments first.
+
+## Permissions
+
+The provider's app registration needs the **Role Management** Exchange management role, which lets it grant itself any other role: give it only to the pipeline that manages the Exchange delegation. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it with `-IncludeRoleManagement`. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-managementrole?view=exchange-ps)
+- [`Get-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-managementrole?view=exchange-ps)
+- [`Set-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-managementrole?view=exchange-ps)
+- [`Remove-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-managementrole?view=exchange-ps)
+- [`Get-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-managementroleentry?view=exchange-ps)
+- [`Add-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/add-managementroleentry?view=exchange-ps)
+- [`Remove-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-managementroleentry?view=exchange-ps)
+- [`Set-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-managementroleentry?view=exchange-ps)
+
+## Import
+
+Import using the role name:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

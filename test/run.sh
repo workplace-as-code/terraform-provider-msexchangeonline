@@ -188,12 +188,13 @@ if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
     "msexchangeonline_anti_phish_policy.defender[0]=TF-CI-AntiPhish-Defender"
   )
 fi
-RBAC_TYPES="management_scope role_group"
+RBAC_TYPES="management_scope role_group management_role"
 ENCRYPTION_TYPES=""
 if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
   export TF_VAR_test_rbac=true
   CREATED+=(
     "msexchangeonline_role_group.test[0]=TF-CI-RoleGroup"
+    "msexchangeonline_management_role.test[0]=TF-CI-Role"
     "msexchangeonline_management_scope.test[0]=TF-CI-Scope"
   )
 fi
@@ -548,7 +549,7 @@ else
   echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
 fi
 if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
-  echo "  RBAC:             management scopes, role groups"
+  echo "  RBAC:             management scopes, role groups, custom roles"
 else
   echo "  Not tested:       Exchange RBAC (set EXCHANGE_TEST_RBAC)"
 fi

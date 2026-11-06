@@ -43,6 +43,8 @@ func registrations() []registration {
 		{NewApplicationAccessPolicyResource, listQuery{noun: "ApplicationAccessPolicy"}},
 		// Exchange names a rule "<query string> (<characteristic>)": the import ID.
 		{NewActiveSyncDeviceAccessRuleResource, listQuery{noun: "ActiveSyncDeviceAccessRule", property: "Name"}},
+		// list.ps1 skips the built-in (root) roles.
+		{NewManagementRoleResource, listQuery{noun: "ManagementRole", property: "Name"}},
 	}
 	for _, spec := range objectSpecs {
 		regs = append(regs, registration{newObjectResource(spec), spec.listQuery()})

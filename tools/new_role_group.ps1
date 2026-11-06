@@ -357,12 +357,20 @@ $ProviderCmdlets = @(
 # role, which lets the app grant itself any other role: they are checked and
 # granted only with -IncludeRoleManagement.
 $RoleManagementCmdlets = @(
+    "Add-ManagementRoleEntry",
+    "Get-ManagementRole",
+    "Get-ManagementRoleEntry",
     "Get-ManagementScope",
     "Get-RoleGroup",
+    "New-ManagementRole",
     "New-ManagementScope",
     "New-RoleGroup",
+    "Remove-ManagementRole",
+    "Remove-ManagementRoleEntry",
     "Remove-ManagementScope",
     "Remove-RoleGroup",
+    "Set-ManagementRole",
+    "Set-ManagementRoleEntry",
     "Set-ManagementScope",
     "Set-RoleGroup"
 )

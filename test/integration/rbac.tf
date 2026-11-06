@@ -35,3 +35,15 @@ check "built_in_role_group" {
     error_message = "The Organization Management role group could not be read."
   }
 }
+
+# A help desk role that can read recipients and change phone numbers only.
+resource "msexchangeonline_management_role" "test" {
+  count       = local.rbac
+  name        = "TF-CI-Role"
+  parent      = "Mail Recipients"
+  description = "Integration test role"
+  cmdlets     = local.updated ? ["Get-Mailbox", "Get-Recipient", "Get-User", "Set-User"] : ["Get-Mailbox", "Get-Recipient", "Set-User"]
+  cmdlet_parameters = {
+    "Set-User" = ["Identity", "Phone", "MobilePhone"]
+  }
+}
