@@ -65,7 +65,10 @@ func TestOMEConfigurationSpec(t *testing.T) {
 			t.Errorf("missing attribute %s", name)
 		}
 	}
-	if f := have["image"]; f.kind != stringField {
-		t.Error("image is base64 text, filled with filebase64()")
+	// Exchange re-encodes the logo (it adds PNG chunks and padding): like an
+	// OPATH filter, the state keeps the configured value as long as Exchange
+	// returns what it returned after the last write.
+	if f := have["image"]; f.kind != filterField {
+		t.Error("image is base64 text that Exchange rewrites: it must be a filterField")
 	}
 }

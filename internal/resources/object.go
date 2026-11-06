@@ -46,9 +46,10 @@ const (
 	listField
 	daysField // Exchange time span, exposed as a number of days
 	setField  // multi-valued property whose order Exchange does not keep
-	// filterField is an OPATH recipient filter, which Exchange rewrites (it adds
-	// parentheses): the state keeps the configured text while Exchange returns
-	// the text it returned after the last write, recorded in private state.
+	// filterField is a value Exchange rewrites: an OPATH recipient filter (it
+	// adds parentheses) or an OME logo (re-encoded). The state keeps the
+	// configured text while Exchange returns the text it returned after the last
+	// write, recorded in private state.
 	filterField
 )
 

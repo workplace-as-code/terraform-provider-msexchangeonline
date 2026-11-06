@@ -472,6 +472,8 @@ pass "${#CREATED[@]} resources imported"
 FILTERS=(-target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child
   -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test)
 [[ -n "${EXCHANGE_TEST_RBAC:-}" ]] && FILTERS+=(-target='msexchangeonline_management_scope.test[0]')
+# The OME logo is re-encoded by Exchange, like a filter.
+[[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && FILTERS+=(-target='msexchangeonline_ome_configuration.custom[0]')
 terraform apply -auto-approve -no-color -var phase=update "${FILTERS[@]}" > /dev/null ||
   fail "Recording the filters after import failed"
 expect_no_changes "Drift check after import" -var phase=update

@@ -26,7 +26,7 @@ Reads an existing object by `name`, with the attributes of the [`msexchangeonlin
 - `email_text` (String) Text of the message the recipient receives.
 - `external_mail_expiry_in_days` (Number) Days external recipients can read the message in the portal, from 1 to 730; `0` for no expiry. Custom templates only.
 - `id` (String) The object name (same as `name`).
-- `image` (String) Logo, as base64 (`filebase64("logo.png")`): PNG, JPG, BMP or TIFF, ideally under 40 KB and 170 x 70 pixels. `""` removes the logo.
+- `image` (String) Logo, as base64 (`filebase64("logo.png")`): PNG, JPG, BMP or TIFF, ideally under 40 KB and 170 x 70 pixels. `""` removes the logo. Exchange re-encodes the image: the configured value is kept as long as Exchange returns the image it stored at the last write.
 - `introduction_text` (String) Text after the sender's name and address.
 - `otp_enabled` (Boolean) Let recipients sign in to the portal with a one-time passcode.
 - `portal_text` (String) Text at the top of the encrypted message portal.

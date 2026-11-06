@@ -418,8 +418,9 @@ var objectSpecs = []objectSpec{
 			"the resource only removes it from the state. Other names are custom templates, which need Advanced Message " +
 			"Encryption (E5); a transport rule applies them with `apply_rights_protection_customization_template`.",
 		fields: []field{
-			stringAttr("image", "Image", "Logo, as base64 (`filebase64(\"logo.png\")`): PNG, JPG, BMP or TIFF, ideally "+
-				"under 40 KB and 170 x 70 pixels. `\"\"` removes the logo."),
+			filterAttr("image", "Image", "Logo, as base64 (`filebase64(\"logo.png\")`): PNG, JPG, BMP or TIFF, ideally "+
+				"under 40 KB and 170 x 70 pixels. `\"\"` removes the logo. Exchange re-encodes the image: the configured "+
+				"value is kept as long as Exchange returns the image it stored at the last write."),
 			stringAttr("background_color", "BackgroundColor", "Background color, as an HTML name or a hex code such as "+
 				"`#ffffff`."),
 			stringAttr("introduction_text", "IntroductionText", "Text after the sender's name and address."),
