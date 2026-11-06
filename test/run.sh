@@ -32,6 +32,9 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   EXCHANGE_TEST_RBAC      (any value) — also tests the Exchange RBAC delegation
+#                           (test/integration/rbac.tf): scopes, roles, role groups, role
+#                           assignments and policies; the app needs Role Management
 #   EXCHANGE_TEST_ENCRYPTION (any value) — also tests message encryption
 #                           (test/integration/encryption.tf): the encryption actions of
 #                           transport rules, the IRM configuration and the OME branding
@@ -183,6 +186,15 @@ if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
     "msexchangeonline_safe_attachment_rule.test[0]=TF-CI-SafeAttachmentRule"
     "msexchangeonline_safe_attachment_policy.unscoped[0]=TF-CI-SafeAttachments-Unscoped"
     "msexchangeonline_anti_phish_policy.defender[0]=TF-CI-AntiPhish-Defender"
+  )
+fi
+RBAC_TYPES="management_scope role_group"
+ENCRYPTION_TYPES=""
+if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
+  export TF_VAR_test_rbac=true
+  CREATED+=(
+    "msexchangeonline_role_group.test[0]=TF-CI-RoleGroup"
+    "msexchangeonline_management_scope.test[0]=TF-CI-Scope"
   )
 fi
 if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
@@ -428,9 +440,10 @@ done
 pass "${#CREATED[@]} resources imported"
 # An imported filter holds Exchange's text, with parentheses: the first apply
 # writes the same filter in the configured form.
-terraform apply -auto-approve -no-color -var phase=update \
-  -target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child \
-  -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test > /dev/null ||
+FILTERS=(-target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child
+  -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test)
+[[ -n "${EXCHANGE_TEST_RBAC:-}" ]] && FILTERS+=(-target='msexchangeonline_management_scope.test[0]')
+terraform apply -auto-approve -no-color -var phase=update "${FILTERS[@]}" > /dev/null ||
   fail "Recording the filters after import failed"
 expect_no_changes "Drift check after import" -var phase=update
 
@@ -453,6 +466,9 @@ for doc in "$ROOT"/docs/resources/*.md; do
   name="$(basename "$doc" .md)"
   # Safe Links, Safe Attachments and the preset rules of Defender need Defender for Office 365.
   [[ ( "$name" == safe_* || "$name" == atp_* ) && -z "${EXCHANGE_TEST_DEFENDER:-}" ]] && continue
+  # The RBAC types need Role Management, the encryption types a Purview license.
+  [[ " $RBAC_TYPES " == *" $name "* && -z "${EXCHANGE_TEST_RBAC:-}" ]] && continue
+  [[ " $ENCRYPTION_TYPES " == *" $name "* && -z "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && continue
   printf 'list "msexchangeonline_%s" "all" {\n  provider = msexchangeonline\n}\n\n' "$name" >> "$QUERYDIR/all.tfquery.hcl"
 done
 (cd "$QUERYDIR" && terraform query -no-color -generate-config-out=generated.tf > query.log 2>&1) ||
@@ -530,6 +546,11 @@ if [[ ${#PRESET[@]} -gt 0 ]]; then
   echo "  Adopted, turned off on destroy: ${PRESET[*]%%.standard*} (Standard preset)"
 else
   echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
+fi
+if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
+  echo "  RBAC:             management scopes, role groups"
+else
+  echo "  Not tested:       Exchange RBAC (set EXCHANGE_TEST_RBAC)"
 fi
 if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
   echo "  Encryption:       transport rule encryption actions"

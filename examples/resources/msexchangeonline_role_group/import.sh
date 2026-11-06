@@ -1,0 +1,1 @@
+terraform import msexchangeonline_role_group.helpdesk_france "Helpdesk France"

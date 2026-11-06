@@ -69,6 +69,11 @@ When a built-in role grants much more than the provider needs, the script create
 
 The names above are the defaults, `<role group> <name>`. For a naming convention, `-RoleGroupName` names the role group, `-CustomRolePrefix` replaces the prefix of the custom roles (`-CustomRolePrefix CR-EXO-TF-` gives `CR-EXO-TF-Retention`), and `-CustomRoleNames` names each custom role (`-CustomRoleNames @{ Retention = "CR-EXO-TF-RET" }`). The provider does not depend on these names. After a rename, `-Apply -RemoveExtraRoles` deletes the old custom roles.
 
+**Role Management** is only granted with `-IncludeRoleManagement`. The Exchange RBAC resources
+(management scopes, management roles, role groups, role assignments, role assignment policies and service
+principals) need it, but it lets the app grant itself any other role, which amounts to Exchange
+administrator rights. Give it only to the app of the pipeline that manages the Exchange delegation.
+
 The script first checks with Exchange Online that these roles contain every cmdlet of the provider, and stops if Microsoft has moved one. Run it as an administrator who can manage roles (Organization Management).
 
 You need the Object ID of the app's **service principal**: **Entra admin center → Enterprise applications → terraform-msexchangeonline → Object ID**. It differs from the Object ID shown under App registrations.

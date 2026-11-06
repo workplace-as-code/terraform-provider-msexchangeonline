@@ -1,0 +1,19 @@
+# list_rbac.ps1 - runs bridge/scripts/list.ps1 against fake RBAC cmdlets (run by
+# rbac_scripts_test.go): terraform query must only list the custom role groups
+# and roles, never the built-in ones Microsoft manages.
+param([string]$Script)
+$ErrorActionPreference = "Stop"
+
+function global:Get-ConnectionInformation { [pscustomobject]@{ State = "Connected" } }
+function global:Get-RoleGroup {
+    [pscustomobject]@{ Name = "Organization Management"; WellKnownObject = "ExOrgAdmin" }
+    [pscustomobject]@{ Name = "ExchangeServiceAdmins_-1234567890"; WellKnownObject = "" }
+    [pscustomobject]@{ Name = "Compliance Management"; WellKnownObject = "" }
+    [pscustomobject]@{ Name = "TF-CI-RoleGroup"; WellKnownObject = "" }
+}
+function global:Get-ManagementRole {
+    [pscustomobject]@{ Name = "Mail Recipients"; IsRootRole = $true }
+    [pscustomobject]@{ Name = "TF-CI-Role"; IsRootRole = $false }
+}
+"role groups: " + (& $Script -Noun RoleGroup -Property Name)
+"roles: " + (& $Script -Noun ManagementRole -Property Name)

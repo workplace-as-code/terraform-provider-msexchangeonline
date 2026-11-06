@@ -126,6 +126,34 @@ function Test-BridgeNotFound {
     $Message -match "couldn't be found|could not be found|not found|ObjectNotFound|doesn't exist|does not exist"
 }
 
+# Built-in role groups of Exchange Online and Microsoft Purview. Microsoft
+# creates them in every tenant; the provider only manages custom role groups.
+$BridgeBuiltInRoleGroups = @(
+    "Compliance Administrator", "Compliance Data Administrator", "Compliance Management", "Discovery Management",
+    "Help Desk", "Hygiene Management", "Organization Management", "Recipient Management", "Records Management",
+    "Security Administrator", "Security Operator", "Security Reader", "View-Only Organization Management",
+    "Communication Compliance", "Communication Compliance Administrators", "Communication Compliance Analysts",
+    "Communication Compliance Investigators", "Communication Compliance Viewers", "Insider Risk Management",
+    "Privacy Management", "Privacy Management Administrators", "Privacy Management Analysts",
+    "Privacy Management Investigators", "Privacy Management Viewers", "TenantAdmins", "UM Management"
+)
+
+# Test-BridgeBuiltIn reports whether an RBAC object was created by Microsoft:
+# a role group with a well-known object, an ExchangeServiceAdmins_ group or a
+# known name; a root management role (custom roles are derived from a parent).
+function Test-BridgeBuiltIn {
+    param([string]$Noun, $Object)
+    $name = [string](Get-BridgeProp $Object "Name" "")
+    switch ($Noun) {
+        "RoleGroup" {
+            [bool](Get-BridgeProp $Object "WellKnownObject" "") -or $name -like "ExchangeServiceAdmins_*" -or
+                $BridgeBuiltInRoleGroups -contains $name
+        }
+        "ManagementRole" { [bool](Get-BridgeProp $Object "IsRootRole" $true) }
+        default { $false }
+    }
+}
+
 # Get-BridgeProp reads a property that may be missing on some objects or module
 # versions; under StrictMode a direct access to it would throw.
 function Get-BridgeProp {

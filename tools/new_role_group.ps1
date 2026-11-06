@@ -44,6 +44,12 @@
     Create the role group, or add the missing roles to it, and add the
     service principal. Without it, the script only shows what it would do.
 
+.PARAMETER IncludeRoleManagement
+    Also grant the Role Management role, needed by the Exchange RBAC resources
+    (management scopes, roles, role groups, role assignments and policies,
+    service principals). It lets the app grant itself any other role: use it
+    only for the pipeline that manages the Exchange delegation.
+
 .PARAMETER RemoveExtraRoles
     With -Apply, also remove from an existing role group the roles that are
     not in $ProviderRoles nor $CustomRoles. Without it, the script only lists
@@ -71,6 +77,7 @@ param(
     [string]$CustomRolePrefix = "",
     [hashtable]$CustomRoleNames = @{},
     [switch]$Apply,
+    [switch]$IncludeRoleManagement,
     [switch]$RemoveExtraRoles
 )
 
@@ -346,6 +353,24 @@ $ProviderCmdlets = @(
     "Set-TransportRule"
 )
 
+# The cmdlets of the Exchange RBAC resources. They are in the Role Management
+# role, which lets the app grant itself any other role: they are checked and
+# granted only with -IncludeRoleManagement.
+$RoleManagementCmdlets = @(
+    "Get-ManagementScope",
+    "Get-RoleGroup",
+    "New-ManagementScope",
+    "New-RoleGroup",
+    "Remove-ManagementScope",
+    "Remove-RoleGroup",
+    "Set-ManagementScope",
+    "Set-RoleGroup"
+)
+if ($IncludeRoleManagement) {
+    $ProviderRoles = @($ProviderRoles) + "Role Management"
+    $ProviderCmdlets = @($ProviderCmdlets) + $RoleManagementCmdlets
+}
+
 # Find-UncoveredCmdlets returns the cmdlets that none of $Roles contains.
 # $RolesByCmdlet maps each cmdlet to the names of the roles containing it.
 function Find-UncoveredCmdlets {
@@ -437,6 +462,12 @@ if ($extra.Count -gt 0 -and -not ($Apply -and $RemoveExtraRoles)) {
     Write-Host ""
     Write-Warning ("'$RoleGroupName' has roles the provider does not need: $($extra -join ', '). " +
         "Remove them with -Apply -RemoveExtraRoles.")
+}
+
+if (-not $IncludeRoleManagement) {
+    Write-Host ""
+    Write-Host ("Role Management is not granted: the Exchange RBAC resources (management scopes, roles, role groups, " +
+        "role assignments and policies, service principals) need -IncludeRoleManagement.")
 }
 
 if (-not $Apply) {

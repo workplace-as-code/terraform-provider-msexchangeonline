@@ -44,6 +44,8 @@ try {
                 @()
             }
             foreach ($object in $objects) {
+                # terraform query lists custom RBAC objects only.
+                if (Test-BridgeBuiltIn $Noun $object) { continue }
                 [string](Get-BridgeProp $object $Property "")
             }
         }

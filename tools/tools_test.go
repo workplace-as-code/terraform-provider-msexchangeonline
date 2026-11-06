@@ -19,6 +19,7 @@ var (
 	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
 	functionRe = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
 	listRe     = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
+	rmListRe   = regexp.MustCompile(`(?s)\$RoleManagementCmdlets = @\((.*?)\n\)`)
 	rolesRe    = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
 	// customRoleRe matches one entry of $CustomRoles: name, parent, cmdlets.
 	customRoleRe = regexp.MustCompile(`(?s)@\{ Name = "([^"]+)"; Parent = "([^"]+)"; Cmdlets = @\((.*?)\) \}`)
@@ -26,6 +27,9 @@ var (
 	// "- **Role**" item per role, alone on its line.
 	guideRoleRe = regexp.MustCompile(`(?m)^- \*\*([^*]+)\*\*$`)
 	quotedRe    = regexp.MustCompile(`"([^"]+)"`)
+	// rbacNounRe matches the cmdlets of the Role Management role.
+	rbacNounRe = regexp.MustCompile(`^[A-Za-z]+-(ManagementScope|ManagementRole|ManagementRoleEntry|RoleGroup|` +
+		`ManagementRoleAssignment|RoleAssignmentPolicy|ServicePrincipal)$`)
 	// Sync-BridgeRule (common.ps1) builds the rule cmdlet names from -Noun.
 	ruleNounRe = regexp.MustCompile(`Sync-BridgeRule -Noun "([A-Za-z]+)"`)
 	// Invoke-BridgePresetRule (common.ps1) does the same for the preset rules.
@@ -144,11 +148,29 @@ func TestRoleGroupScriptListsEveryBridgeCmdlet(t *testing.T) {
 	if block == nil {
 		t.Fatal("$ProviderCmdlets list not found")
 	}
+	rmBlock := rmListRe.FindStringSubmatch(string(data))
+	if rmBlock == nil {
+		t.Fatal("$RoleManagementCmdlets list not found")
+	}
+	// The Role Management cmdlets are only granted with -IncludeRoleManagement:
+	// together, the two lists hold every cmdlet of the bridge, once.
 	var listed []string
-	for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
-		listed = append(listed, m[1])
+	seen := map[string]bool{}
+	for _, b := range []string{block[1], rmBlock[1]} {
+		for _, m := range quotedRe.FindAllStringSubmatch(b, -1) {
+			if seen[m[1]] {
+				t.Errorf("%s is listed twice", m[1])
+			}
+			seen[m[1]] = true
+			listed = append(listed, m[1])
+		}
 	}
 	sort.Strings(listed)
+	for _, m := range quotedRe.FindAllStringSubmatch(rmBlock[1], -1) {
+		if !rbacNounRe.MatchString(m[1]) {
+			t.Errorf("%s is not a Role Management cmdlet", m[1])
+		}
+	}
 
 	want := bridgeCmdlets(t)
 	if strings.Join(listed, ",") != strings.Join(want, ",") {
@@ -283,5 +305,31 @@ func TestCustomRolesKeepTheBridgeCmdlets(t *testing.T) {
 				t.Errorf("custom role %q keeps %v, the bridge runs %v", role[1], kept, want)
 			}
 		}
+	}
+}
+
+// TestIncludeRoleManagement checks that Role Management and its cmdlets are
+// only part of the role group with -IncludeRoleManagement.
+func TestIncludeRoleManagement(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	run := func(args string) string {
+		script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + ` ` + args + `
+"$($ProviderRoles -contains 'Role Management') $($ProviderCmdlets -contains 'New-RoleGroup')"
+`
+		out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		if err != nil {
+			t.Fatalf("pwsh: %v\n%s", err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if out := run(""); out != "False False" {
+		t.Errorf("without the switch: %s, want False False", out)
+	}
+	if out := run("-IncludeRoleManagement"); out != "True True" {
+		t.Errorf("with -IncludeRoleManagement: %s, want True True", out)
 	}
 }
