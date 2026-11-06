@@ -1,0 +1,51 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Administration"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Default policy
+
+Mailboxes without a policy of their own use the default policy, `Default Role Assignment Policy`: import
+it to restrict what every user can change. `is_default = true` on another policy makes the previous
+default drift (its `is_default` becomes `false`): manage both policies, or neither flag. A policy that is
+the default or that mailboxes use cannot be deleted. Assigning a policy to mailboxes is not managed.
+
+## Permissions
+
+The provider's app registration needs the **Role Management** Exchange management role, which lets it grant itself any other role: give it only to the pipeline that manages the Exchange delegation. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it with `-IncludeRoleManagement`. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-RoleAssignmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-roleassignmentpolicy?view=exchange-ps)
+- [`Get-RoleAssignmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-roleassignmentpolicy?view=exchange-ps)
+- [`Set-RoleAssignmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-roleassignmentpolicy?view=exchange-ps)
+- [`Remove-RoleAssignmentPolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-roleassignmentpolicy?view=exchange-ps)
+- [`New-ManagementRoleAssignment`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-managementroleassignment?view=exchange-ps)
+
+## Import
+
+Import using the policy name:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

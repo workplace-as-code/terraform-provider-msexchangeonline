@@ -91,3 +91,23 @@ resource "msexchangeonline_management_role_assignment" "app" {
   app                   = msexchangeonline_service_principal.test[0].app_id
   custom_resource_scope = msexchangeonline_management_scope.test[0].name
 }
+
+# What users can change on their own mailbox; never the default policy.
+resource "msexchangeonline_role_assignment_policy" "test" {
+  count       = local.rbac
+  name        = "TF-CI-RoleAssignmentPolicy"
+  description = "Integration test policy"
+  roles       = local.updated ? ["MyBaseOptions", "MyMailSubscriptions"] : ["MyBaseOptions", "MyContactInformation"]
+}
+
+data "msexchangeonline_role_assignment_policy" "default" {
+  count = local.rbac
+  name  = "Default Role Assignment Policy"
+}
+
+check "default_role_assignment_policy" {
+  assert {
+    condition     = local.rbac == 0 || one(data.msexchangeonline_role_assignment_policy.default[*].is_default) == true
+    error_message = "The Default Role Assignment Policy could not be read, or is not the default."
+  }
+}

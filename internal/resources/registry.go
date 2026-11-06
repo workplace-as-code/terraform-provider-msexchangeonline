@@ -48,6 +48,7 @@ func registrations() []registration {
 		// list.ps1 lists the regular assignments of custom role groups and applications.
 		{NewManagementRoleAssignmentResource, listQuery{noun: "ManagementRoleAssignment", property: "Name"}},
 		{NewServicePrincipalResource, listQuery{noun: "ServicePrincipal", property: "AppId"}},
+		{NewRoleAssignmentPolicyResource, listQuery{noun: "RoleAssignmentPolicy", property: "Name"}},
 	}
 	for _, spec := range objectSpecs {
 		regs = append(regs, registration{newObjectResource(spec), spec.listQuery()})

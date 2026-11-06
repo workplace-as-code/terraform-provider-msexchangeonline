@@ -90,3 +90,14 @@ func TestServicePrincipalScript(t *testing.T) {
 			"Set sp-obj-1 DisplayName=TF-CI-App-2; Remove sp-obj-1",
 	)
 }
+
+// TestRoleAssignmentPolicyRoles guards role_assignment_policy.ps1: only the
+// roles that differ are added or removed, whatever their case.
+func TestRoleAssignmentPolicyRoles(t *testing.T) {
+	out := runStub(t, "role_assignment_policy.ps1", "role_assignment_policy.ps1")
+	expectLines(t, out,
+		`"Roles":["MyBaseOptions","MyVoiceMail"]`,
+		"update calls: Add MyTextMessaging; Remove MyVoiceMail",
+		`"Roles":["MyBaseOptions","MyTextMessaging"]`,
+	)
+}
