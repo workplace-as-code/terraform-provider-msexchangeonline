@@ -56,3 +56,33 @@ func TestPresetRuleScript(t *testing.T) {
 		}
 	}
 }
+
+// TestTransportRuleScript guards transport_rule.ps1: a rule can encrypt
+// without a basic action, and an update clears what left the configuration.
+func TestTransportRuleScript(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh is not installed")
+	}
+	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive",
+		"-File", "testdata/transport_rule.ps1", "-Script", "../../bridge/scripts/transport_rule.ps1").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	for _, want := range []string{
+		"create calls: New ApplyRightsProtectionCustomizationTemplate=OME Configuration," +
+			"ApplyRightsProtectionTemplate=Encrypt,Name=TF-Encrypt,SentToScope=NotInOrganization",
+		`"Action":""`,
+		`"ApplyRightsProtectionTemplate":"Encrypt"`,
+		`"SentToScope":"NotInOrganization"`,
+		"ApplyRightsProtectionCustomizationTemplate=<null>,ApplyRightsProtectionTemplate=<null>",
+		"ExceptIfRecipientDomainIs=fabrikam.com",
+		"Quarantine=True",
+		"RecipientDomainIs=contoso.com",
+		"SentToScope=<null>",
+		`"Action":"Quarantine"`,
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+}

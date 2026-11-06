@@ -32,6 +32,10 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   EXCHANGE_TEST_ENCRYPTION (any value) — also tests message encryption
+#                           (test/integration/encryption.tf): the encryption actions of
+#                           transport rules, the IRM configuration and the OME branding
+#                           templates; needs Purview Message Encryption (E5 for custom templates)
 #   EXCHANGE_TEST_PRESET    (any value) — also tests the rules of the Standard preset security
 #                           policy, which must have been turned on once in the Defender portal;
 #                           they are adopted and turned off on destroy (the Defender part with
@@ -134,6 +138,7 @@ pass "Build OK"
 # ---------------------------------------------------------------------------
 CREATED=(
   "msexchangeonline_transport_rule.test=TF-CI-Rule"
+  "msexchangeonline_transport_rule.scope=TF-CI-Rule-Scope"
   "msexchangeonline_remote_domain.test=TF-CI-Domain"
   "msexchangeonline_inbound_connector.test=TF-CI-Inbound"
   "msexchangeonline_outbound_connector.test=TF-CI-Outbound"
@@ -178,6 +183,12 @@ if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
     "msexchangeonline_safe_attachment_rule.test[0]=TF-CI-SafeAttachmentRule"
     "msexchangeonline_safe_attachment_policy.unscoped[0]=TF-CI-SafeAttachments-Unscoped"
     "msexchangeonline_anti_phish_policy.defender[0]=TF-CI-AntiPhish-Defender"
+  )
+fi
+if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
+  export TF_VAR_test_encryption=true
+  CREATED+=(
+    "msexchangeonline_transport_rule.encrypt[0]=TF-CI-Rule-Encrypt"
   )
 fi
 if [[ -n "${TF_VAR_test_mail_enabled_group:-}" && -n "${TF_VAR_test_app_id:-}" ]]; then
@@ -519,6 +530,11 @@ if [[ ${#PRESET[@]} -gt 0 ]]; then
   echo "  Adopted, turned off on destroy: ${PRESET[*]%%.standard*} (Standard preset)"
 else
   echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
+fi
+if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
+  echo "  Encryption:       transport rule encryption actions"
+else
+  echo "  Not tested:       message encryption (set EXCHANGE_TEST_ENCRYPTION)"
 fi
 if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   echo "  Defender:         safe_links_*, safe_attachment_*, anti-phishing Defender settings"

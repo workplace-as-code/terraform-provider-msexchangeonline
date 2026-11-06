@@ -286,6 +286,18 @@ resource "msexchangeonline_transport_rule" "test" {
   action           = "Quarantine"
 }
 
+# Recipient conditions and an exception; disabled, so no message is affected.
+resource "msexchangeonline_transport_rule" "scope" {
+  name    = "TF-CI-Rule-Scope"
+  enabled = false
+
+  sent_to_scope                  = "NotInOrganization"
+  recipient_domain_is            = local.updated ? ["tf-ci-test.example", "tf-ci-other.example"] : ["tf-ci-test.example"]
+  except_if_recipient_domain_is  = ["tf-ci-skip.example"]
+  subject_or_body_contains_words = local.updated ? [] : ["[TF-CI-SCOPE]"]
+  action                         = "MoveToJmf"
+}
+
 resource "msexchangeonline_remote_domain" "test" {
   name        = "TF-CI-Domain"
   domain_name = "tf-ci-test.example"
