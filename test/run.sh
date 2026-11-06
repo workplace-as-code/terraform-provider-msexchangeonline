@@ -191,7 +191,7 @@ if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   )
 fi
 RBAC_TYPES="management_scope role_group management_role management_role_assignment service_principal role_assignment_policy"
-ENCRYPTION_TYPES=""
+ENCRYPTION_TYPES="ome_configuration"
 if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
   export TF_VAR_test_rbac=true
   CREATED+=(
@@ -215,6 +215,7 @@ if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
   export TF_VAR_test_encryption=true
   CREATED+=(
     "msexchangeonline_transport_rule.encrypt[0]=TF-CI-Rule-Encrypt"
+    "msexchangeonline_ome_configuration.custom[0]=TF-CI-OME"
   )
 fi
 if [[ -n "${TF_VAR_test_mail_enabled_group:-}" && -n "${TF_VAR_test_app_id:-}" ]]; then
@@ -250,6 +251,8 @@ KEEP=(
   "msexchangeonline_hosted_content_filter_policy.default"
   "msexchangeonline_mobile_device_mailbox_policy.default"
 )
+# The default branding template is adopted: kept like the tenant-wide objects.
+[[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && KEEP+=("msexchangeonline_ome_configuration.default[0]")
 
 # expect_no_changes <label> [terraform plan args...]
 # Fails unless terraform plan reports no changes.
@@ -426,6 +429,9 @@ if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
   logs="$(state_value msexchangeonline_irm_configuration.this enable_portal_tracking_logs)"
   write_and_restore msexchangeonline_irm_configuration.this enable_portal_tracking_logs \
     irm_enable_portal_tracking_logs "$([[ "$logs" == true ]] && echo false || echo true)" "$logs"
+  otp="$(state_value 'msexchangeonline_ome_configuration.default[0]' otp_enabled)"
+  write_and_restore 'msexchangeonline_ome_configuration.default[0]' otp_enabled \
+    ome_default_otp_enabled "$([[ "$otp" == true ]] && echo false || echo true)" "$otp"
 fi
 if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admin_mail_recipients)" != *'"'* ]]; then
   write_and_restore msexchangeonline_activesync_organization_settings.this admin_mail_recipients \
@@ -573,7 +579,7 @@ else
   echo "  Not tested:       Exchange RBAC (set EXCHANGE_TEST_RBAC)"
 fi
 if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
-  echo "  Encryption:       transport rule encryption actions, IRM configuration written and restored"
+  echo "  Encryption:       transport rule encryption actions, branding templates, IRM configuration and default template written and restored"
 else
   echo "  Not tested:       message encryption (set EXCHANGE_TEST_ENCRYPTION)"
 fi

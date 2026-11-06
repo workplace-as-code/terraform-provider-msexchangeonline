@@ -40,3 +40,32 @@ func TestIRMConfigurationSpec(t *testing.T) {
 		t.Error("transport_decryption_setting is Disabled, Optional or Mandatory")
 	}
 }
+
+// TestOMEConfigurationSpec checks the branding templates: a script of their
+// own, the logo as base64 text, and a list by Identity (they have no Name).
+func TestOMEConfigurationSpec(t *testing.T) {
+	spec, ok := findSpec("ome_configuration")
+	if !ok {
+		t.Fatal("no spec for ome_configuration")
+	}
+	if spec.script != "ome_configuration.ps1" {
+		t.Errorf("ome_configuration needs its own script, got %q", spec.script)
+	}
+	if q := spec.listQuery(); q.property != "Identity" {
+		t.Errorf("branding templates are listed by Identity, got %q", q.property)
+	}
+	have := map[string]field{}
+	for _, f := range spec.fields {
+		have[f.name] = f
+	}
+	for _, name := range []string{"background_color", "disclaimer_text", "email_text", "introduction_text",
+		"portal_text", "privacy_statement_url", "read_button_text", "otp_enabled", "social_id_sign_in",
+		"external_mail_expiry_in_days", "image"} {
+		if _, ok := have[name]; !ok {
+			t.Errorf("missing attribute %s", name)
+		}
+	}
+	if f := have["image"]; f.kind != stringField {
+		t.Error("image is base64 text, filled with filebase64()")
+	}
+}

@@ -109,15 +109,17 @@ func enumAttr(name, param, desc string, values ...string) field {
 
 // objectSpec describes one Exchange object or tenant-wide setting.
 type objectSpec struct {
-	typeName    string // resource name without the provider prefix
-	noun        string // cmdlet noun, e.g. "RetentionPolicyTag"
-	script      string // bridge script; "" means exo_object.ps1
-	singleton   bool   // tenant-wide setting: Get/Set only
-	adopted     bool   // named object that cannot be created or removed: Get/Set only
-	identity    string // singleton identity ("" calls Get/Set without -Identity)
-	description string // first sentence of the resource documentation
-	notes       string // appended to the description
-	fields      []field
+	typeName  string // resource name without the provider prefix
+	noun      string // cmdlet noun, e.g. "RetentionPolicyTag"
+	script    string // bridge script; "" means exo_object.ps1
+	singleton bool   // tenant-wide setting: Get/Set only
+	adopted   bool   // named object that cannot be created or removed: Get/Set only
+	identity  string // singleton identity ("" calls Get/Set without -Identity)
+	// listProperty is the property list.ps1 reads the import IDs from; "" is Name.
+	listProperty string
+	description  string // first sentence of the resource documentation
+	notes        string // appended to the description
+	fields       []field
 }
 
 func (s objectSpec) scriptName() string {
@@ -138,6 +140,9 @@ func (s objectSpec) singletonID() string {
 func (s objectSpec) listQuery() listQuery {
 	if s.singleton {
 		return listQuery{id: s.singletonID()}
+	}
+	if s.listProperty != "" {
+		return listQuery{noun: s.noun, property: s.listProperty}
 	}
 	return listQuery{noun: s.noun, property: "Name"}
 }

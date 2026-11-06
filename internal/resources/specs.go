@@ -404,4 +404,32 @@ var objectSpecs = []objectSpec{
 				"Azure Information Protection features automatically."),
 		},
 	},
+	{
+		typeName:     "ome_configuration",
+		noun:         "OMEConfiguration",
+		script:       "ome_configuration.ps1",
+		listProperty: "Identity",
+		description: "Manages a branding template of Microsoft Purview Message Encryption: the logo, colors and texts " +
+			"of encrypted messages and of the encrypted message portal",
+		notes: "`name = \"OME Configuration\"` adopts the default template: it is changed, never created, and destroying " +
+			"the resource only removes it from the state. Other names are custom templates, which need Advanced Message " +
+			"Encryption (E5); a transport rule applies them with `apply_rights_protection_customization_template`.",
+		fields: []field{
+			stringAttr("image", "Image", "Logo, as base64 (`filebase64(\"logo.png\")`): PNG, JPG, BMP or TIFF, ideally "+
+				"under 40 KB and 170 x 70 pixels. `\"\"` removes the logo."),
+			stringAttr("background_color", "BackgroundColor", "Background color, as an HTML name or a hex code such as "+
+				"`#ffffff`."),
+			stringAttr("introduction_text", "IntroductionText", "Text after the sender's name and address."),
+			stringAttr("email_text", "EmailText", "Text of the message the recipient receives."),
+			stringAttr("read_button_text", "ReadButtonText", "Text of the Read the message button."),
+			stringAttr("portal_text", "PortalText", "Text at the top of the encrypted message portal."),
+			stringAttr("disclaimer_text", "DisclaimerText", "Disclaimer at the bottom of the message."),
+			stringAttr("privacy_statement_url", "PrivacyStatementUrl", "Address of the privacy statement link."),
+			boolAttr("otp_enabled", "OTPEnabled", "Let recipients sign in to the portal with a one-time passcode."),
+			boolAttr("social_id_sign_in", "SocialIdSignIn", "Let recipients sign in with a Microsoft, Google or Yahoo account."),
+			int64Attr("external_mail_expiry_in_days", "ExternalMailExpiryInDays", "Days external recipients can read "+
+				"the message in the portal, from 1 to 730; `0` for no expiry. Custom templates only.",
+				int64validator.Between(0, 730)),
+		},
+	},
 }

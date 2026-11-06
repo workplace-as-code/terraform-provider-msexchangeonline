@@ -101,3 +101,15 @@ func TestRoleAssignmentPolicyRoles(t *testing.T) {
 		`"Roles":["MyBaseOptions","MyTextMessaging"]`,
 	)
 }
+
+// TestOmeConfigurationScript guards ome_configuration.ps1.
+func TestOmeConfigurationScript(t *testing.T) {
+	out := runStub(t, "ome_configuration.ps1", "ome_configuration.ps1")
+	expectLines(t, out,
+		`default: {"Name":"OME Configuration","DisclaimerText":"Confidential"`,
+		"default delete: {}",
+		`"Image":"iVBORw==","ExternalMailExpiryInDays":7`,
+		"custom delete: {}",
+		"calls: Set OME Configuration DisclaimerText=String; New TF-CI-OME ExternalMailExpiryInDays=Int32,Image=Byte[]; Remove TF-CI-OME",
+	)
+}
