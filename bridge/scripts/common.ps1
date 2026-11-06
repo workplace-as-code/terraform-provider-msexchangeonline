@@ -138,6 +138,8 @@ $BridgeBuiltInRoleGroups = @(
     "Privacy Management Investigators", "Privacy Management Viewers", "TenantAdmins", "UM Management"
 )
 
+$script:BridgeRoleGroupCache = @{}
+
 # Test-BridgeBuiltIn reports whether an RBAC object was created by Microsoft:
 # a role group with a well-known object, an ExchangeServiceAdmins_ group or a
 # known name; a root management role (custom roles are derived from a parent).
@@ -150,6 +152,21 @@ function Test-BridgeBuiltIn {
                 $BridgeBuiltInRoleGroups -contains $name
         }
         "ManagementRole" { [bool](Get-BridgeProp $Object "IsRootRole" $true) }
+        # Only the regular assignments of custom role groups and of
+        # applications: the others belong to Microsoft or to a role assignment
+        # policy (msexchangeonline_role_assignment_policy manages its roles).
+        "ManagementRoleAssignment" {
+            if ([bool](Get-BridgeProp $Object "Delegating" $false)) { return $true }
+            $type = [string](Get-BridgeProp $Object "RoleAssigneeType" "")
+            if ($type -match "ServicePrincipal|Application") { return $false }
+            if ($type -ne "RoleGroup") { return $true }
+            $group = [string](Get-BridgeProp $Object "RoleAssigneeName" "")
+            if (-not $script:BridgeRoleGroupCache.ContainsKey($group)) {
+                $found = @(Invoke-BridgeRetry { Get-RoleGroup -Identity $group }) | Select-Object -First 1
+                $script:BridgeRoleGroupCache[$group] = if ($found) { Test-BridgeBuiltIn "RoleGroup" $found } else { $true }
+            }
+            $script:BridgeRoleGroupCache[$group]
+        }
         default { $false }
     }
 }

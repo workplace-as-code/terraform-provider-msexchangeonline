@@ -1,0 +1,1 @@
+terraform import msexchangeonline_management_role_assignment.helpdesk "Helpdesk Phone-Helpdesk France"

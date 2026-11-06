@@ -56,3 +56,24 @@ func TestManagementRoleScript(t *testing.T) {
 		"notinparent calls: \n",
 	)
 }
+
+// TestRoleAssignmentScript guards management_role_assignment.ps1.
+func TestRoleAssignmentScript(t *testing.T) {
+	out := runStub(t, "management_role_assignment.ps1", "management_role_assignment.ps1")
+	expectLines(t, out,
+		"group calls: New CustomRecipientWriteScope=TF-CI-Scope,Role=TF-CI-Role,SecurityGroup=TF-CI-RoleGroup",
+		`"RoleGroup":"TF-CI-RoleGroup"`,
+		`"CustomRecipientWriteScope":"TF-CI-Scope"`,
+		"app calls: New App=11111111-2222-3333-4444-555555555555,CustomResourceScope=TF-CI-Scope,Role=Application Mail.Read",
+		`"App":"11111111-2222-3333-4444-555555555555"`,
+		"unscope calls: Set Enabled=False,RecipientRelativeWriteScope=Organization",
+		`"RecipientRelativeWriteScope":"Organization"`,
+	)
+}
+
+// TestRoleAssignmentListSkipsBuiltIn: terraform query lists the regular
+// assignments of custom role groups and of applications only.
+func TestRoleAssignmentListSkipsBuiltIn(t *testing.T) {
+	out := runStub(t, "list_rbac.ps1", "list.ps1")
+	expectLines(t, out, `assignments: ["TF-CI-Role-TF-CI-RoleGroup","Application Mail.Read-TF-CI-App"]`)
+}

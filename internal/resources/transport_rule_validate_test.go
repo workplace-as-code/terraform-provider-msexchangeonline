@@ -16,8 +16,14 @@ import (
 // given attributes; every other attribute is null.
 func validateTransportRule(t *testing.T, values map[string]tftypes.Value) diag.Diagnostics {
 	t.Helper()
+	return validateResource(t, &transportRuleResource{}, values)
+}
+
+// validateResource runs ValidateConfig (and the resource's config validators)
+// on a configuration made of the given attributes; every other attribute is null.
+func validateResource(t *testing.T, r resource.ResourceWithValidateConfig, values map[string]tftypes.Value) diag.Diagnostics {
+	t.Helper()
 	ctx := context.Background()
-	r := &transportRuleResource{}
 	var sresp resource.SchemaResponse
 	r.Schema(ctx, resource.SchemaRequest{}, &sresp)
 	typ := sresp.Schema.Type().TerraformType(ctx).(tftypes.Object)
@@ -27,12 +33,17 @@ func validateTransportRule(t *testing.T, values map[string]tftypes.Value) diag.D
 	}
 	for name, v := range values {
 		if _, ok := typ.AttributeTypes[name]; !ok {
-			t.Fatalf("attribute %q is not in the transport_rule schema", name)
+			t.Fatalf("attribute %q is not in the schema", name)
 		}
 		vals[name] = v
 	}
 	cfg := tfsdk.Config{Schema: sresp.Schema, Raw: tftypes.NewValue(typ, vals)}
 	var resp resource.ValidateConfigResponse
+	if cv, ok := r.(resource.ResourceWithConfigValidators); ok {
+		for _, v := range cv.ConfigValidators(ctx) {
+			v.ValidateResource(ctx, resource.ValidateConfigRequest{Config: cfg}, &resp)
+		}
+	}
 	r.ValidateConfig(ctx, resource.ValidateConfigRequest{Config: cfg}, &resp)
 	return resp.Diagnostics
 }

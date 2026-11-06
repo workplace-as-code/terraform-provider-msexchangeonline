@@ -47,3 +47,21 @@ resource "msexchangeonline_management_role" "test" {
     "Set-User" = ["Identity", "Phone", "MobilePhone"]
   }
 }
+
+# The custom role, limited to the recipients of the scope.
+resource "msexchangeonline_management_role_assignment" "scoped" {
+  count                        = local.rbac
+  name                         = "TF-CI-Assignment-Scoped"
+  role                         = msexchangeonline_management_role.test[0].name
+  role_group                   = msexchangeonline_role_group.test[0].name
+  custom_recipient_write_scope = msexchangeonline_management_scope.test[0].name
+  enabled                      = !local.updated
+}
+
+# A built-in role on the whole organization.
+resource "msexchangeonline_management_role_assignment" "builtin" {
+  count      = local.rbac
+  name       = "TF-CI-Assignment-Builtin"
+  role       = "Distribution Groups"
+  role_group = msexchangeonline_role_group.test[0].name
+}
