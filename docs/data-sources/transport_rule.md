@@ -33,7 +33,7 @@ output "enabled" {
 
 - `action` (String) The action to take when conditions are met. Valid values: `Reject`, `Quarantine`, `MoveToJmf` (deliver to the Junk Email folder). Optional when `apply_rights_protection_template` is set.
 - `apply_rights_protection_customization_template` (String) Action: the branding template (`msexchangeonline_ome_configuration`) of the encrypted message, for example `OME Configuration`. Needs `apply_rights_protection_template`.
-- `apply_rights_protection_template` (String) Action: encrypt the message with this rights protection template, for example `Encrypt` or `Do Not Forward`, or the name of a custom template. Needs Microsoft Purview Message Encryption.
+- `apply_rights_protection_template` (String) Action: encrypt the message with this rights protection template, for example `Encrypt` or `Do Not Forward`, or the name of a custom template. Needs Microsoft Purview Message Encryption, and `internal_licensing_enabled = true` in `msexchangeonline_irm_configuration`: otherwise Exchange lists no template.
 - `attachment_is_executable` (Boolean) Condition: an attachment contains executable content.
 - `enabled` (Boolean) Whether the rule is enabled. A new rule is enabled unless this is `false`.
 - `except_if_recipient_domain_is` (List of String) Exception: the recipient's domain is one of these domains.

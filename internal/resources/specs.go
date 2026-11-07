@@ -382,7 +382,8 @@ var objectSpecs = []objectSpec{
 			boolAttr("azure_rms_licensing_enabled", "AzureRMSLicensingEnabled", "Connect to Azure Rights Management: "+
 				"turns Microsoft Purview Message Encryption on."),
 			boolAttr("internal_licensing_enabled", "InternalLicensingEnabled", "Use IRM for messages sent inside the "+
-				"organization."),
+				"organization. Exchange lists the rights protection templates, which transport rules use, only "+
+				"when it is `true`."),
 			boolAttr("simplified_client_access_enabled", "SimplifiedClientAccessEnabled", "Show the Protect button in "+
 				"Outlook on the web."),
 			boolAttr("simplified_client_access_encrypt_only_disabled", "SimplifiedClientAccessEncryptOnlyDisabled",

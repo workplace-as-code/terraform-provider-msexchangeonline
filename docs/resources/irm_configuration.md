@@ -35,7 +35,7 @@ resource "msexchangeonline_irm_configuration" "this" {
 - `ediscovery_super_user_enabled` (Boolean) Let eDiscovery searches read protected messages.
 - `enable_pdf_encryption` (Boolean) Encrypt PDF attachments of encrypted messages.
 - `enable_portal_tracking_logs` (Boolean) Log the activity of the encrypted message portal (Advanced Message Encryption).
-- `internal_licensing_enabled` (Boolean) Use IRM for messages sent inside the organization.
+- `internal_licensing_enabled` (Boolean) Use IRM for messages sent inside the organization. Exchange lists the rights protection templates, which transport rules use, only when it is `true`.
 - `journal_report_decryption_enabled` (Boolean) Add a decrypted copy of protected messages to journal reports.
 - `reject_if_recipient_has_no_rights` (Boolean) Reject a protected message sent to a recipient who has no rights on it.
 - `search_enabled` (Boolean) Let users search encrypted messages in Outlook on the web.

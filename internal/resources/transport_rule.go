@@ -132,7 +132,8 @@ func (r *transportRuleResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"apply_rights_protection_template": optionalString("Action: encrypt the message with this rights " +
 				"protection template, for example `Encrypt` or `Do Not Forward`, or the name of a custom template. Needs " +
-				"Microsoft Purview Message Encryption."),
+				"Microsoft Purview Message Encryption, and `internal_licensing_enabled = true` in " +
+				"`msexchangeonline_irm_configuration`: otherwise Exchange lists no template."),
 			"apply_rights_protection_customization_template": optionalString("Action: the branding template " +
 				"(`msexchangeonline_ome_configuration`) of the encrypted message, for example `OME Configuration`. Needs " +
 				"`apply_rights_protection_template`."),
