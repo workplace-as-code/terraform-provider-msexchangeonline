@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -22,15 +23,60 @@ const (
 	// ExchangeScope is the scope of an access token for Exchange Online in the
 	// public cloud (also used by GCC).
 	ExchangeScope = "https://outlook.office365.com/.default"
+	// GraphScope is the scope of the Microsoft Graph access token the bridge
+	// uses for the Microsoft 365 cross-tenant access policy.
+	GraphScope = "https://graph.microsoft.com/.default"
 	// GitHubAudience is the audience Entra ID expects in an OIDC token it
 	// exchanges, in the public cloud.
 	GitHubAudience = "api://AzureADTokenExchange"
 )
 
-// AccessToken is an Exchange Online access token and the time it expires.
+// AccessToken is an Exchange Online access token (Value), a Microsoft Graph
+// access token (Graph), and the time the first of them expires.
 type AccessToken struct {
 	Value     string
+	Graph     string
 	ExpiresOn time.Time
+}
+
+// tokenGetter is what both azidentity credentials have in common: GetToken.
+// Tests pass a fake one to bothTokens.
+type tokenGetter interface {
+	GetToken(ctx context.Context, opts policy.TokenRequestOptions) (azcore.AccessToken, error)
+}
+
+// graphTokenError marks a failure of the Microsoft Graph token request, so the
+// sources say which token could not be obtained.
+type graphTokenError struct{ err error }
+
+func (e graphTokenError) Error() string { return "Microsoft Graph: " + e.err.Error() }
+
+// bothTokens asks credential for an Exchange Online token, then a Microsoft
+// Graph token. ExpiresOn is the earlier expiry: the pool recycles a worker
+// before either token expires.
+func bothTokens(ctx context.Context, credential tokenGetter) (AccessToken, error) {
+	exchange, err := credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
+	if err != nil {
+		return AccessToken{}, err
+	}
+	graph, err := credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{GraphScope}})
+	if err != nil {
+		return AccessToken{}, graphTokenError{err}
+	}
+	expires := exchange.ExpiresOn
+	if graph.ExpiresOn.Before(expires) {
+		expires = graph.ExpiresOn
+	}
+	return AccessToken{Value: exchange.Token, Graph: graph.Token, ExpiresOn: expires}, nil
+}
+
+// tokenKind names the token a failure is about, for the error messages.
+func tokenKind(err error) string {
+	var g graphTokenError
+	if errors.As(err, &g) {
+		return "a Microsoft Graph"
+	}
+	return "an Exchange Online"
 }
 
 // TokenSource returns an Exchange Online access token. The client asks for one
@@ -145,15 +191,15 @@ func NewOIDCTokenSource(organization, clientID string, assertion AssertionFunc, 
 var expiredAssertion = regexp.MustCompile(`AADSTS700024|(?i)assertion is (expired|not within its valid time range)`)
 
 func (s *oidcTokenSource) Token(ctx context.Context) (AccessToken, error) {
-	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
+	token, err := bothTokens(ctx, s.credential)
 	if err != nil {
-		msg := "obtaining an Exchange Online access token with OIDC failed: " + err.Error()
+		msg := "obtaining " + tokenKind(err) + " access token with OIDC failed: " + err.Error()
 		if s.hint != "" && expiredAssertion.MatchString(err.Error()) {
 			msg += ". " + s.hint
 		}
 		return AccessToken{}, errors.New(msg)
 	}
-	return AccessToken{Value: token.Token, ExpiresOn: token.ExpiresOn}, nil
+	return token, nil
 }
 
 // Retry bounds of the managed identity credential. IMDS, the identity endpoint
@@ -246,12 +292,12 @@ func (s *managedIdentityTokenSource) Token(ctx context.Context) (AccessToken, er
 	if s.failure != nil && s.now().Sub(s.failedAt) < managedIdentityFailureMemory {
 		return AccessToken{}, s.failure
 	}
-	token, err := s.credential.GetToken(ctx, policy.TokenRequestOptions{Scopes: []string{ExchangeScope}})
+	token, err := bothTokens(ctx, s.credential)
 	if err != nil {
-		s.failure = errors.New("obtaining an Exchange Online access token with the managed identity failed: " + strings.TrimSuffix(err.Error(), ".") + ". " + s.hint)
+		s.failure = errors.New("obtaining " + tokenKind(err) + " access token with the managed identity failed: " + strings.TrimSuffix(err.Error(), ".") + ". " + s.hint)
 		s.failedAt = s.now()
 		return AccessToken{}, s.failure
 	}
 	s.failure = nil
-	return AccessToken{Value: token.Token, ExpiresOn: token.ExpiresOn}, nil
+	return token, nil
 }
