@@ -223,6 +223,13 @@ if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
     "msexchangeonline_ome_configuration.custom[0]=TF-CI-OME"
   )
 fi
+# The cross-tenant access policy goes through the second app (Entra role
+# Exchange Administrator): see test/integration/cross_tenant.tf.
+CROSS_TENANT=""
+if [[ -n "${TF_VAR_test_partner_tenant_id:-}" && -n "${TF_VAR_xtap_client_id:-}" ]]; then
+  CROSS_TENANT=1
+  CREATED+=("msexchangeonline_cross_tenant_partner.test[0]=$TF_VAR_test_partner_tenant_id")
+fi
 if [[ -n "${TF_VAR_test_mail_enabled_group:-}" && -n "${TF_VAR_test_app_id:-}" ]]; then
   # The policy ID is only known once it exists: it is imported by the loop below
   # from the state, and the deletion check cannot look it up by name.
@@ -494,9 +501,34 @@ terraform {
   }
 }
 provider "msexchangeonline" {}
+variable "xtap_client_id" {
+  type    = string
+  default = null
+}
+variable "xtap_certificate_path" {
+  type    = string
+  default = null
+}
+variable "xtap_certificate_password" {
+  type      = string
+  default   = null
+  sensitive = true
+}
+provider "msexchangeonline" {
+  alias                = "xtap"
+  client_id            = var.xtap_client_id
+  certificate_path     = var.xtap_certificate_path
+  certificate_password = var.xtap_certificate_password
+}
 HCL
 for doc in "$ROOT"/docs/resources/*.md; do
   name="$(basename "$doc" .md)"
+  # The cross-tenant access policy needs the second app (listed through its alias).
+  if [[ "$name" == cross_tenant_partner ]]; then
+    [[ -n "$CROSS_TENANT" ]] &&
+      printf 'list "msexchangeonline_%s" "all" {\n  provider = msexchangeonline.xtap\n}\n\n' "$name" >> "$QUERYDIR/all.tfquery.hcl"
+    continue
+  fi
   # Safe Links, Safe Attachments and the preset rules of Defender need Defender for Office 365.
   [[ ( "$name" == safe_* || "$name" == atp_* ) && -z "${EXCHANGE_TEST_DEFENDER:-}" ]] && continue
   # The RBAC types need Role Management, the encryption types a Purview license.
@@ -594,6 +626,11 @@ if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
   echo "  Encryption:       transport rule encryption actions, branding templates, IRM configuration and default template written and restored"
 else
   echo "  Not tested:       message encryption (set EXCHANGE_TEST_ENCRYPTION)"
+fi
+if [[ -n "$CROSS_TENANT" ]]; then
+  echo "  Cross-tenant:     Exchange capabilities of a partner (second app with Exchange Administrator)"
+else
+  echo "  Not tested:       cross_tenant_partner (set TF_VAR_test_partner_tenant_id and TF_VAR_xtap_client_id)"
 fi
 if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   echo "  Defender:         safe_links_*, safe_attachment_*, anti-phishing Defender settings"
