@@ -136,7 +136,7 @@ func (r *transportRuleResource) Schema(_ context.Context, _ resource.SchemaReque
 				"`msexchangeonline_irm_configuration`: otherwise Exchange lists no template."),
 			"apply_rights_protection_customization_template": optionalString("Action: the branding template " +
 				"(`msexchangeonline_ome_configuration`) of the encrypted message, for example `OME Configuration`. Needs " +
-				"`apply_rights_protection_template`."),
+				"`apply_rights_protection_template` and `from_scope = \"InOrganization\"`."),
 			"from_scope": schema.StringAttribute{
 				Optional:   true,
 				Validators: []validator.String{stringvalidator.OneOf(transportRuleScopes[:2]...)},
@@ -223,10 +223,18 @@ func (r *transportRuleResource) ValidateConfig(ctx context.Context, req resource
 			"Set action or apply_rights_protection_template.")
 	}
 	if !cfg.ApplyRightsProtectionCustomizationTemplate.IsUnknown() &&
-		cfg.ApplyRightsProtectionCustomizationTemplate.ValueString() != "" && !encrypts {
-		resp.Diagnostics.AddAttributeError(path.Root("apply_rights_protection_customization_template"),
-			"Missing apply_rights_protection_template",
-			"A branding template only applies to an encrypted message: set apply_rights_protection_template.")
+		cfg.ApplyRightsProtectionCustomizationTemplate.ValueString() != "" {
+		if !encrypts {
+			resp.Diagnostics.AddAttributeError(path.Root("apply_rights_protection_customization_template"),
+				"Missing apply_rights_protection_template",
+				"A branding template only applies to an encrypted message: set apply_rights_protection_template.")
+		}
+		// Exchange refuses the action otherwise, at apply time.
+		if cfg.FromScope.ValueString() != "InOrganization" {
+			resp.Diagnostics.AddAttributeError(path.Root("from_scope"), "Branding template needs internal senders",
+				"Exchange applies a branding template only to messages sent from inside the organization: "+
+					"set from_scope = \"InOrganization\".")
+		}
 	}
 
 	if cfg.Action.ValueString() == "Reject" && !cfg.RejectMessage.IsUnknown() && cfg.RejectMessage.ValueString() == "" {

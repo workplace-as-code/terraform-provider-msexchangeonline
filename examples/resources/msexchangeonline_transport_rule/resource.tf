@@ -38,6 +38,8 @@ resource "msexchangeonline_transport_rule" "encrypt_partner" {
   name    = "Encrypt mail to Fabrikam"
   enabled = true
 
+  # A branding template only applies to mail sent from inside the organization.
+  from_scope          = "InOrganization"
   sent_to_scope       = "NotInOrganization"
   recipient_domain_is = ["fabrikam.com"]
 

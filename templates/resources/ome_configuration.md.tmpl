@@ -20,11 +20,12 @@ description: |-
 `OME Configuration` is the default template of every tenant: Microsoft Purview Message Encryption uses it
 when a transport rule names no other template. Custom templates need Advanced Message Encryption
 (Microsoft 365 E5 or the add-on), as does `external_mail_expiry_in_days`. Apply a template to messages with a
-transport rule:
+transport rule. Exchange applies a branding template only to messages sent from inside the organization:
 
 ```terraform
 resource "msexchangeonline_transport_rule" "encrypt_finance" {
   name                                           = "Encrypt finance mail"
+  from_scope                                     = "InOrganization"
   subject_or_body_contains_words                 = ["[secure]"]
   apply_rights_protection_template               = "Encrypt"
   apply_rights_protection_customization_template = msexchangeonline_ome_configuration.finance.name

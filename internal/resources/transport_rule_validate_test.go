@@ -89,6 +89,30 @@ func TestTransportRuleCustomizationWithoutTemplate(t *testing.T) {
 	}
 }
 
+// Exchange refuses a branding template unless the rule only matches senders
+// inside the organization.
+func TestTransportRuleCustomizationNeedsInternalSender(t *testing.T) {
+	values := map[string]tftypes.Value{
+		"name":                             str("r"),
+		"sent_to_scope":                    str("NotInOrganization"),
+		"apply_rights_protection_template": str("Encrypt"),
+		"apply_rights_protection_customization_template": str("OME Configuration"),
+	}
+	if diags := validateTransportRule(t, values); !hasError(diags, "Branding template needs internal senders") {
+		t.Errorf("expected a Branding template needs internal senders error, got %v", diags)
+	}
+
+	values["from_scope"] = str("NotInOrganization")
+	if diags := validateTransportRule(t, values); !hasError(diags, "Branding template needs internal senders") {
+		t.Errorf("expected a Branding template needs internal senders error, got %v", diags)
+	}
+
+	values["from_scope"] = str("InOrganization")
+	if diags := validateTransportRule(t, values); diags.HasError() {
+		t.Errorf("a branding template with from_scope = InOrganization must be valid, got %v", diags)
+	}
+}
+
 func TestTransportRuleEncryptOnly(t *testing.T) {
 	diags := validateTransportRule(t, map[string]tftypes.Value{
 		"name":                             str("r"),

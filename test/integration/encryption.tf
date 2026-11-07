@@ -20,6 +20,8 @@ resource "msexchangeonline_transport_rule" "encrypt" {
   # Created after the other rules: two rules created at once race for priority 0.
   depends_on = [msexchangeonline_transport_rule.scope]
 
+  # Exchange applies a branding template only to mail from inside the organization.
+  from_scope                                     = "InOrganization"
   sent_to_scope                                  = "NotInOrganization"
   recipient_domain_is                            = ["tf-ci-test.example"]
   apply_rights_protection_template               = local.updated ? "Do Not Forward" : "Encrypt"
