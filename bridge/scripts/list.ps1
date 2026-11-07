@@ -2,7 +2,8 @@
 # list resources (terraform query).
 #
 #   -Noun      cmdlet noun, e.g. "TransportRule": Get-<noun> returns the objects
-#   -Property  property holding the import ID (Identity or Name)
+#   -Property  property holding the import ID (Identity, Name, or AppId for
+#              service principals)
 #
 # Output: JSON array of strings.
 
@@ -15,7 +16,7 @@ param(
     [string]$Environment           = "global",
 
     [Parameter(Mandatory)] [ValidatePattern('^[A-Za-z]+$')] [string]$Noun,
-    [ValidateSet("Identity", "Name")] [string]$Property = "Identity"
+    [ValidateSet("Identity", "Name", "AppId")] [string]$Property = "Identity"
 )
 
 Set-StrictMode -Version Latest
@@ -44,6 +45,8 @@ try {
                 @()
             }
             foreach ($object in $objects) {
+                # terraform query lists custom RBAC objects only.
+                if (Test-BridgeBuiltIn $Noun $object) { continue }
                 [string](Get-BridgeProp $object $Property "")
             }
         }

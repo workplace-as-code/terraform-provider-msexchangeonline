@@ -45,7 +45,10 @@ module() {
 }
 
 for dir in "$ROOT"/examples/resources/*/; do
-  validate "$(module "r-$(basename "$dir")" "$dir/resource.tf")" "${dir#"$ROOT"/}"
+  # Files an example reads, such as the logo of a branding template.
+  assets=()
+  for f in "$dir"*.png; do [[ -e "$f" ]] && assets+=("$f"); done
+  validate "$(module "r-$(basename "$dir")" "$dir/resource.tf" ${assets[@]+"${assets[@]}"})" "${dir#"$ROOT"/}"
 done
 for dir in "$ROOT"/examples/data-sources/*/; do
   [[ -d "$dir" ]] || continue

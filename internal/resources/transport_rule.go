@@ -31,6 +31,16 @@ var (
 // transportRuleActions lists the actions the bridge script implements.
 var transportRuleActions = []string{"Reject", "Quarantine", "MoveToJmf"}
 
+// transportRuleScopes are the values of SentToScope; FromScope takes the
+// first two only.
+var transportRuleScopes = []string{"InOrganization", "NotInOrganization", "ExternalPartner", "ExternalNonPartner"}
+
+// optionalStringList is an optional list of strings that the bridge receives
+// as base64 JSON (encodeStringList).
+func optionalStringList(desc string) schema.ListAttribute {
+	return schema.ListAttribute{ElementType: types.StringType, Optional: true, MarkdownDescription: desc}
+}
+
 // transportRuleResource is the main resource struct
 type transportRuleResource struct {
 	client *client.Client
@@ -47,6 +57,15 @@ type transportRuleModel struct {
 	FromAddressContains    types.List   `tfsdk:"from_address_contains"`
 	SubjectContains        types.List   `tfsdk:"subject_contains"`
 	AttachmentIsExecutable types.Bool   `tfsdk:"attachment_is_executable"`
+
+	ApplyRightsProtectionTemplate              types.String `tfsdk:"apply_rights_protection_template"`
+	ApplyRightsProtectionCustomizationTemplate types.String `tfsdk:"apply_rights_protection_customization_template"`
+	FromScope                                  types.String `tfsdk:"from_scope"`
+	SentToScope                                types.String `tfsdk:"sent_to_scope"`
+	RecipientDomainIs                          types.List   `tfsdk:"recipient_domain_is"`
+	SenderDomainIs                             types.List   `tfsdk:"sender_domain_is"`
+	SubjectOrBodyContainsWords                 types.List   `tfsdk:"subject_or_body_contains_words"`
+	ExceptIfRecipientDomainIs                  types.List   `tfsdk:"except_if_recipient_domain_is"`
 }
 
 // transportRuleAPIResponse represents the JSON response from the PowerShell script
@@ -60,6 +79,15 @@ type transportRuleAPIResponse struct {
 	FromAddressContains    []string `json:"FromAddressContains"`
 	SubjectContains        []string `json:"SubjectContains"`
 	AttachmentIsExecutable bool     `json:"AttachmentIsExecutable"`
+
+	ApplyRightsProtectionTemplate              string   `json:"ApplyRightsProtectionTemplate"`
+	ApplyRightsProtectionCustomizationTemplate string   `json:"ApplyRightsProtectionCustomizationTemplate"`
+	FromScope                                  string   `json:"FromScope"`
+	SentToScope                                string   `json:"SentToScope"`
+	RecipientDomainIs                          []string `json:"RecipientDomainIs"`
+	SenderDomainIs                             []string `json:"SenderDomainIs"`
+	SubjectOrBodyContainsWords                 []string `json:"SubjectOrBodyContainsWords"`
+	ExceptIfRecipientDomainIs                  []string `json:"ExceptIfRecipientDomainIs"`
 }
 
 // NewTransportRuleResource is the factory function registered in the provider
@@ -97,10 +125,37 @@ func (r *transportRuleResource) Schema(_ context.Context, _ resource.SchemaReque
 			},
 			"enabled": optionalBool("Whether the rule is enabled. A new rule is enabled unless this is `false`."),
 			"action": schema.StringAttribute{
-				Required:            true,
-				Validators:          []validator.String{stringvalidator.OneOf(transportRuleActions...)},
-				MarkdownDescription: "The action to take when conditions are met. Valid values: `Reject`, `Quarantine`, `MoveToJmf` (deliver to the Junk Email folder).",
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.OneOf(transportRuleActions...)},
+				MarkdownDescription: "The action to take when conditions are met. Valid values: `Reject`, `Quarantine`, " +
+					"`MoveToJmf` (deliver to the Junk Email folder). Optional when `apply_rights_protection_template` is set.",
 			},
+			"apply_rights_protection_template": optionalString("Action: encrypt the message with this rights " +
+				"protection template, for example `Encrypt` or `Do Not Forward`, or the name of a custom template. Needs " +
+				"Microsoft Purview Message Encryption, and `internal_licensing_enabled = true` in " +
+				"`msexchangeonline_irm_configuration`: otherwise Exchange lists no template."),
+			"apply_rights_protection_customization_template": optionalString("Action: the branding template " +
+				"(`msexchangeonline_ome_configuration`) of the encrypted message, for example `OME Configuration`. Needs " +
+				"`apply_rights_protection_template` and `from_scope = \"InOrganization\"`."),
+			"from_scope": schema.StringAttribute{
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.OneOf(transportRuleScopes[:2]...)},
+				MarkdownDescription: "Condition: the sender is inside (`InOrganization`) or outside (`NotInOrganization`) " +
+					"the organization.",
+			},
+			"sent_to_scope": schema.StringAttribute{
+				Optional:   true,
+				Validators: []validator.String{stringvalidator.OneOf(transportRuleScopes...)},
+				MarkdownDescription: "Condition: where the recipient is. Valid values: `InOrganization`, " +
+					"`NotInOrganization`, `ExternalPartner`, `ExternalNonPartner`.",
+			},
+			"recipient_domain_is": optionalStringList("Condition: the recipient's domain is one of these domains " +
+				"(subdomains included)."),
+			"sender_domain_is": optionalStringList("Condition: the sender's domain is one of these domains."),
+			"subject_or_body_contains_words": optionalStringList("Condition: the subject or the body contains any of " +
+				"these words or phrases."),
+			"except_if_recipient_domain_is": optionalStringList("Exception: the recipient's domain is one of these " +
+				"domains."),
 			"reject_message": optionalString("The rejection message shown to senders. Required when `action` is `Reject`."),
 			"from_address_contains": schema.ListAttribute{
 				ElementType:         types.StringType,
@@ -131,16 +186,55 @@ func (r *transportRuleResource) ValidateConfig(ctx context.Context, req resource
 
 	// Values that come from other resources are unknown until apply; skip the
 	// check rather than reject a config that may turn out valid.
-	if cfg.FromAddressContains.IsUnknown() || cfg.SubjectContains.IsUnknown() || cfg.AttachmentIsExecutable.IsUnknown() {
+	conditions := []types.List{cfg.FromAddressContains, cfg.SubjectContains, cfg.RecipientDomainIs,
+		cfg.SenderDomainIs, cfg.SubjectOrBodyContainsWords}
+	scopes := []types.String{cfg.FromScope, cfg.SentToScope}
+	for _, l := range conditions {
+		if l.IsUnknown() {
+			return
+		}
+	}
+	for _, s := range append(scopes, cfg.Action, cfg.ApplyRightsProtectionTemplate) {
+		if s.IsUnknown() {
+			return
+		}
+	}
+	if cfg.AttachmentIsExecutable.IsUnknown() {
 		return
 	}
-	hasCondition := len(cfg.FromAddressContains.Elements()) > 0 ||
-		len(cfg.SubjectContains.Elements()) > 0 ||
-		cfg.AttachmentIsExecutable.ValueBool()
+
+	hasCondition := cfg.AttachmentIsExecutable.ValueBool()
+	for _, l := range conditions {
+		hasCondition = hasCondition || len(l.Elements()) > 0
+	}
+	for _, s := range scopes {
+		hasCondition = hasCondition || s.ValueString() != ""
+	}
 	if !hasCondition {
 		resp.Diagnostics.AddAttributeError(path.Root("action"), "Transport rule without condition",
-			"Set at least one of from_address_contains, subject_contains or attachment_is_executable. "+
+			"Set at least one condition: from_address_contains, subject_contains, attachment_is_executable, "+
+				"from_scope, sent_to_scope, recipient_domain_is, sender_domain_is or subject_or_body_contains_words. "+
 				"A transport rule without conditions applies to every message in the organization.")
+	}
+
+	encrypts := cfg.ApplyRightsProtectionTemplate.ValueString() != ""
+	if cfg.Action.ValueString() == "" && !encrypts {
+		resp.Diagnostics.AddAttributeError(path.Root("action"), "Missing action",
+			"Set action or apply_rights_protection_template.")
+	}
+	if !cfg.ApplyRightsProtectionCustomizationTemplate.IsUnknown() &&
+		cfg.ApplyRightsProtectionCustomizationTemplate.ValueString() != "" {
+		if !encrypts {
+			resp.Diagnostics.AddAttributeError(path.Root("apply_rights_protection_customization_template"),
+				"Missing apply_rights_protection_template",
+				"A branding template only applies to an encrypted message: set apply_rights_protection_template.")
+		}
+		// Exchange refuses the action otherwise, at apply time.
+		if cfg.FromScope.ValueString() != "InOrganization" {
+			resp.Diagnostics.AddAttributeError(path.Root("from_scope"), "Branding template needs internal senders",
+				"Exchange applies a branding template only to messages sent from inside the organization: "+
+					"set from_scope = \"InOrganization\".")
+		}
 	}
 
 	if cfg.Action.ValueString() == "Reject" && !cfg.RejectMessage.IsUnknown() && cfg.RejectMessage.ValueString() == "" {
@@ -179,6 +273,21 @@ func (r *transportRuleResource) writeParams(ctx context.Context, action string, 
 		"FromAddressContains":    from,
 		"SubjectContains":        subject,
 		"AttachmentIsExecutable": fmt.Sprintf("%t", plan.AttachmentIsExecutable.ValueBool()),
+
+		"ApplyRightsProtectionTemplate":              plan.ApplyRightsProtectionTemplate.ValueString(),
+		"ApplyRightsProtectionCustomizationTemplate": plan.ApplyRightsProtectionCustomizationTemplate.ValueString(),
+		"FromScope":   plan.FromScope.ValueString(),
+		"SentToScope": plan.SentToScope.ValueString(),
+	}
+	for name, l := range map[string]types.List{
+		"RecipientDomainIs":          plan.RecipientDomainIs,
+		"SenderDomainIs":             plan.SenderDomainIs,
+		"SubjectOrBodyContainsWords": plan.SubjectOrBodyContainsWords,
+		"ExceptIfRecipientDomainIs":  plan.ExceptIfRecipientDomainIs,
+	} {
+		enc, d := encodeStringList(ctx, l)
+		diags.Append(d...)
+		params[name] = enc
 	}
 	// Unknown means "not configured": Exchange keeps its value or picks one.
 	putBool(params, "Enabled", plan.Enabled)
@@ -312,14 +421,29 @@ func applyTransportRuleResponse(m *transportRuleModel, a transportRuleAPIRespons
 	m.Name = types.StringValue(a.Name)
 	m.Priority = types.Int64Value(a.Priority)
 	m.Enabled = types.BoolValue(a.Enabled)
-	m.Action = types.StringValue(a.Action)
+	m.Action = stringOrNull(m.Action, a.Action)
 	m.RejectMessage = types.StringValue(a.RejectMessage)
+	m.ApplyRightsProtectionTemplate = stringOrNull(m.ApplyRightsProtectionTemplate, a.ApplyRightsProtectionTemplate)
+	m.ApplyRightsProtectionCustomizationTemplate = stringOrNull(m.ApplyRightsProtectionCustomizationTemplate,
+		a.ApplyRightsProtectionCustomizationTemplate)
+	m.FromScope = stringOrNull(m.FromScope, a.FromScope)
+	m.SentToScope = stringOrNull(m.SentToScope, a.SentToScope)
 
 	var d diag.Diagnostics
-	m.FromAddressContains, d = stringListOrNull(m.FromAddressContains, a.FromAddressContains)
-	diags.Append(d...)
-	m.SubjectContains, d = stringListOrNull(m.SubjectContains, a.SubjectContains)
-	diags.Append(d...)
+	for _, l := range []struct {
+		dst    *types.List
+		values []string
+	}{
+		{&m.FromAddressContains, a.FromAddressContains},
+		{&m.SubjectContains, a.SubjectContains},
+		{&m.RecipientDomainIs, a.RecipientDomainIs},
+		{&m.SenderDomainIs, a.SenderDomainIs},
+		{&m.SubjectOrBodyContainsWords, a.SubjectOrBodyContainsWords},
+		{&m.ExceptIfRecipientDomainIs, a.ExceptIfRecipientDomainIs},
+	} {
+		*l.dst, d = stringListOrNull(*l.dst, l.values)
+		diags.Append(d...)
+	}
 
 	// Keep null when unset in config and false in Exchange, to avoid a
 	// perpetual null -> false diff.
@@ -327,6 +451,15 @@ func applyTransportRuleResponse(m *transportRuleModel, a transportRuleAPIRespons
 		m.AttachmentIsExecutable = types.BoolValue(a.AttachmentIsExecutable)
 	}
 	return diags
+}
+
+// stringOrNull returns a null string when Exchange has no value and the
+// current value is null, so an unset optional attribute does not show a diff.
+func stringOrNull(current types.String, value string) types.String {
+	if value == "" && current.IsNull() {
+		return types.StringNull()
+	}
+	return types.StringValue(value)
 }
 
 // stringListOrNull returns a null list when Exchange has no values and the

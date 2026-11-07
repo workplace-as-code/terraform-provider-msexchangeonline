@@ -27,7 +27,16 @@ param(
     [string]$RejectMessage,
     [string]$FromAddressContains    = "",       # base64 JSON array
     [string]$SubjectContains        = "",       # base64 JSON array
-    [string]$AttachmentIsExecutable = "false"
+    [string]$AttachmentIsExecutable = "false",
+
+    [string]$ApplyRightsProtectionTemplate              = "",
+    [string]$ApplyRightsProtectionCustomizationTemplate = "",
+    [string]$FromScope                  = "",
+    [string]$SentToScope                = "",
+    [string]$RecipientDomainIs          = "",   # base64 JSON array
+    [string]$SenderDomainIs             = "",   # base64 JSON array
+    [string]$SubjectOrBodyContainsWords = "",   # base64 JSON array
+    [string]$ExceptIfRecipientDomainIs  = ""    # base64 JSON array
 )
 
 Set-StrictMode -Version Latest
@@ -54,6 +63,31 @@ $AttachmentIsExecutableBool = $AttachmentIsExecutable -eq "true"
 $FromAddressArr             = @(ConvertFrom-B64JsonArray $FromAddressContains)
 $SubjectArr                 = @(ConvertFrom-B64JsonArray $SubjectContains)
 
+# List conditions and exceptions added in v0.5.0: rule parameter -> values.
+$ListParams = [ordered]@{
+    RecipientDomainIs          = @(ConvertFrom-B64JsonArray $RecipientDomainIs)
+    SenderDomainIs             = @(ConvertFrom-B64JsonArray $SenderDomainIs)
+    SubjectOrBodyContainsWords = @(ConvertFrom-B64JsonArray $SubjectOrBodyContainsWords)
+    ExceptIfRecipientDomainIs  = @(ConvertFrom-B64JsonArray $ExceptIfRecipientDomainIs)
+}
+# String actions and conditions: rule parameter -> value ("" = not set).
+$StringParams = [ordered]@{
+    ApplyRightsProtectionTemplate              = $ApplyRightsProtectionTemplate
+    ApplyRightsProtectionCustomizationTemplate = $ApplyRightsProtectionCustomizationTemplate
+    FromScope                                  = $FromScope
+    SentToScope                                = $SentToScope
+}
+
+# Get-BridgeRuleString reads a rule property as text: the rights protection
+# template is an object whose TemplateName is the name the configuration uses.
+function Get-BridgeRuleString($Rule, [string]$Property) {
+    if ($null -eq $Rule -or $null -eq $Rule.PSObject.Properties[$Property]) { return "" }
+    $v = $Rule.$Property
+    if ($null -eq $v) { return "" }
+    if ($null -ne $v.PSObject.Properties["TemplateName"]) { return "$($v.TemplateName)" }
+    "$v"
+}
+
 # Map a rule object to the JSON schema returned to Terraform.
 function ConvertTo-BridgeRule {
     param($Rule)
@@ -61,9 +95,10 @@ function ConvertTo-BridgeRule {
     $actionName = if ($Rule.RejectMessageReasonText) { "Reject" }
                   elseif ($Rule.Quarantine)           { "Quarantine" }
                   elseif ($Rule.SetSCL -eq $JunkScl)  { "MoveToJmf" }
+                  elseif (Get-BridgeRuleString $Rule "ApplyRightsProtectionTemplate") { "" }
                   else                                { "Unsupported" }
 
-    @{
+    $out = @{
         Identity               = "$($Rule.Identity)"
         Name                   = $Rule.Name
         Priority               = $Rule.Priority
@@ -73,18 +108,24 @@ function ConvertTo-BridgeRule {
         FromAddressContains    = @(ConvertTo-StringArray $Rule.FromAddressContainsWords)
         SubjectContains        = @(ConvertTo-StringArray $Rule.SubjectContainsWords)
         AttachmentIsExecutable = [bool]$Rule.AttachmentHasExecutableContent
-    } | ConvertTo-Json -Compress
+    }
+    foreach ($p in $StringParams.Keys) { $out[$p] = Get-BridgeRuleString $Rule $p }
+    foreach ($p in $ListParams.Keys) {
+        $out[$p] = @(if ($null -ne $Rule.PSObject.Properties[$p]) { ConvertTo-StringArray $Rule.$p })
+    }
+    $out | ConvertTo-Json -Compress
 }
 
 # Builds the action and condition parameters. On Update, removed conditions and
 # previous actions are explicitly cleared with $null so Exchange matches the plan.
-function Get-RuleParams([bool]$IsUpdate) {
+function Get-RuleParams([bool]$IsUpdate, $Current = $null) {
     $p = @{}
 
     switch ($RuleAction) {
         "Reject"     { $p["RejectMessageReasonText"] = $RejectMessage }
         "Quarantine" { $p["Quarantine"] = $true }
         "MoveToJmf"  { $p["SetSCL"] = $JunkScl }
+        ""           { if (-not $ApplyRightsProtectionTemplate) { throw "Set an action or a rights protection template." } }
         default      { throw "Unsupported action '$RuleAction'. Valid values: Reject, Quarantine, MoveToJmf." }
     }
     if ($IsUpdate) {
@@ -102,9 +143,25 @@ function Get-RuleParams([bool]$IsUpdate) {
     if ($AttachmentIsExecutableBool)  { $p["AttachmentHasExecutableContent"] = $true }
     elseif ($IsUpdate)                { $p["AttachmentHasExecutableContent"] = $false }
 
+    # The attributes added in v0.5.0 are only cleared when the rule has a value:
+    # clearing an empty one is a no-op, and tenants without Purview Message
+    # Encryption may refuse the encryption parameters.
+    foreach ($name in $StringParams.Keys) {
+        if ($StringParams[$name]) { $p[$name] = $StringParams[$name] }
+        elseif ($IsUpdate -and (Get-BridgeRuleString $Current $name)) { $p[$name] = $null }
+    }
+    foreach ($name in $ListParams.Keys) {
+        if ($ListParams[$name].Count -gt 0) { $p[$name] = [string[]]$ListParams[$name] }
+        elseif ($IsUpdate -and $null -ne $Current -and $null -ne $Current.PSObject.Properties[$name] -and
+            @($Current.$name | Where-Object { $_ }).Count -gt 0) { $p[$name] = $null }
+    }
+
     # Safety net, duplicated from the provider's plan-time validation: a rule
     # without conditions applies to every message in the organization.
-    if ($FromAddressArr.Count -eq 0 -and $SubjectArr.Count -eq 0 -and -not $AttachmentIsExecutableBool) {
+    $hasCondition = $FromAddressArr.Count -gt 0 -or $SubjectArr.Count -gt 0 -or $AttachmentIsExecutableBool -or
+        $FromScope -or $SentToScope -or $ListParams["RecipientDomainIs"].Count -gt 0 -or
+        $ListParams["SenderDomainIs"].Count -gt 0 -or $ListParams["SubjectOrBodyContainsWords"].Count -gt 0
+    if (-not $hasCondition) {
         throw "Refusing to write transport rule '$Name' without any condition: it would apply to all mail."
     }
     return $p
@@ -135,7 +192,8 @@ try {
         }
 
         "Update" {
-            $params = Get-RuleParams -IsUpdate $true
+            $current = Get-TransportRule -Identity $Identity -ErrorAction Stop
+            $params = Get-RuleParams -IsUpdate $true -Current $current
             $params["Identity"] = $Identity
             if ($Name -and $Name -ne $Identity) { $params["Name"] = $Name }
             if ($Priority -ne "") { $params["Priority"] = [int]$Priority }

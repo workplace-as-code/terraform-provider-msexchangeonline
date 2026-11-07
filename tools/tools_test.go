@@ -16,9 +16,10 @@ import (
 const roleGroupScript = "new_role_group.ps1"
 
 var (
-	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable)-[A-Z][A-Za-z]+`)
+	cmdletRe   = regexp.MustCompile(`\b(?:Get|Set|New|Remove|Enable|Disable|Add)-[A-Z][A-Za-z]+`)
 	functionRe = regexp.MustCompile(`(?m)^\s*function\s+([A-Za-z]+-[A-Za-z]+)`)
 	listRe     = regexp.MustCompile(`(?s)\$ProviderCmdlets = @\((.*?)\n\)`)
+	rmListRe   = regexp.MustCompile(`(?s)\$RoleManagementCmdlets = @\((.*?)\n\)`)
 	rolesRe    = regexp.MustCompile(`(?s)\$ProviderRoles = @\((.*?)\n\)`)
 	// customRoleRe matches one entry of $CustomRoles: name, parent, cmdlets.
 	customRoleRe = regexp.MustCompile(`(?s)@\{ Name = "([^"]+)"; Parent = "([^"]+)"; Cmdlets = @\((.*?)\) \}`)
@@ -26,6 +27,9 @@ var (
 	// "- **Role**" item per role, alone on its line.
 	guideRoleRe = regexp.MustCompile(`(?m)^- \*\*([^*]+)\*\*$`)
 	quotedRe    = regexp.MustCompile(`"([^"]+)"`)
+	// rbacNounRe matches the cmdlets of the Role Management role.
+	rbacNounRe = regexp.MustCompile(`^[A-Za-z]+-(ManagementScope|ManagementRole|ManagementRoleEntry|RoleGroup|` +
+		`ManagementRoleAssignment|RoleAssignmentPolicy|ServicePrincipal)$`)
 	// Sync-BridgeRule (common.ps1) builds the rule cmdlet names from -Noun.
 	ruleNounRe = regexp.MustCompile(`Sync-BridgeRule -Noun "([A-Za-z]+)"`)
 	// Invoke-BridgePresetRule (common.ps1) does the same for the preset rules.
@@ -77,6 +81,14 @@ func specCmdlets(t *testing.T) []string {
 	if len(out) == 0 {
 		t.Fatal("no noun found in specs.go")
 	}
+	// The read-only objects (data sources only) are read with Get- only.
+	readOnly, err := os.ReadFile("../internal/resources/readonly_specs.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range specNounRe.FindAllStringSubmatch(string(readOnly), -1) {
+		out = append(out, "Get-"+m[1])
+	}
 	return out
 }
 
@@ -89,7 +101,7 @@ var builtins = map[string]bool{
 	"New-Object": true, "New-PSSession": true, "New-PSSessionOption": true, "New-Guid": true,
 	"New-SelfSignedCertificate": true, "Remove-PSSession": true, "Remove-Variable": true, "Remove-Item": true,
 	"Set-StrictMode": true, "Set-Variable": true, "Set-Content": true, "Set-CASMailbox": true,
-	"New-AcceptedDomain": true, "Remove-AcceptedDomain": true,
+	"New-AcceptedDomain": true, "Remove-AcceptedDomain": true, "Add-Member": true,
 }
 
 func bridgeCmdlets(t *testing.T) []string {
@@ -144,11 +156,29 @@ func TestRoleGroupScriptListsEveryBridgeCmdlet(t *testing.T) {
 	if block == nil {
 		t.Fatal("$ProviderCmdlets list not found")
 	}
+	rmBlock := rmListRe.FindStringSubmatch(string(data))
+	if rmBlock == nil {
+		t.Fatal("$RoleManagementCmdlets list not found")
+	}
+	// The Role Management cmdlets are only granted with -IncludeRoleManagement:
+	// together, the two lists hold every cmdlet of the bridge, once.
 	var listed []string
-	for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
-		listed = append(listed, m[1])
+	seen := map[string]bool{}
+	for _, b := range []string{block[1], rmBlock[1]} {
+		for _, m := range quotedRe.FindAllStringSubmatch(b, -1) {
+			if seen[m[1]] {
+				t.Errorf("%s is listed twice", m[1])
+			}
+			seen[m[1]] = true
+			listed = append(listed, m[1])
+		}
 	}
 	sort.Strings(listed)
+	for _, m := range quotedRe.FindAllStringSubmatch(rmBlock[1], -1) {
+		if !rbacNounRe.MatchString(m[1]) {
+			t.Errorf("%s is not a Role Management cmdlet", m[1])
+		}
+	}
 
 	want := bridgeCmdlets(t)
 	if strings.Join(listed, ",") != strings.Join(want, ",") {
@@ -283,5 +313,76 @@ func TestCustomRolesKeepTheBridgeCmdlets(t *testing.T) {
 				t.Errorf("custom role %q keeps %v, the bridge runs %v", role[1], kept, want)
 			}
 		}
+	}
+}
+
+// TestIncludeRoleManagement checks that Role Management and its cmdlets are
+// only part of the role group with -IncludeRoleManagement.
+func TestIncludeRoleManagement(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	run := func(args string) string {
+		script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + ` ` + args + `
+"$($ProviderRoles -contains 'Role Management') $($ProviderCmdlets -contains 'New-RoleGroup')"
+`
+		out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		if err != nil {
+			t.Fatalf("pwsh: %v\n%s", err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	if out := run(""); out != "False False" {
+		t.Errorf("without the switch: %s, want False False", out)
+	}
+	if out := run("-IncludeRoleManagement"); out != "True True" {
+		t.Errorf("with -IncludeRoleManagement: %s, want True True", out)
+	}
+}
+
+// TestDelegatingRoles: the roles the app may hand out get a delegating
+// assignment, only with -IncludeRoleManagement (Exchange requires both to
+// derive or assign a role).
+func TestDelegatingRoles(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	run := func(args string) (string, error) {
+		script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + ` ` + args + `
+$DelegatingRoles -join "|"
+`
+		out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+		return strings.TrimSpace(string(out)), err
+	}
+	if out, err := run(`-DelegatingRoles "Mail Recipients"`); err == nil {
+		t.Errorf("-DelegatingRoles without -IncludeRoleManagement must fail: %s", out)
+	}
+	out, err := run(`-IncludeRoleManagement -DelegatingRoles "Mail Recipients","MyBaseOptions"`)
+	if err != nil || out != "Mail Recipients|MyBaseOptions" {
+		t.Errorf("with -IncludeRoleManagement: %v %s", err, out)
+	}
+}
+
+// TestDelegationTarget: Exchange refuses an Application role on a role group,
+// even as a delegation: the app's service principal gets it instead.
+func TestDelegationTarget(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh not installed")
+	}
+	script := `
+$env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
+. ./` + roleGroupScript + `
+@("Mail Recipients", "MyBaseOptions", "Application Mail.Send", "Exchange Application") | ForEach-Object { Get-DelegationTarget $_ }
+`
+	out, err := exec.Command("pwsh", "-NoProfile", "-NonInteractive", "-Command", script).CombinedOutput()
+	if err != nil {
+		t.Fatalf("pwsh: %v\n%s", err, out)
+	}
+	if got := strings.Join(strings.Fields(string(out)), ","); got != "SecurityGroup,SecurityGroup,App,App" {
+		t.Errorf("got %s", got)
 	}
 }

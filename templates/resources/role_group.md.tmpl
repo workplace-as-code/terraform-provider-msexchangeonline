@@ -1,0 +1,43 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Administration"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs the **Role Management** Exchange management role, which lets it grant itself any other role: give it only to the pipeline that manages the Exchange delegation. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it with `-IncludeRoleManagement`. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`New-RoleGroup`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-rolegroup?view=exchange-ps)
+- [`Get-RoleGroup`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-rolegroup?view=exchange-ps)
+- [`Set-RoleGroup`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-rolegroup?view=exchange-ps)
+- [`Remove-RoleGroup`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-rolegroup?view=exchange-ps)
+
+## Import
+
+Import using the role group name:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}
+
+To import every existing object at once, see [Import an existing tenant](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/import_existing).

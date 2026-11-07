@@ -31,14 +31,22 @@ output "enabled" {
 
 ### Read-Only
 
-- `action` (String) The action to take when conditions are met. Valid values: `Reject`, `Quarantine`, `MoveToJmf` (deliver to the Junk Email folder).
+- `action` (String) The action to take when conditions are met. Valid values: `Reject`, `Quarantine`, `MoveToJmf` (deliver to the Junk Email folder). Optional when `apply_rights_protection_template` is set.
+- `apply_rights_protection_customization_template` (String) Action: the branding template (`msexchangeonline_ome_configuration`) of the encrypted message, for example `OME Configuration`. Needs `apply_rights_protection_template` and `from_scope = "InOrganization"`.
+- `apply_rights_protection_template` (String) Action: encrypt the message with this rights protection template, for example `Encrypt` or `Do Not Forward`, or the name of a custom template. Needs Microsoft Purview Message Encryption, and `internal_licensing_enabled = true` in `msexchangeonline_irm_configuration`: otherwise Exchange lists no template.
 - `attachment_is_executable` (Boolean) Condition: an attachment contains executable content.
 - `enabled` (Boolean) Whether the rule is enabled. A new rule is enabled unless this is `false`.
+- `except_if_recipient_domain_is` (List of String) Exception: the recipient's domain is one of these domains.
 - `from_address_contains` (List of String) Condition: the sender address contains any of these strings.
+- `from_scope` (String) Condition: the sender is inside (`InOrganization`) or outside (`NotInOrganization`) the organization.
 - `id` (String) The unique identifier of the transport rule.
 - `priority` (Number) The priority of the rule. Lower numbers are evaluated first. When omitted, Exchange assigns the lowest priority.
+- `recipient_domain_is` (List of String) Condition: the recipient's domain is one of these domains (subdomains included).
 - `reject_message` (String) The rejection message shown to senders. Required when `action` is `Reject`.
+- `sender_domain_is` (List of String) Condition: the sender's domain is one of these domains.
+- `sent_to_scope` (String) Condition: where the recipient is. Valid values: `InOrganization`, `NotInOrganization`, `ExternalPartner`, `ExternalNonPartner`.
 - `subject_contains` (List of String) Condition: the subject contains any of these words or phrases.
+- `subject_or_body_contains_words` (List of String) Condition: the subject or the body contains any of these words or phrases.
 
 ## Permissions
 

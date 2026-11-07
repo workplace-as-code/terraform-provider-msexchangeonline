@@ -32,6 +32,18 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   TF_VAR_test_hybrid=true — also reads the hybrid data sources: an administrator
+#                           creates TF-CI-OnPrem (New-OnPremisesOrganization) and TF-CI-IOC
+#                           (New-IntraOrganizationConnector) once, with contoso values
+#   EXCHANGE_TEST_RBAC      (any value) — also tests the Exchange RBAC delegation
+#                           (test/integration/rbac.tf): scopes, roles, role groups, role
+#                           assignments and policies; the app needs Role Management
+#                           With TF_VAR_test_app_id and TF_VAR_test_app_object_id (the
+#                           enterprise application), also RBAC for Applications
+#   EXCHANGE_TEST_ENCRYPTION (any value) — also tests message encryption
+#                           (test/integration/encryption.tf): the encryption actions of
+#                           transport rules, the IRM configuration and the OME branding
+#                           templates; needs Purview Message Encryption (E5 for custom templates)
 #   EXCHANGE_TEST_PRESET    (any value) — also tests the rules of the Standard preset security
 #                           policy, which must have been turned on once in the Defender portal;
 #                           they are adopted and turned off on destroy (the Defender part with
@@ -134,6 +146,7 @@ pass "Build OK"
 # ---------------------------------------------------------------------------
 CREATED=(
   "msexchangeonline_transport_rule.test=TF-CI-Rule"
+  "msexchangeonline_transport_rule.scope=TF-CI-Rule-Scope"
   "msexchangeonline_remote_domain.test=TF-CI-Domain"
   "msexchangeonline_inbound_connector.test=TF-CI-Inbound"
   "msexchangeonline_outbound_connector.test=TF-CI-Outbound"
@@ -180,6 +193,34 @@ if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
     "msexchangeonline_anti_phish_policy.defender[0]=TF-CI-AntiPhish-Defender"
   )
 fi
+RBAC_TYPES="management_scope role_group management_role management_role_assignment service_principal role_assignment_policy"
+ENCRYPTION_TYPES="ome_configuration"
+if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
+  export TF_VAR_test_rbac=true
+  CREATED+=(
+    "msexchangeonline_management_role_assignment.scoped[0]=TF-CI-Assignment-Scoped"
+  )
+  if [[ -n "${TF_VAR_test_app_id:-}" && -n "${TF_VAR_test_app_object_id:-}" ]]; then
+    CREATED+=(
+      "msexchangeonline_management_role_assignment.app[0]=TF-CI-Assignment-App"
+      "msexchangeonline_service_principal.test[0]=$TF_VAR_test_app_id"
+    )
+  fi
+  CREATED+=(
+    "msexchangeonline_management_role_assignment.builtin[0]=TF-CI-Assignment-Builtin"
+    "msexchangeonline_role_group.test[0]=TF-CI-RoleGroup"
+    "msexchangeonline_role_assignment_policy.test[0]=TF-CI-RoleAssignmentPolicy"
+    "msexchangeonline_management_role.test[0]=TF-CI-Role"
+    "msexchangeonline_management_scope.test[0]=TF-CI-Scope"
+  )
+fi
+if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
+  export TF_VAR_test_encryption=true
+  CREATED+=(
+    "msexchangeonline_transport_rule.encrypt[0]=TF-CI-Rule-Encrypt"
+    "msexchangeonline_ome_configuration.custom[0]=TF-CI-OME"
+  )
+fi
 if [[ -n "${TF_VAR_test_mail_enabled_group:-}" && -n "${TF_VAR_test_app_id:-}" ]]; then
   # The policy ID is only known once it exists: it is imported by the loop below
   # from the state, and the deletion check cannot look it up by name.
@@ -205,6 +246,7 @@ KEEP=(
   "msexchangeonline_external_in_outlook.this"
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
+  "msexchangeonline_irm_configuration.this"
   "msexchangeonline_activesync_organization_settings.this"
   "msexchangeonline_mailbox_plan.enterprise"
   "msexchangeonline_cas_mailbox_plan.enterprise"
@@ -212,6 +254,8 @@ KEEP=(
   "msexchangeonline_hosted_content_filter_policy.default"
   "msexchangeonline_mobile_device_mailbox_policy.default"
 )
+# The default branding template is adopted: kept like the tenant-wide objects.
+[[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && KEEP+=("msexchangeonline_ome_configuration.default[0]")
 
 # expect_no_changes <label> [terraform plan args...]
 # Fails unless terraform plan reports no changes.
@@ -384,6 +428,14 @@ write_and_restore msexchangeonline_cas_mailbox_plan.enterprise pop_enabled \
 days="$(state_value msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days)"
 write_and_restore msexchangeonline_mailbox_plan.enterprise retain_deleted_items_for_days \
   mailbox_plan_retain_deleted_items_for_days "$(( days == 30 ? 29 : days + 1 ))" "$days"
+if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
+  logs="$(state_value msexchangeonline_irm_configuration.this enable_portal_tracking_logs)"
+  write_and_restore msexchangeonline_irm_configuration.this enable_portal_tracking_logs \
+    irm_enable_portal_tracking_logs "$([[ "$logs" == true ]] && echo false || echo true)" "$logs"
+  otp="$(state_value 'msexchangeonline_ome_configuration.default[0]' otp_enabled)"
+  write_and_restore 'msexchangeonline_ome_configuration.default[0]' otp_enabled \
+    ome_default_otp_enabled "$([[ "$otp" == true ]] && echo false || echo true)" "$otp"
+fi
 if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admin_mail_recipients)" != *'"'* ]]; then
   write_and_restore msexchangeonline_activesync_organization_settings.this admin_mail_recipients \
     activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
@@ -417,9 +469,12 @@ done
 pass "${#CREATED[@]} resources imported"
 # An imported filter holds Exchange's text, with parentheses: the first apply
 # writes the same filter in the configured form.
-terraform apply -auto-approve -no-color -var phase=update \
-  -target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child \
-  -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test > /dev/null ||
+FILTERS=(-target=msexchangeonline_address_list.test -target=msexchangeonline_address_list.child
+  -target=msexchangeonline_address_list.rooms -target=msexchangeonline_global_address_list.test)
+[[ -n "${EXCHANGE_TEST_RBAC:-}" ]] && FILTERS+=(-target='msexchangeonline_management_scope.test[0]')
+# The OME logo is re-encoded by Exchange, like a filter.
+[[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && FILTERS+=(-target='msexchangeonline_ome_configuration.custom[0]')
+terraform apply -auto-approve -no-color -var phase=update "${FILTERS[@]}" > /dev/null ||
   fail "Recording the filters after import failed"
 expect_no_changes "Drift check after import" -var phase=update
 
@@ -442,6 +497,9 @@ for doc in "$ROOT"/docs/resources/*.md; do
   name="$(basename "$doc" .md)"
   # Safe Links, Safe Attachments and the preset rules of Defender need Defender for Office 365.
   [[ ( "$name" == safe_* || "$name" == atp_* ) && -z "${EXCHANGE_TEST_DEFENDER:-}" ]] && continue
+  # The RBAC types need Role Management, the encryption types a Purview license.
+  [[ " $RBAC_TYPES " == *" $name "* && -z "${EXCHANGE_TEST_RBAC:-}" ]] && continue
+  [[ " $ENCRYPTION_TYPES " == *" $name "* && -z "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && continue
   printf 'list "msexchangeonline_%s" "all" {\n  provider = msexchangeonline\n}\n\n' "$name" >> "$QUERYDIR/all.tfquery.hcl"
 done
 (cd "$QUERYDIR" && terraform query -no-color -generate-config-out=generated.tf > query.log 2>&1) ||
@@ -519,6 +577,21 @@ if [[ ${#PRESET[@]} -gt 0 ]]; then
   echo "  Adopted, turned off on destroy: ${PRESET[*]%%.standard*} (Standard preset)"
 else
   echo "  Skipped:          eop/atp_protection_policy_rule (set EXCHANGE_TEST_PRESET)"
+fi
+if [[ "${TF_VAR_test_hybrid:-}" == true ]]; then
+  echo "  Hybrid:           onpremises_organization and intra_organization_connector data sources"
+else
+  echo "  Not tested:       hybrid data sources (set TF_VAR_test_hybrid=true)"
+fi
+if [[ -n "${EXCHANGE_TEST_RBAC:-}" ]]; then
+  echo "  RBAC:             management scopes, role groups, custom roles, role assignments, service principals, role assignment policies"
+else
+  echo "  Not tested:       Exchange RBAC (set EXCHANGE_TEST_RBAC)"
+fi
+if [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]]; then
+  echo "  Encryption:       transport rule encryption actions, branding templates, IRM configuration and default template written and restored"
+else
+  echo "  Not tested:       message encryption (set EXCHANGE_TEST_ENCRYPTION)"
 fi
 if [[ -n "${EXCHANGE_TEST_DEFENDER:-}" ]]; then
   echo "  Defender:         safe_links_*, safe_attachment_*, anti-phishing Defender settings"

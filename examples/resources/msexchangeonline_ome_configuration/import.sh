@@ -1,0 +1,1 @@
+terraform import msexchangeonline_ome_configuration.finance "Finance"

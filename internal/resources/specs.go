@@ -331,4 +331,110 @@ var objectSpecs = []objectSpec{
 			setAttr("address_lists", "AddressLists", "Names of the address lists users see besides the GAL."),
 		},
 	},
+	{
+		typeName: "management_scope",
+		noun:     "ManagementScope",
+		script:   "management_scope.ps1",
+		description: "Manages a management scope: the recipients a role assignment can change, selected by an " +
+			"OPATH filter",
+		notes: "Use it in `msexchangeonline_management_role_assignment` (`custom_recipient_write_scope`, or " +
+			"`custom_resource_scope` for an application).",
+		fields: []field{
+			{
+				name: "recipient_restriction_filter", param: "RecipientRestrictionFilter", property: "RecipientFilter",
+				kind: filterField,
+				desc: "OPATH filter of the recipients in the scope, for example `CustomAttribute1 -eq 'France'`. " +
+					"Exchange may rewrite it with parentheses: the configured text is kept as long as Exchange returns " +
+					"the text it wrote.",
+			},
+			stringAttr("recipient_root", "RecipientRoot", "Organizational unit the filter applies to. Empty for the "+
+				"whole organization."),
+			{
+				name: "exclusive", param: "Exclusive", kind: boolField, forceNew: true,
+				desc: "An exclusive scope: only the assignments that use it can change its recipients, even for " +
+					"administrators with organization-wide roles. Changing it creates a new scope.",
+			},
+		},
+	},
+	{
+		typeName: "role_group",
+		noun:     "RoleGroup",
+		script:   "role_group.ps1",
+		description: "Manages a custom role group: an Exchange administration role group whose roles and scopes " +
+			"come from `msexchangeonline_management_role_assignment`",
+		notes: "Members and the managers of the membership (ManagedBy) are not managed: they come from your identity " +
+			"management process, and a member added or removed outside Terraform never shows as a change. Built-in role groups (Organization Management, ...) " +
+			"cannot be managed; read them with the data source.",
+		fields: []field{
+			stringAttr("display_name", "DisplayName", "Name shown in the Exchange admin center. Defaults to `name`."),
+			stringAttr("description", "Description", "Description of the role group."),
+		},
+	},
+	{
+		typeName:  "irm_configuration",
+		noun:      "IRMConfiguration",
+		singleton: true,
+		description: "Manages the Information Rights Management (IRM) configuration of the organization: Microsoft " +
+			"Purview Message Encryption, and how Exchange decrypts protected messages",
+		notes: "It needs Microsoft Purview Message Encryption (Microsoft 365 E3 or E5, Office 365 E3 or E5, or Azure " +
+			"Information Protection Plan 1). Legacy AD RMS settings are not managed.",
+		fields: []field{
+			boolAttr("azure_rms_licensing_enabled", "AzureRMSLicensingEnabled", "Connect to Azure Rights Management: "+
+				"turns Microsoft Purview Message Encryption on."),
+			boolAttr("internal_licensing_enabled", "InternalLicensingEnabled", "Use IRM for messages sent inside the "+
+				"organization. Exchange lists the rights protection templates, which transport rules use, only "+
+				"when it is `true`."),
+			boolAttr("simplified_client_access_enabled", "SimplifiedClientAccessEnabled", "Show the Protect button in "+
+				"Outlook on the web."),
+			boolAttr("simplified_client_access_encrypt_only_disabled", "SimplifiedClientAccessEncryptOnlyDisabled",
+				"Hide the Encrypt-Only option in Outlook on the web."),
+			boolAttr("simplified_client_access_do_not_forward_disabled", "SimplifiedClientAccessDoNotForwardDisabled",
+				"Hide the Do Not Forward option in Outlook on the web."),
+			enumAttr("transport_decryption_setting", "TransportDecryptionSetting", "Whether Exchange decrypts protected "+
+				"messages in transport, for example to scan them.", "Disabled", "Optional", "Mandatory"),
+			boolAttr("journal_report_decryption_enabled", "JournalReportDecryptionEnabled", "Add a decrypted copy of "+
+				"protected messages to journal reports."),
+			boolAttr("decrypt_attachment_for_encrypt_only", "DecryptAttachmentForEncryptOnly", "Give recipients "+
+				"unrestricted rights on the attachments of Encrypt-Only messages."),
+			boolAttr("enable_pdf_encryption", "EnablePdfEncryption", "Encrypt PDF attachments of encrypted messages."),
+			boolAttr("enable_portal_tracking_logs", "EnablePortalTrackingLogs", "Log the activity of the encrypted "+
+				"message portal (Advanced Message Encryption)."),
+			boolAttr("search_enabled", "SearchEnabled", "Let users search encrypted messages in Outlook on the web."),
+			boolAttr("ediscovery_super_user_enabled", "EDiscoverySuperUserEnabled", "Let eDiscovery searches read "+
+				"protected messages."),
+			boolAttr("reject_if_recipient_has_no_rights", "RejectIfRecipientHasNoRights", "Reject a protected message "+
+				"sent to a recipient who has no rights on it."),
+			boolAttr("automatic_service_update_enabled", "AutomaticServiceUpdateEnabled", "Let Microsoft add new "+
+				"Azure Information Protection features automatically."),
+		},
+	},
+	{
+		typeName:     "ome_configuration",
+		noun:         "OMEConfiguration",
+		script:       "ome_configuration.ps1",
+		listProperty: "Identity",
+		description: "Manages a branding template of Microsoft Purview Message Encryption: the logo, colors and texts " +
+			"of encrypted messages and of the encrypted message portal",
+		notes: "`name = \"OME Configuration\"` adopts the default template: it is changed, never created, and destroying " +
+			"the resource only removes it from the state. Other names are custom templates, which need Advanced Message " +
+			"Encryption (E5); a transport rule applies them with `apply_rights_protection_customization_template`.",
+		fields: []field{
+			filterAttr("image", "Image", "Logo, as base64 (`filebase64(\"logo.png\")`): PNG, JPG, BMP or TIFF, ideally "+
+				"under 40 KB and 170 x 70 pixels. `\"\"` removes the logo. Exchange re-encodes the image: the configured "+
+				"value is kept as long as Exchange returns the image it stored at the last write."),
+			stringAttr("background_color", "BackgroundColor", "Background color, as an HTML name or a hex code such as "+
+				"`#ffffff`."),
+			stringAttr("introduction_text", "IntroductionText", "Text after the sender's name and address."),
+			stringAttr("email_text", "EmailText", "Text of the message the recipient receives."),
+			stringAttr("read_button_text", "ReadButtonText", "Text of the Read the message button."),
+			stringAttr("portal_text", "PortalText", "Text at the top of the encrypted message portal."),
+			stringAttr("disclaimer_text", "DisclaimerText", "Disclaimer at the bottom of the message."),
+			stringAttr("privacy_statement_url", "PrivacyStatementUrl", "Address of the privacy statement link."),
+			boolAttr("otp_enabled", "OTPEnabled", "Let recipients sign in to the portal with a one-time passcode."),
+			boolAttr("social_id_sign_in", "SocialIdSignIn", "Let recipients sign in with a Microsoft, Google or Yahoo account."),
+			int64Attr("external_mail_expiry_in_days", "ExternalMailExpiryInDays", "Days external recipients can read "+
+				"the message in the portal, from 1 to 730; `0` for no expiry. Custom templates only.",
+				int64validator.Between(0, 730)),
+		},
+	},
 }

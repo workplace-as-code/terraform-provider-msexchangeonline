@@ -44,6 +44,21 @@
     Create the role group, or add the missing roles to it, and add the
     service principal. Without it, the script only shows what it would do.
 
+.PARAMETER IncludeRoleManagement
+    Also grant the Role Management role, needed by the Exchange RBAC resources
+    (management scopes, roles, role groups, role assignments and policies,
+    service principals). It lets the app grant itself any other role: use it
+    only for the pipeline that manages the Exchange delegation.
+
+.PARAMETER DelegatingRoles
+    With -IncludeRoleManagement, the roles the app may hand out: each one gets
+    a delegating assignment. Exchange requires it to create a custom role
+    from a role (or one of its parents) and to assign a role to a role group,
+    an application or a role assignment policy, for example "Mail Recipients",
+    "Distribution Groups", "MyBaseOptions" or "Application Mail.Send". The
+    Application roles are delegated to the app's service principal: Exchange
+    refuses them on a role group.
+
 .PARAMETER RemoveExtraRoles
     With -Apply, also remove from an existing role group the roles that are
     not in $ProviderRoles nor $CustomRoles. Without it, the script only lists
@@ -71,6 +86,8 @@ param(
     [string]$CustomRolePrefix = "",
     [hashtable]$CustomRoleNames = @{},
     [switch]$Apply,
+    [switch]$IncludeRoleManagement,
+    [string[]]$DelegatingRoles = @(),
     [switch]$RemoveExtraRoles
 )
 
@@ -84,6 +101,7 @@ $ErrorActionPreference = "Stop"
 $ProviderRoles = @(
     "Address Lists",
     "E-Mail Address Policies",
+    "Information Rights Management",
     "Journaling",
     "Organization Configuration",
     "Organization Transport Settings",
@@ -206,14 +224,18 @@ $ProviderCmdlets = @(
     "Get-HostedContentFilterRule",
     "Get-HostedOutboundSpamFilterPolicy",
     "Get-HostedOutboundSpamFilterRule",
+    "Get-IRMConfiguration",
     "Get-InboundConnector",
+    "Get-IntraOrganizationConnector",
     "Get-JournalRule",
     "Get-Mailbox",
     "Get-MailboxPlan",
     "Get-MalwareFilterPolicy",
     "Get-MalwareFilterRule",
     "Get-MobileDeviceMailboxPolicy",
+    "Get-OMEConfiguration",
     "Get-OfflineAddressBook",
+    "Get-OnPremisesOrganization",
     "Get-OrganizationConfig",
     "Get-OrganizationRelationship",
     "Get-OutboundConnector",
@@ -251,6 +273,7 @@ $ProviderCmdlets = @(
     "New-MalwareFilterPolicy",
     "New-MalwareFilterRule",
     "New-MobileDeviceMailboxPolicy",
+    "New-OMEConfiguration",
     "New-OfflineAddressBook",
     "New-OrganizationRelationship",
     "New-OutboundConnector",
@@ -285,6 +308,7 @@ $ProviderCmdlets = @(
     "Remove-MalwareFilterPolicy",
     "Remove-MalwareFilterRule",
     "Remove-MobileDeviceMailboxPolicy",
+    "Remove-OMEConfiguration",
     "Remove-OfflineAddressBook",
     "Remove-OrganizationRelationship",
     "Remove-OutboundConnector",
@@ -321,12 +345,14 @@ $ProviderCmdlets = @(
     "Set-HostedContentFilterRule",
     "Set-HostedOutboundSpamFilterPolicy",
     "Set-HostedOutboundSpamFilterRule",
+    "Set-IRMConfiguration",
     "Set-InboundConnector",
     "Set-JournalRule",
     "Set-MailboxPlan",
     "Set-MalwareFilterPolicy",
     "Set-MalwareFilterRule",
     "Set-MobileDeviceMailboxPolicy",
+    "Set-OMEConfiguration",
     "Set-OfflineAddressBook",
     "Set-OrganizationConfig",
     "Set-OrganizationRelationship",
@@ -346,6 +372,55 @@ $ProviderCmdlets = @(
     "Set-TransportRule"
 )
 
+# The cmdlets of the Exchange RBAC resources. They are in the Role Management
+# role, which lets the app grant itself any other role: they are checked and
+# granted only with -IncludeRoleManagement.
+$RoleManagementCmdlets = @(
+    "Add-ManagementRoleEntry",
+    "Get-ManagementRole",
+    "Get-ManagementRoleAssignment",
+    "Get-ManagementRoleEntry",
+    "Get-ManagementScope",
+    "Get-RoleAssignmentPolicy",
+    "Get-RoleGroup",
+    "Get-ServicePrincipal",
+    "New-ManagementRole",
+    "New-ManagementRoleAssignment",
+    "New-ManagementScope",
+    "New-RoleAssignmentPolicy",
+    "New-RoleGroup",
+    "New-ServicePrincipal",
+    "Remove-ManagementRole",
+    "Remove-ManagementRoleAssignment",
+    "Remove-ManagementRoleEntry",
+    "Remove-ManagementScope",
+    "Remove-RoleAssignmentPolicy",
+    "Remove-RoleGroup",
+    "Remove-ServicePrincipal",
+    "Set-ManagementRole",
+    "Set-ManagementRoleAssignment",
+    "Set-ManagementRoleEntry",
+    "Set-ManagementScope",
+    "Set-RoleAssignmentPolicy",
+    "Set-RoleGroup",
+    "Set-ServicePrincipal"
+)
+if ($DelegatingRoles.Count -gt 0 -and -not $IncludeRoleManagement) {
+    throw "-DelegatingRoles needs -IncludeRoleManagement: only the Exchange RBAC resources hand out roles."
+}
+if ($IncludeRoleManagement) {
+    $ProviderRoles = @($ProviderRoles) + "Role Management"
+    $ProviderCmdlets = @($ProviderCmdlets) + $RoleManagementCmdlets
+}
+
+# Get-DelegationTarget tells who gets the delegating assignment of a role:
+# Exchange refuses an Application role (RBAC for Applications, a name that
+# starts or ends with "Application") on a role group, even as a delegation, so
+# the app's service principal gets it; the role group gets the other roles.
+function Get-DelegationTarget([string]$Role) {
+    if ($Role -like "Application *" -or $Role -like "* Application") { "App" } else { "SecurityGroup" }
+}
+
 # Find-UncoveredCmdlets returns the cmdlets that none of $Roles contains.
 # $RolesByCmdlet maps each cmdlet to the names of the roles containing it.
 function Find-UncoveredCmdlets {
@@ -364,7 +439,7 @@ if (-not (Get-Command Get-ManagementRole -ErrorAction SilentlyContinue)) {
 }
 
 Write-Host "Checking that the roles contain the $($ProviderCmdlets.Count) cmdlets of the provider..."
-$unknownRoles = @(@($ProviderRoles) + @($CustomRoles | ForEach-Object { $_.Parent }) | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
+$unknownRoles = @(@($ProviderRoles) + @($CustomRoles | ForEach-Object { $_.Parent }) + @($DelegatingRoles) | Where-Object { -not (Get-ManagementRole -Identity $_ -ErrorAction SilentlyContinue) })
 if ($unknownRoles.Count -gt 0) {
     throw "These roles do not exist in this organization: $($unknownRoles -join ', ')"
 }
@@ -431,12 +506,23 @@ $CustomRoleDescription = "for the workplace-as-code/msexchangeonline Terraform p
 $extra = @()
 if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
     $current = @((Get-RoleGroup -Identity $RoleGroupName).Roles | ForEach-Object { (Get-ManagementRole -Identity $_).Name })
-    $extra = @($current | Where-Object { $groupRoles -notcontains $_ } | Sort-Object)
+    $extra = @($current | Where-Object { $groupRoles -notcontains $_ -and $DelegatingRoles -notcontains $_ } | Sort-Object)
 }
 if ($extra.Count -gt 0 -and -not ($Apply -and $RemoveExtraRoles)) {
     Write-Host ""
     Write-Warning ("'$RoleGroupName' has roles the provider does not need: $($extra -join ', '). " +
         "Remove them with -Apply -RemoveExtraRoles.")
+}
+
+if ($IncludeRoleManagement) {
+    Write-Host ""
+    $list = if ($DelegatingRoles.Count -gt 0) { $DelegatingRoles -join ", " } else { "none (use -DelegatingRoles)" }
+    Write-Host "Roles the app may hand out (delegating assignments): $list"
+}
+if (-not $IncludeRoleManagement) {
+    Write-Host ""
+    Write-Host ("Role Management is not granted: the Exchange RBAC resources (management scopes, roles, role groups, " +
+        "role assignments and policies, service principals) need -IncludeRoleManagement.")
 }
 
 if (-not $Apply) {
@@ -500,6 +586,20 @@ if (Get-RoleGroup -Identity $RoleGroupName -ErrorAction SilentlyContinue) {
 } else {
     New-RoleGroup -Name $RoleGroupName -Roles $groupRoles -Description "Least-privilege roles for the workplace-as-code/msexchangeonline Terraform provider" | Out-Null
     Write-Host "Created role group '$RoleGroupName'."
+}
+
+# The roles the app may hand out: one delegating assignment each, on the role
+# group, or on the app's service principal for the Application roles.
+foreach ($role in $DelegatingRoles) {
+    $target = Get-DelegationTarget $role
+    $assignee = if ($target -eq "App") { [string]$sp.Identity } else { $RoleGroupName }
+    $delegating = @(Get-ManagementRoleAssignment -RoleAssignee $assignee -Role $role -Delegating $true -ErrorAction SilentlyContinue |
+        Where-Object { [string]$_.RoleAssigneeName -eq $assignee })
+    if ($delegating.Count -eq 0) {
+        $to = @{ $target = $assignee }
+        New-ManagementRoleAssignment @to -Role $role -Delegating | Out-Null
+        Write-Host "The app can now hand out the role '$role' (delegating assignment to $assignee)."
+    }
 }
 
 $members = @(Get-RoleGroupMember -Identity $RoleGroupName | ForEach-Object { [string]$_.Identity })

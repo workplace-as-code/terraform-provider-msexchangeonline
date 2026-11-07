@@ -126,6 +126,64 @@ function Test-BridgeNotFound {
     $Message -match "couldn't be found|could not be found|not found|ObjectNotFound|doesn't exist|does not exist"
 }
 
+# Built-in role groups of Exchange Online and Microsoft Purview. Microsoft
+# creates them in every tenant; the provider only manages custom role groups.
+$BridgeBuiltInRoleGroups = @(
+    "Compliance Administrator", "Compliance Data Administrator", "Compliance Management", "Discovery Management",
+    "Help Desk", "Hygiene Management", "Organization Management", "Recipient Management", "Records Management",
+    "Security Administrator", "Security Operator", "Security Reader", "View-Only Organization Management",
+    "Communication Compliance", "Communication Compliance Administrators", "Communication Compliance Analysts",
+    "Communication Compliance Investigators", "Communication Compliance Viewers", "Insider Risk Management",
+    "Privacy Management", "Privacy Management Administrators", "Privacy Management Analysts",
+    "Privacy Management Investigators", "Privacy Management Viewers", "TenantAdmins", "UM Management",
+    "Information Protection", "Information Protection Admins", "Information Protection Analysts",
+    "Information Protection Investigators", "Information Protection Readers", "Insider Risk Management Admins",
+    "Insider Risk Management Investigators", "Places Administrator"
+)
+
+# End-user roles that Microsoft derives from other roles: they are not root
+# roles, but Microsoft manages them.
+$BridgeBuiltInDerivedRoles = @("MyAddressInformation", "MyMobileInformation", "MyPersonalInformation", "MyDisplayName", "MyName")
+
+$script:BridgeRoleGroupCache = @{}
+
+# Test-BridgeBuiltIn reports whether an RBAC object was created by Microsoft:
+# a role group with a well-known object, linked to an Entra role or with a
+# known name; a root management role (custom roles are derived from a parent).
+function Test-BridgeBuiltIn {
+    param([string]$Noun, $Object)
+    $name = [string](Get-BridgeProp $Object "Name" "")
+    switch ($Noun) {
+        "RoleGroup" {
+            # Role groups linked to a Microsoft Entra role end in "_<number>" or
+            # "_-<number>" (TenantAdmins_-123..., GlobalReaders_556...) and are
+            # partner-managed.
+            [bool](Get-BridgeProp $Object "WellKnownObject" "") -or $name -match '_-?\d+$' -or
+                @(Get-BridgeProp $Object "Capabilities" @()) -contains "Partner_Managed" -or
+                $name -like "RIM-MailboxAdmins*" -or $name -like "ISVMailboxUsers*" -or
+                $BridgeBuiltInRoleGroups -contains $name
+        }
+        "ManagementRole" { [bool](Get-BridgeProp $Object "IsRootRole" $true) -or $BridgeBuiltInDerivedRoles -contains $name }
+        # Only the regular assignments of custom role groups and of
+        # applications: the others belong to Microsoft or to a role assignment
+        # policy (msexchangeonline_role_assignment_policy manages its roles).
+        "ManagementRoleAssignment" {
+            $delegation = [string](Get-BridgeProp $Object "RoleAssignmentDelegationType" "")
+            if ([bool](Get-BridgeProp $Object "Delegating" $false) -or ($delegation -and $delegation -ne "Regular")) { return $true }
+            $type = [string](Get-BridgeProp $Object "RoleAssigneeType" "")
+            if ($type -match "ServicePrincipal|Application") { return $false }
+            if ($type -ne "RoleGroup") { return $true }
+            $group = [string](Get-BridgeProp $Object "RoleAssigneeName" "")
+            if (-not $script:BridgeRoleGroupCache.ContainsKey($group)) {
+                $found = @(Invoke-BridgeRetry { Get-RoleGroup -Identity $group }) | Select-Object -First 1
+                $script:BridgeRoleGroupCache[$group] = if ($found) { Test-BridgeBuiltIn "RoleGroup" $found } else { $true }
+            }
+            $script:BridgeRoleGroupCache[$group]
+        }
+        default { $false }
+    }
+}
+
 # Get-BridgeProp reads a property that may be missing on some objects or module
 # versions; under StrictMode a direct access to it would throw.
 function Get-BridgeProp {

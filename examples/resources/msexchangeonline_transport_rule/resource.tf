@@ -32,3 +32,17 @@ resource "msexchangeonline_transport_rule" "quarantine_suspicious_subjects" {
 
   action = "Quarantine"
 }
+
+# Encrypt mail sent to a partner, with the default branding template
+resource "msexchangeonline_transport_rule" "encrypt_partner" {
+  name    = "Encrypt mail to Fabrikam"
+  enabled = true
+
+  # A branding template only applies to mail sent from inside the organization.
+  from_scope          = "InOrganization"
+  sent_to_scope       = "NotInOrganization"
+  recipient_domain_is = ["fabrikam.com"]
+
+  apply_rights_protection_template               = "Encrypt"
+  apply_rights_protection_customization_template = "OME Configuration"
+}

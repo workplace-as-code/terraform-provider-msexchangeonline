@@ -270,3 +270,35 @@ data "msexchangeonline_address_book_policy" "test" {
     }
   }
 }
+
+# ---------------------------------------------------------------------------
+# Hybrid: read-only objects of the Hybrid Configuration Wizard. The test tenant
+# is not hybrid: an administrator created TF-CI-OnPrem and TF-CI-IOC once, with
+# contoso values. test/run.sh sets test_hybrid when TF_VAR_test_hybrid is set.
+# ---------------------------------------------------------------------------
+
+variable "test_hybrid" {
+  description = "Read the TF-CI-OnPrem and TF-CI-IOC hybrid objects."
+  type        = bool
+  default     = false
+}
+
+data "msexchangeonline_onpremises_organization" "test" {
+  count = var.test_hybrid ? 1 : 0
+  name  = "TF-CI-OnPrem"
+}
+
+data "msexchangeonline_intra_organization_connector" "test" {
+  count = var.test_hybrid ? 1 : 0
+  name  = "TF-CI-IOC"
+}
+
+check "hybrid_objects" {
+  assert {
+    condition = !var.test_hybrid || (
+      length(one(data.msexchangeonline_onpremises_organization.test[*].hybrid_domains)) > 0 &&
+      one(data.msexchangeonline_intra_organization_connector.test[*].discovery_endpoint) != ""
+    )
+    error_message = "The hybrid test objects could not be read."
+  }
+}

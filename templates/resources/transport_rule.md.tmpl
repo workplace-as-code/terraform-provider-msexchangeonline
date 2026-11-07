@@ -15,6 +15,13 @@ description: |-
 
 {{ .SchemaMarkdown | trimspace }}
 
+## Message encryption
+
+`apply_rights_protection_template` encrypts the matching messages with Microsoft Purview Message
+Encryption (Microsoft 365 E3 or E5, Office 365 E3 or E5, or Azure Information Protection Plan 1).
+`apply_rights_protection_customization_template` chooses the branding of the encrypted message: the
+default template, `OME Configuration`, or a custom template (Advanced Message Encryption, E5).
+
 ## Permissions
 
 The provider's app registration needs the **Transport Rules** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
