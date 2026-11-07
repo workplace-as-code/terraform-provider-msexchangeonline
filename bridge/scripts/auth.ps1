@@ -7,6 +7,9 @@
 #     (EXCHANGE_BRIDGE_ACCESS_TOKEN);
 #   - a certificate: Windows store thumbprint, base64 content of a .pfx
 #     (EXCHANGE_BRIDGE_CERTIFICATE_BASE64), or .pfx file.
+# It also records in $global:BridgeGraph what Get-BridgeGraphToken (common.ps1)
+# needs for Microsoft Graph: the provider's Graph token
+# (EXCHANGE_BRIDGE_GRAPH_TOKEN), or the certificate to get one.
 # The app needs Exchange.ManageAsApp and the management roles of the provider's
 # role group (or Exchange Administrator).
 
@@ -82,6 +85,21 @@ $ErrorActionPreference = "Stop"
         [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::DefaultKeySet
     } else {
         [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    }
+
+    # Microsoft Graph credentials, recorded once per process. Global: this file
+    # runs in a child scope, and the persistent worker keeps the variable.
+    $global:BridgeGraph = @{
+        Token               = $env:EXCHANGE_BRIDGE_GRAPH_TOKEN
+        Environment         = $Environment
+        Organization        = $organization
+        ClientId            = $ClientId
+        Thumbprint          = $CertificateThumbprint
+        CertificateBase64   = $certificateBase64
+        CertificatePath     = $CertificatePath
+        CertificatePassword = $CertificatePassword
+        Flags               = $certFlags
+        App                 = $null
     }
 
     try {
