@@ -8,6 +8,7 @@ $ErrorActionPreference = "Stop"
 function global:Get-ConnectionInformation { [pscustomobject]@{ State = "Connected" } }
 $global:BridgeGraph = @{ Token = "gt-1"; Environment = "global" }
 $global:Forbidden = $false
+$global:NoRole = $false
 function Response([int]$Status, $Object) {
     [pscustomobject]@{ StatusCode = $Status; Content = (ConvertTo-Json -InputObject $Object -Depth 10 -Compress); Headers = @{} }
 }
@@ -19,10 +20,15 @@ function global:Invoke-WebRequest {
         return Response 200 @{ value = @(@{ tenantId = "AAAAAAAA-0000-0000-0000-000000000001" }); "@odata.nextLink" = "https://graph.microsoft.com/v1.0/policies/crossTenantAccessPolicy/partners?page=2" }
     }
     if ($u -like "*/partners[?]page=2") { return Response 200 @{ value = @(@{ tenantId = "bbbbbbbb-0000-0000-0000-000000000002" }) } }
+    if ($global:NoRole -and $u -like "*/m365Capabilities/*") { return Response 403 @{ error = @{ code = "forbidden"; message = "Your administrative role is not allowed to access the cross-tenant capability." } } }
+    if ($global:NoRole -and $u -like "*/m365Capabilities") { return Response 200 @{ value = @() } }
     if ($u -like "*aaaaaaaa-0000-0000-0000-000000000001/m365Capabilities") { return Response 200 @{ value = @(@{ name = "crossTenantMailTipsAll" }) } }
     if ($u -like "*bbbbbbbb-0000-0000-0000-000000000002/m365Capabilities") { return Response 200 @{ value = @(@{ name = "crossTenantOpenProfileCard" }) } }
     Response 404 @{ error = @{ code = "NotFound"; message = "unexpected $u" } }
 }
 "partners: " + (& $Script -Noun CrossTenantPartner 2>&1)
+$global:NoRole = $true
+& $Script -Noun CrossTenantPartner
+$global:NoRole = $false
 $global:Forbidden = $true
 & $Script -Noun CrossTenantPartner

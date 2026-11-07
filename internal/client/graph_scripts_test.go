@@ -51,6 +51,8 @@ func TestCrossTenantPartnerScript(t *testing.T) {
 		"CrossTenantPartner Get failed: The app needs the Microsoft Entra role Exchange Administrator to manage the "+
 			"cross-tenant capabilities of partner 11111111-2222-3333-4444-555555555555 (Graph 403 forbidden",
 	)
+	expectLines(t, out, "CrossTenantPartner Get failed: Microsoft Graph listed no Exchange capability for partner "+
+		"11111111-2222-3333-4444-555555555555, but crossTenantMailTipsAll exists: retry later")
 	// Both reads without the role (with and without capabilities in the state) fail.
 	if n := strings.Count(out, "CrossTenantPartner Get failed: The app needs the Microsoft Entra role"); n != 2 {
 		t.Errorf("%d role errors, want 2:\n%s", n, out)
@@ -71,5 +73,7 @@ func TestListCrossTenantPartners(t *testing.T) {
 	expectLines(t, out,
 		`partners: ["aaaaaaaa-0000-0000-0000-000000000001"]`,
 		"Listing cross-tenant partners needs the Microsoft Graph application permission Policy.Read.All",
+		// Without the Entra role every partner lists no capability: an error, not an empty list.
+		"Listing cross-tenant partners needs the Microsoft Entra role Exchange Administrator",
 	)
 }

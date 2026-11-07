@@ -369,6 +369,7 @@ func crossTenantPartnerFromAPI(ctx context.Context, prior crossTenantPartnerMode
 				values[s.attr] = types.SetNull(types.StringType)
 				continue
 			}
+			ids = foldIDs(priorByName[c.Name][s.attr], ids)
 			v, diags := types.SetValueFrom(ctx, types.StringType, ids)
 			if diags.HasError() {
 				return prior, fmt.Errorf("%s: %v", s.attr, diags)
@@ -388,4 +389,25 @@ func crossTenantPartnerFromAPI(ctx context.Context, prior crossTenantPartnerMode
 	id := strings.ToLower(a.PartnerTenantID)
 	m := crossTenantPartnerModel{ID: types.StringValue(id), PartnerTenantID: foldString(prior.PartnerTenantID, id), Capabilities: set}
 	return m, nil
+}
+
+// foldIDs returns ids with each one written as in prior when they differ only
+// by case: Graph returns object IDs in lowercase, and an ID configured in
+// uppercase must not show as a change.
+func foldIDs(prior attr.Value, ids []string) []string {
+	set, ok := prior.(types.Set)
+	if !ok || set.IsNull() || set.IsUnknown() {
+		return ids
+	}
+	out := make([]string, len(ids))
+	for i, id := range ids {
+		out[i] = id
+		for _, e := range set.Elements() {
+			if v, ok := e.(types.String); ok && strings.EqualFold(v.ValueString(), id) {
+				out[i] = v.ValueString()
+				break
+			}
+		}
+	}
+	return out
 }

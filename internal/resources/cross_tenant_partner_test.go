@@ -7,6 +7,7 @@ import (
 
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
+	"github.com/hashicorp/terraform-plugin-framework/tfsdk"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
 )
 
@@ -110,4 +111,39 @@ func TestCrossTenantPartnerFromAPI(t *testing.T) {
 		!strings.Contains(got, `"excluded_users":<null>`) {
 		t.Errorf("capabilities = %s", got)
 	}
+}
+
+// Object IDs written in uppercase (pasted from a portal export) come back from
+// Graph in lowercase: the state keeps the configured form, or every apply would
+// end in "inconsistent result after apply".
+func TestCrossTenantPartnerFromAPIKeepsConfiguredCase(t *testing.T) {
+	r := NewCrossTenantPartnerResource()
+	var sresp resource.SchemaResponse
+	r.Schema(context.Background(), resource.SchemaRequest{}, &sresp)
+	typ := sresp.Schema.Type().TerraformType(context.Background()).(tftypes.Object)
+	raw := tftypes.NewValue(typ, map[string]tftypes.Value{
+		"id":                tftypes.NewValue(tftypes.String, nil),
+		"partner_tenant_id": str("11111111-2222-3333-4444-555555555555"),
+		"capabilities": capabilities(capabilityValue("crossTenantMailTipsAll", true,
+			"AAAAAAAA-0000-0000-0000-000000000001")),
+	})
+	plan := tfsdkPlan(t, sresp.Schema, raw)
+	var prior crossTenantPartnerModel
+	if diags := plan.Get(context.Background(), &prior); diags.HasError() {
+		t.Fatal(diags)
+	}
+	m, err := crossTenantPartnerFromAPI(context.Background(), prior, []byte(
+		`{"PartnerTenantId":"11111111-2222-3333-4444-555555555555","Capabilities":[{"name":"crossTenantMailTipsAll",`+
+			`"allowed":true,"includedGroups":["aaaaaaaa-0000-0000-0000-000000000001"],"excludedGroups":[],"includedUsers":[],"excludedUsers":[]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !m.Capabilities.Equal(prior.Capabilities) {
+		t.Errorf("capabilities = %s, want the configured %s", m.Capabilities, prior.Capabilities)
+	}
+}
+
+func tfsdkPlan(t *testing.T, s schema.Schema, raw tftypes.Value) tfsdk.Plan {
+	t.Helper()
+	return tfsdk.Plan{Schema: s, Raw: raw}
 }

@@ -12,6 +12,7 @@ function global:Start-Sleep { param([int]$Seconds) }
 $partner = "11111111-2222-3333-4444-555555555555"
 $global:Caps = [ordered]@{}
 $global:RoleMissing = $false
+$global:ListHides = $false
 $global:Calls = [System.Collections.Generic.List[string]]::new()
 
 function Cap([string]$Name, [bool]$Allowed, [object[]]$Included, [object[]]$Excluded = @()) {
@@ -33,7 +34,7 @@ function global:Invoke-WebRequest {
     if ($global:RoleMissing -and ($name -or $Method -ne "GET")) { return Response 403 $denied }
     switch ($Method) {
         "GET" {
-            if (-not $name) { return Response 200 @{ value = @(if (-not $global:RoleMissing) { $global:Caps.Values }) } }
+            if (-not $name) { return Response 200 @{ value = @(if (-not $global:RoleMissing -and -not $global:ListHides) { $global:Caps.Values }) } }
             if ($global:Caps.Contains($name)) { return Response 200 $global:Caps[$name] }
             return Response 404 @{ error = @{ code = "NotFound"; message = "Capability $name not found." } }
         }
@@ -87,3 +88,7 @@ $global:Caps["crossTenantMailTipsAll"] = Cap crossTenantMailTipsAll $true @(Scop
 $global:RoleMissing = $true
 Invoke-Step "norole" Get $null @("crossTenantMailTipsAll")
 Invoke-Step "norole-import" Get
+# The list hides a capability that a read by name finds: not reliable, never "gone".
+$global:RoleMissing = $false
+$global:ListHides = $true
+Invoke-Step "hidden" Get $null @("crossTenantMailTipsAll")

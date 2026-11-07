@@ -57,14 +57,16 @@ function Get-PartnerCapabilities {
     @(@($list.value) | Where-Object { $ExchangeCapabilities -ccontains [string]$_.name })
 }
 
-# Test-PartnerRole fails unless a capability read by name answers (or 404):
-# without the Entra role, the list is empty and only a read by name says why.
+# Test-PartnerRole returns only when a capability read by name answers 404:
+# without the Entra role the list is empty and only a read by name says why
+# (403), and a capability found by name means the list cannot be trusted.
 function Test-PartnerRole([string[]]$Names) {
     $probe = @($Names | Where-Object { $_ }) + @($ExchangeCapabilities[0]) | Select-Object -First 1
     try { Invoke-PartnerGraph GET "$base/$probe" | Out-Null } catch {
         if ($_.Exception.Message -match '^Graph 404') { return }
         throw
     }
+    throw "Microsoft Graph listed no Exchange capability for partner $PartnerTenantId, but $probe exists: retry later"
 }
 
 # The "All" scope uses the resource type Graph stores for the capability.
