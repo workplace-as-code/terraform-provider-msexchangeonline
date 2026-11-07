@@ -43,7 +43,9 @@
 #   EXCHANGE_TEST_ENCRYPTION (any value) — also tests message encryption
 #                           (test/integration/encryption.tf): the encryption actions of
 #                           transport rules, the IRM configuration and the OME branding
-#                           templates; needs Purview Message Encryption (E5 for custom templates)
+#                           templates. Needs a tenant with Microsoft 365 E5, or E3 with the E5
+#                           Compliance add-on (custom branding templates); Business Basic and
+#                           Standard have no message encryption at all
 #   EXCHANGE_TEST_PRESET    (any value) — also tests the rules of the Standard preset security
 #                           policy, which must have been turned on once in the Defender portal;
 #                           they are adopted and turned off on destroy (the Defender part with
