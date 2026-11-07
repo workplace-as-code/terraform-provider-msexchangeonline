@@ -35,6 +35,41 @@ try {
                     if ($value) { "${listType}:$value" }
                 }
             }
+        } elseif ($Noun -eq "CrossTenantPartner") {
+            # Microsoft Graph: the partners of the cross-tenant access policy
+            # that have at least one Exchange capability.
+            $exchange = @(Get-BridgeExchangeCapabilities)
+            $partners = 0
+            $found = 0
+            $next = "/v1.0/policies/crossTenantAccessPolicy/partners?`$select=tenantId"
+            while ($next) {
+                $page = try { Invoke-BridgeGraph -Method GET -Path $next } catch {
+                    if ($_.Exception.Message -match '^Graph 403') {
+                        throw "Listing cross-tenant partners needs the Microsoft Graph application permission Policy.Read.All ($($_.Exception.Message))"
+                    }
+                    throw
+                }
+                foreach ($partner in @($page.value)) {
+                    $id = ([string]$partner.tenantId).ToLowerInvariant()
+                    $partners++
+                    $caps = Invoke-BridgeGraph -Method GET -Path "/v1.0/policies/crossTenantAccessPolicy/partners/$id/m365Capabilities"
+                    if (@(@($caps.value) | Where-Object { $exchange -ccontains [string]$_.name }).Count -gt 0) { $found++; $id }
+                }
+                $link = Get-BridgeProp $page '@odata.nextLink' ""
+                $next = if ($link) { ([uri]$link).PathAndQuery } else { "" }
+            }
+            # Without the Entra role Graph lists no capability for any partner:
+            # a read by name tells it from partners that really have none.
+            if ($partners -gt 0 -and $found -eq 0) {
+                try {
+                    Invoke-BridgeGraph -Method GET -Path "/v1.0/policies/crossTenantAccessPolicy/partners/$id/m365Capabilities/$($exchange[0])" | Out-Null
+                } catch {
+                    if ($_.Exception.Message -match '^Graph 403 .*administrative role') {
+                        throw "Listing cross-tenant partners needs the Microsoft Entra role Exchange Administrator ($($_.Exception.Message))"
+                    }
+                    if ($_.Exception.Message -notmatch '^Graph 404') { throw }
+                }
+            }
         } else {
             $cmdlet = Get-Command "Get-$Noun"
             # Some Get cmdlets return the first 1000 objects only by default.

@@ -102,6 +102,7 @@ var builtins = map[string]bool{
 	"New-SelfSignedCertificate": true, "Remove-PSSession": true, "Remove-Variable": true, "Remove-Item": true,
 	"Set-StrictMode": true, "Set-Variable": true, "Set-Content": true, "Set-CASMailbox": true,
 	"New-AcceptedDomain": true, "Remove-AcceptedDomain": true, "Add-Member": true,
+	"Add-Type": true, "Get-Module": true,
 }
 
 func bridgeCmdlets(t *testing.T) []string {

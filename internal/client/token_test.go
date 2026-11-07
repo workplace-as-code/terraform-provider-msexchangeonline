@@ -243,12 +243,15 @@ func TestManagedIdentityTokenSourceSystemAssigned(t *testing.T) {
 	if d := time.Until(token.ExpiresOn); d < imdsTokenLifetime-time.Minute || d > imdsTokenLifetime {
 		t.Errorf("token expires in %v, want the %v returned by IMDS", d, imdsTokenLifetime)
 	}
-	if len(transport.requests) != 1 {
-		t.Fatalf("%d requests, want 1", len(transport.requests))
+	// One request for Exchange Online, one for Microsoft Graph.
+	if len(transport.requests) != 2 {
+		t.Fatalf("%d requests, want 2", len(transport.requests))
 	}
-	u := transport.requests[0]
-	if u.Host != "169.254.169.254" || u.Query().Get("resource") != "https://outlook.office365.com" || u.Query().Has("client_id") {
-		t.Errorf("request = %s, want IMDS for Exchange Online without client_id", u)
+	for i, resource := range []string{"https://outlook.office365.com", "https://graph.microsoft.com"} {
+		u := transport.requests[i]
+		if u.Host != "169.254.169.254" || u.Query().Get("resource") != resource || u.Query().Has("client_id") {
+			t.Errorf("request %d = %s, want IMDS for %s without client_id", i, u, resource)
+		}
 	}
 }
 

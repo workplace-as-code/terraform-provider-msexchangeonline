@@ -112,6 +112,10 @@ Simpler, but broader: the app can run every Exchange Online cmdlet, including ma
 
 Role assignments can take up to 30 minutes to apply.
 
+### Microsoft 365 cross-tenant access policy
+
+[`msexchangeonline_cross_tenant_partner`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/cross_tenant_partner) calls Microsoft Graph instead of Exchange: the app needs the Microsoft Graph application permission `Policy.ReadWrite.CrossTenantCapability` (with admin consent) and the Microsoft Entra role **Exchange Administrator**, which Microsoft Graph requires for these capabilities, also to read them. Its list resource also needs `Policy.Read.All`.
+
 ## Step 3 — Give the App Its Credential
 
 Follow the guide of the method you chose:

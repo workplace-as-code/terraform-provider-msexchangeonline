@@ -367,3 +367,94 @@ function Invoke-BridgePresetRule {
         }
     }
 }
+
+# Microsoft Graph, for the Microsoft 365 cross-tenant access policy. auth.ps1
+# records in $global:BridgeGraph the token the provider obtained (OIDC, managed
+# identity) or what a certificate token needs; the first call builds an MSAL
+# client from the certificate, which then caches and renews the token.
+function Get-BridgeGraphToken {
+    $g = Get-Variable -Name BridgeGraph -Scope Global -ValueOnly -ErrorAction SilentlyContinue
+    if ($null -eq $g) { throw "Microsoft Graph: auth.ps1 recorded no credentials" }
+    if ($g.Environment -notin "global", "gcc") {
+        throw "Microsoft Graph cross-tenant access policy is only available in the global and gcc environments"
+    }
+    if ($g.Token) { return $g.Token }
+    if ($null -eq $g.App) {
+        $cert = if ($g.Thumbprint) {
+            $found = @(foreach ($store in "Cert:\CurrentUser\My", "Cert:\LocalMachine\My") {
+                Get-Item -Path (Join-Path $store $g.Thumbprint) -ErrorAction SilentlyContinue
+            })
+            if ($found.Count -eq 0) { throw "Microsoft Graph: certificate $($g.Thumbprint) not found in the certificate store" }
+            $found[0]
+        } elseif ($g.CertificateBase64) {
+            [System.Security.Cryptography.X509Certificates.X509Certificate2]::new(
+                [byte[]][Convert]::FromBase64String(($g.CertificateBase64 -replace '\s', '')), $g.CertificatePassword, $g.Flags)
+        } else {
+            [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($g.CertificatePath, $g.CertificatePassword, $g.Flags)
+        }
+        # MSAL ships with ExchangeOnlineManagement, which Connect-ExchangeOnline loads.
+        if (-not ('Microsoft.Identity.Client.ConfidentialClientApplicationBuilder' -as [type])) {
+            $module = Get-Module -ListAvailable ExchangeOnlineManagement | Sort-Object Version -Descending | Select-Object -First 1
+            Add-Type -Path (Join-Path $module.ModuleBase "netCore/Microsoft.Identity.Client.dll")
+        }
+        $g.App = [Microsoft.Identity.Client.ConfidentialClientApplicationBuilder]::Create($g.ClientId).
+            WithCertificate($cert).
+            WithAuthority("https://login.microsoftonline.com/$($g.Organization)").
+            Build()
+    }
+    $g.App.AcquireTokenForClient([string[]]@("https://graph.microsoft.com/.default")).ExecuteAsync().GetAwaiter().GetResult().AccessToken
+}
+
+# Get-BridgeExchangeCapabilities returns the Microsoft 365 cross-tenant
+# capabilities that msexchangeonline_cross_tenant_partner manages. The others
+# (profile card, Places, migration) are never read or changed.
+function Get-BridgeExchangeCapabilities {
+    @(
+        "crossTenantCalendarAvailabilityBasic", "crossTenantCalendarAvailabilityLimitedDetails",
+        "crossTenantMailTipsAll", "crossTenantMailTipsLimited",
+        "crossTenantCalendarSharingFreeBusySimple", "crossTenantCalendarSharingFreeBusyDetail",
+        "crossTenantCalendarSharingFreeBusyReviewer"
+    )
+}
+
+# Invoke-BridgeGraph calls Microsoft Graph and returns the parsed JSON ($null
+# for 204). Throttling (429) and transient server errors are retried, after
+# Retry-After when Graph sends it; any other error throws
+# "Graph <status> <code>: <message>".
+function Invoke-BridgeGraph {
+    param(
+        [Parameter(Mandatory)] [ValidateSet("GET", "POST", "PATCH", "DELETE")] [string]$Method,
+        [Parameter(Mandatory)] [string]$Path,
+        $Body = $null,
+        [int]$MaxAttempts = 4
+    )
+    for ($attempt = 1; ; $attempt++) {
+        $request = @{
+            Method             = $Method
+            Uri                = "https://graph.microsoft.com$Path"
+            Headers            = @{ Authorization = "Bearer $(Get-BridgeGraphToken)" }
+            ContentType        = "application/json"
+            SkipHttpErrorCheck = $true
+        }
+        if ($null -ne $Body) { $request.Body = ConvertTo-Json -InputObject $Body -Depth 10 -Compress }
+        $response = Invoke-WebRequest @request
+        $status = [int]$response.StatusCode
+        if ($status -lt 300) {
+            if ("$($response.Content)") { return ($response.Content | ConvertFrom-Json) }
+            return $null
+        }
+        if ($status -in 429, 500, 502, 503, 504 -and $attempt -lt $MaxAttempts) {
+            $wait = 5 * $attempt
+            $retryAfter = @($response.Headers["Retry-After"]) | Select-Object -First 1
+            if ("$retryAfter" -match '^\d+$') { $wait = [int]$retryAfter }
+            Start-Sleep -Seconds $wait
+            continue
+        }
+        $code, $message = "", "$($response.Content)"
+        try {
+            $e = ($response.Content | ConvertFrom-Json).error
+            $code, $message = "$($e.code)", "$($e.message)"
+        } catch { }
+        throw "Graph $status ${code}: $message"
+    }
+}

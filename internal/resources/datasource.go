@@ -30,6 +30,7 @@ import (
 var dataSourceResources = []dataSourceResource{
 	{NewAntiPhishPolicyResource, "name", ""},
 	{NewAntiPhishRuleResource, "name", ""},
+	{NewCrossTenantPartnerResource, "partner_tenant_id", ""},
 	{NewDkimSigningConfigResource, "domain_name", ""},
 	{NewEmailAddressPolicyResource, "name", ""},
 	{NewHostedContentFilterPolicyResource, "name", ""},
@@ -157,6 +158,21 @@ func dataSourceAttribute(key bool, a schema.Attribute) (dsschema.Attribute, erro
 		return dsschema.ListAttribute{Computed: true, ElementType: a.ElementType, Sensitive: a.Sensitive, MarkdownDescription: desc}, nil
 	case schema.SetAttribute:
 		return dsschema.SetAttribute{Computed: true, ElementType: a.ElementType, Sensitive: a.Sensitive, MarkdownDescription: desc}, nil
+	case schema.SetNestedAttribute:
+		// Each nested attribute becomes computed too (cross_tenant_partner capabilities).
+		nested := make(map[string]dsschema.Attribute, len(a.NestedObject.Attributes))
+		for name, sub := range a.NestedObject.Attributes {
+			converted, err := dataSourceAttribute(false, sub)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", name, err)
+			}
+			nested[name] = converted
+		}
+		return dsschema.SetNestedAttribute{
+			Computed:            true,
+			MarkdownDescription: desc,
+			NestedObject:        dsschema.NestedAttributeObject{Attributes: nested},
+		}, nil
 	}
 	return nil, fmt.Errorf("%T has no data source equivalent", a)
 }

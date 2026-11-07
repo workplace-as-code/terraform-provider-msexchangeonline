@@ -34,6 +34,9 @@ const (
 	// EnvBridgeAccessToken carries the Exchange Online access token obtained
 	// with OIDC: auth.ps1 then connects with it instead of a certificate.
 	EnvBridgeAccessToken = "EXCHANGE_BRIDGE_ACCESS_TOKEN"
+	// EnvBridgeGraphToken carries the Microsoft Graph access token obtained
+	// with OIDC or a managed identity, for the cross-tenant access policy.
+	EnvBridgeGraphToken = "EXCHANGE_BRIDGE_GRAPH_TOKEN"
 )
 
 // envBridgePrefix is the prefix of the variables the client sets for the
@@ -323,6 +326,9 @@ func (c *Client) buildEnv(ctx context.Context) ([]string, time.Time, error) {
 			return nil, time.Time{}, err
 		}
 		env = append(env, EnvBridgeAccessToken+"="+token.Value)
+		if token.Graph != "" {
+			env = append(env, EnvBridgeGraphToken+"="+token.Graph)
+		}
 		expiresOn = token.ExpiresOn
 	}
 	return env, expiresOn, nil

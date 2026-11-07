@@ -41,6 +41,7 @@ func registrations() []registration {
 		// list.ps1 lists the four lists and returns "<list_type>:<value>".
 		{NewTenantAllowBlockListItemResource, listQuery{noun: "TenantAllowBlockListItems"}},
 		{NewApplicationAccessPolicyResource, listQuery{noun: "ApplicationAccessPolicy"}},
+		{NewCrossTenantPartnerResource, listQuery{noun: "CrossTenantPartner"}},
 		// Exchange names a rule "<query string> (<characteristic>)": the import ID.
 		{NewActiveSyncDeviceAccessRuleResource, listQuery{noun: "ActiveSyncDeviceAccessRule", property: "Name"}},
 		// list.ps1 skips the built-in (root) roles.
