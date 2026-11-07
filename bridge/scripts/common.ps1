@@ -405,6 +405,18 @@ function Get-BridgeGraphToken {
     $g.App.AcquireTokenForClient([string[]]@("https://graph.microsoft.com/.default")).ExecuteAsync().GetAwaiter().GetResult().AccessToken
 }
 
+# Get-BridgeExchangeCapabilities returns the Microsoft 365 cross-tenant
+# capabilities that msexchangeonline_cross_tenant_partner manages. The others
+# (profile card, Places, migration) are never read or changed.
+function Get-BridgeExchangeCapabilities {
+    @(
+        "crossTenantCalendarAvailabilityBasic", "crossTenantCalendarAvailabilityLimitedDetails",
+        "crossTenantMailTipsAll", "crossTenantMailTipsLimited",
+        "crossTenantCalendarSharingFreeBusySimple", "crossTenantCalendarSharingFreeBusyDetail",
+        "crossTenantCalendarSharingFreeBusyReviewer"
+    )
+}
+
 # Invoke-BridgeGraph calls Microsoft Graph and returns the parsed JSON ($null
 # for 204). Throttling (429) and transient server errors are retried, after
 # Retry-After when Graph sends it; any other error throws

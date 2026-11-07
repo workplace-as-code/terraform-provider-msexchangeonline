@@ -35,6 +35,26 @@ try {
                     if ($value) { "${listType}:$value" }
                 }
             }
+        } elseif ($Noun -eq "CrossTenantPartner") {
+            # Microsoft Graph: the partners of the cross-tenant access policy
+            # that have at least one Exchange capability.
+            $exchange = @(Get-BridgeExchangeCapabilities)
+            $next = "/v1.0/policies/crossTenantAccessPolicy/partners?`$select=tenantId"
+            while ($next) {
+                $page = try { Invoke-BridgeGraph -Method GET -Path $next } catch {
+                    if ($_.Exception.Message -match '^Graph 403') {
+                        throw "Listing cross-tenant partners needs the Microsoft Graph application permission Policy.Read.All ($($_.Exception.Message))"
+                    }
+                    throw
+                }
+                foreach ($partner in @($page.value)) {
+                    $id = ([string]$partner.tenantId).ToLowerInvariant()
+                    $caps = Invoke-BridgeGraph -Method GET -Path "/v1.0/policies/crossTenantAccessPolicy/partners/$id/m365Capabilities"
+                    if (@(@($caps.value) | Where-Object { $exchange -ccontains [string]$_.name }).Count -gt 0) { $id }
+                }
+                $link = Get-BridgeProp $page '@odata.nextLink' ""
+                $next = if ($link) { ([uri]$link).PathAndQuery } else { "" }
+            }
         } else {
             $cmdlet = Get-Command "Get-$Noun"
             # Some Get cmdlets return the first 1000 objects only by default.

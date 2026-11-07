@@ -62,3 +62,14 @@ func TestCrossTenantPartnerScript(t *testing.T) {
 		}
 	}
 }
+
+// TestListCrossTenantPartners guards list.ps1 for cross_tenant_partner: only
+// partners with an Exchange capability are listed (in lowercase, all result
+// pages), and without Policy.Read.All the error names the permission.
+func TestListCrossTenantPartners(t *testing.T) {
+	out := runStub(t, "list_cross_tenant.ps1", "list.ps1")
+	expectLines(t, out,
+		`partners: ["aaaaaaaa-0000-0000-0000-000000000001"]`,
+		"Listing cross-tenant partners needs the Microsoft Graph application permission Policy.Read.All",
+	)
+}

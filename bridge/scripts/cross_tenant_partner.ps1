@@ -36,12 +36,7 @@ $ErrorActionPreference = "Stop"
 . "$PSScriptRoot/auth.ps1" -TenantId $TenantId -ClientId $ClientId -CertificatePath $CertificatePath -CertificatePassword $CertificatePassword -CertificateThumbprint $CertificateThumbprint -Environment $Environment
 . "$PSScriptRoot/common.ps1"
 
-$ExchangeCapabilities = @(
-    "crossTenantCalendarAvailabilityBasic", "crossTenantCalendarAvailabilityLimitedDetails",
-    "crossTenantMailTipsAll", "crossTenantMailTipsLimited",
-    "crossTenantCalendarSharingFreeBusySimple", "crossTenantCalendarSharingFreeBusyDetail",
-    "crossTenantCalendarSharingFreeBusyReviewer"
-)
+$ExchangeCapabilities = @(Get-BridgeExchangeCapabilities)
 $base = "/v1.0/policies/crossTenantAccessPolicy/partners/$($PartnerTenantId.ToLowerInvariant())/m365Capabilities"
 
 # Invoke-PartnerGraph adds what to fix when Graph refuses for want of the role.
