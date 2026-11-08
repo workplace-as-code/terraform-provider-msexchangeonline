@@ -32,6 +32,14 @@
 #   EXCHANGE_TEST_DEFENDER  (any value) — also tests the Defender for Office 365 resources
 #                           (test/integration/defender.tf): Safe Links, Safe Attachments and
 #                           the anti-phishing settings that need a Defender license
+#   TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id — test an application access
+#                           policy: a mail-enabled security group and the client ID of an app
+#   TF_VAR_test_partner_tenant_id and TF_VAR_cross_tenant_app_client_id — test the
+#                           cross-tenant access policy of a partner tenant (the test leaves it
+#                           without Exchange capability), through a second app that has the Entra
+#                           role Exchange Administrator: TF_VAR_cross_tenant_app_certificate_path
+#                           and TF_VAR_cross_tenant_app_certificate_password are its certificate,
+#                           TF_VAR_test_group_object_id (optional) a group to limit MailTips to
 #   TF_VAR_test_hybrid=true — also reads the hybrid data sources: an administrator
 #                           creates TF-CI-OnPrem (New-OnPremisesOrganization) and TF-CI-IOC
 #                           (New-IntraOrganizationConnector) once, with contoso values

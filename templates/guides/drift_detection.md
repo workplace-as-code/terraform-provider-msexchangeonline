@@ -53,30 +53,19 @@ jobs:
           Install-PSResource -Name ExchangeOnlineManagement -Scope CurrentUser `
             -TrustRepository -Quiet
 
-      - name: Write the certificate
-        env:
-          PFX_B64: ${{ secrets.EXCHANGE_CERTIFICATE_PFX_B64 }}
-        run: |
-          umask 077
-          echo "$PFX_B64" | base64 -d > "$RUNNER_TEMP/exchange.pfx"
-
       - name: Plan
         env:
           EXCHANGE_TENANT_ID: ${{ secrets.EXCHANGE_TENANT_ID }}
           EXCHANGE_CLIENT_ID: ${{ secrets.EXCHANGE_CLIENT_ID }}
-          EXCHANGE_CERTIFICATE_PATH: ${{ runner.temp }}/exchange.pfx
+          EXCHANGE_CERTIFICATE_BASE64: ${{ secrets.EXCHANGE_CERTIFICATE_BASE64 }}
           EXCHANGE_CERTIFICATE_PASSWORD: ${{ secrets.EXCHANGE_CERTIFICATE_PASSWORD }}
           # Add the credentials of your state backend here.
         run: |
           terraform init -input=false
           terraform plan -detailed-exitcode -input=false -no-color
-
-      - name: Remove the certificate
-        if: always()
-        run: rm -f "$RUNNER_TEMP/exchange.pfx"
 ```
 
-Store the certificate as a base64 secret (`base64 -i certificate.pfx`), never in the repository. In production, pin the actions to a commit SHA instead of a tag.
+Store the certificate as a base64 secret (`base64 -i certificate.pfx`), never in the repository: the provider decodes it in memory and writes no file. In production, pin the actions to a commit SHA instead of a tag.
 
 ## GitLab CI
 
@@ -88,19 +77,13 @@ drift:
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
   resource_group: exchange-tenant # never at the same time as an apply
-  variables:
-    EXCHANGE_CERTIFICATE_PATH: "/tmp/exchange-${CI_JOB_ID}.pfx"
   before_script:
-    - umask 077
-    - echo "$EXCHANGE_CERTIFICATE_PFX_B64" | base64 -d > "$EXCHANGE_CERTIFICATE_PATH"
     - terraform init -input=false
   script:
     - terraform plan -detailed-exitcode -input=false
-  after_script:
-    - rm -f "$EXCHANGE_CERTIFICATE_PATH"
 ```
 
-`EXCHANGE_TENANT_ID`, `EXCHANGE_CLIENT_ID`, `EXCHANGE_CERTIFICATE_PASSWORD` and `EXCHANGE_CERTIFICATE_PFX_B64` are CI/CD variables of the project (masked; protected if only protected branches run this job). With the GitLab-managed Terraform state, the `TF_HTTP_*` variables of your pipeline configure the backend.
+`EXCHANGE_TENANT_ID`, `EXCHANGE_CLIENT_ID`, `EXCHANGE_CERTIFICATE_PASSWORD` and `EXCHANGE_CERTIFICATE_BASE64` are CI/CD variables of the project (masked; protected if only protected branches run this job). With the GitLab-managed Terraform state, the `TF_HTTP_*` variables of your pipeline configure the backend.
 
 Then create the schedule in **Build > Pipeline schedules**, for example with the interval `0 5 * * 1-5` on the default branch, and run it once with the play button to check it.
 

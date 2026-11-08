@@ -24,7 +24,7 @@ terraform {
   required_providers {
     msexchangeonline = {
       source  = "workplace-as-code/msexchangeonline"
-      version = "~> 0.1"
+      version = "~> 0.6"
     }
   }
 }
@@ -104,8 +104,8 @@ Before each release, the integration tests create, update, import and destroy ev
 
 | Provider | Terraform | PowerShell | ExchangeOnlineManagement module | Operating system |
 |---|---|---|---|---|
-| 0.1.1 | 1.17.0 | 7.6.8 | 3.10.1 | Linux (Debian 13) |
+| 0.6.1 | 1.17.0 | 7.6.8 | 3.10.1 | Linux (Debian 13) |
 
-The Defender for Office 365 resources were tested on GitHub Actions (Ubuntu 24.04, ExchangeOnlineManagement 3.10.1), on a tenant licensed for Defender for Office 365 Plan 1.
+The run includes the optional tests: Defender for Office 365 (Plan 1 license), message encryption (Microsoft 365 E5), Exchange RBAC, the hybrid data sources and the cross-tenant partner.
 
 Other versions that meet the requirements (Terraform 1.5 or later, PowerShell 7 or later, ExchangeOnlineManagement 3 or later) should work but are not tested. `terraform query` needs Terraform 1.14 or later.

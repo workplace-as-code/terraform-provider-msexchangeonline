@@ -22,6 +22,7 @@ See the [Authentication guide](https://registry.terraform.io/providers/workplace
 | [`msexchangeonline_outbound_connector`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/outbound_connector) |  |
 | [`msexchangeonline_transport_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/transport_config) | Singleton: SMTP AUTH, reply-all storm protection, ... |
 | [`msexchangeonline_dkim_signing_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/dkim_signing_config) | Needs a custom domain and its DNS records (not covered by the integration tests) |
+| [`msexchangeonline_journal_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/journal_rule) | Needs `journaling_report_ndr_to` on `msexchangeonline_transport_config` first |
 
 ## Anti-spam, anti-malware and anti-phishing (Exchange Online Protection)
 
@@ -39,6 +40,7 @@ See the [Authentication guide](https://registry.terraform.io/providers/workplace
 | [`msexchangeonline_anti_phish_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_rule) |  |
 | [`msexchangeonline_quarantine_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/quarantine_policy) |  |
 | [`msexchangeonline_external_in_outlook`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/external_in_outlook) | Singleton: the External tag in Outlook |
+| [`msexchangeonline_eop_protection_policy_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/eop_protection_policy_rule) | Adopted: who the Exchange Online Protection part of the Standard or Strict preset security policy protects |
 
 New Exchange Online tenants must be customized once before custom policies can be created: an Exchange administrator runs `Enable-OrganizationCustomization`. The provider reports it when it is needed.
 
@@ -50,6 +52,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_safe_links_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/safe_links_rule) | Needs Defender for Office 365 |
 | [`msexchangeonline_safe_attachment_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/safe_attachment_policy) | Needs Defender for Office 365 |
 | [`msexchangeonline_safe_attachment_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/safe_attachment_rule) | Needs Defender for Office 365 |
+| [`msexchangeonline_atp_protection_policy_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/atp_protection_policy_rule) | Adopted: who the Defender part of the Standard or Strict preset security policy protects |
 
 ## Clients, devices and organization
 
@@ -66,6 +69,7 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_application_access_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/application_access_policy) | Limits the mailboxes a Microsoft Graph app can access |
 | [`msexchangeonline_sharing_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/sharing_policy) | Calendar and contact sharing with external domains |
 | [`msexchangeonline_organization_relationship`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/organization_relationship) | Free/busy, MailTips and photos with another organization |
+| [`msexchangeonline_cross_tenant_partner`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/cross_tenant_partner) | Free/busy, MailTips and calendar sharing with a partner tenant, through Microsoft Graph: needs the Entra role Exchange Administrator (global and gcc only) |
 | [`msexchangeonline_mailbox_plan`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/mailbox_plan) | Adopted: size limits of new mailboxes, per license |
 | [`msexchangeonline_cas_mailbox_plan`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/cas_mailbox_plan) | Adopted: client protocols of new mailboxes, per license |
 | [`msexchangeonline_admin_audit_log_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/admin_audit_log_config) | Singleton: unified audit log on or off |
@@ -74,18 +78,42 @@ New Exchange Online tenants must be customized once before custom policies can b
 | [`msexchangeonline_offline_address_book`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/offline_address_book) | Offline address book of an address book policy |
 | [`msexchangeonline_address_book_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/address_book_policy) | Assigning it to mailboxes is not managed |
 
+## Message encryption (Microsoft Purview)
+
+| Resource | Notes |
+|---|---|
+| [`msexchangeonline_irm_configuration`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/irm_configuration) | Singleton: Microsoft Purview Message Encryption and IRM decryption settings; needs a license with Microsoft Purview Message Encryption, such as Microsoft 365 E3 or E5 |
+| [`msexchangeonline_ome_configuration`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/ome_configuration) | Branding templates: the default one is adopted; custom templates need Advanced Message Encryption (Microsoft 365 E5 or the add-on) |
+
+## Exchange RBAC
+
+These resources need the **Role Management** role, which lets the app grant itself any other role: see the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+| Resource | Notes |
+|---|---|
+| [`msexchangeonline_management_scope`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/management_scope) | Recipients a role assignment can change, selected by an OPATH filter |
+| [`msexchangeonline_role_group`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/role_group) | Custom role groups; members are not managed |
+| [`msexchangeonline_management_role`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/management_role) | Custom roles: a built-in role with fewer cmdlets or parameters |
+| [`msexchangeonline_management_role_assignment`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/management_role_assignment) | Gives a role to a role group or an application, optionally within a scope |
+| [`msexchangeonline_role_assignment_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/role_assignment_policy) | End-user roles; assigning the policy to mailboxes is not managed |
+| [`msexchangeonline_service_principal`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/service_principal) | Registers a Microsoft Entra application for RBAC for Applications |
+
 ## Data sources
 
-| Data source |
-|---|
-| [`msexchangeonline_accepted_domain`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/accepted_domain) |
-| [`msexchangeonline_accepted_domains`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/accepted_domains) |
-| [`msexchangeonline_mailbox`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/mailbox) |
-| [`msexchangeonline_organization_config`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/organization_config) |
+Every resource has a data source of the same name, which reads an object without managing it, except `msexchangeonline_activesync_device_access_rule`, `msexchangeonline_activesync_organization_settings`, `msexchangeonline_admin_audit_log_config`, `msexchangeonline_application_access_policy`, `msexchangeonline_external_in_outlook`, `msexchangeonline_hosted_connection_filter_policy`, `msexchangeonline_irm_configuration`, `msexchangeonline_management_role`, `msexchangeonline_management_role_assignment`, `msexchangeonline_tenant_allow_block_list_item` and `msexchangeonline_transport_config`.
+
+These data sources have no resource:
+
+| Data source | Notes |
+|---|---|
+| [`msexchangeonline_accepted_domains`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/accepted_domains) | Every accepted domain of the tenant |
+| [`msexchangeonline_mailbox`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/mailbox) | One mailbox, read only |
+| [`msexchangeonline_onpremises_organization`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/onpremises_organization) | Hybrid: the on-premises organization known to Exchange Online |
+| [`msexchangeonline_intra_organization_connector`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/intra_organization_connector) | Hybrid: the OAuth connector to Exchange Server |
 
 ## Singletons
 
-Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
+Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`, `irm_configuration`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
 
 ```terraform
 import {

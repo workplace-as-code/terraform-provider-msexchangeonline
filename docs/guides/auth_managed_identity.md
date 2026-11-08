@@ -142,7 +142,7 @@ Follow step 2 of the [Authentication guide](https://registry.terraform.io/provid
 
 For `terraform plan` and drift detection, a separate identity with the **View-Only Organization Management** role group is enough: see the read and write split in the Authentication guide.
 
-Role assignments can take up to 30 minutes to apply.
+Exchange can take several hours to apply a role assignment, and longer to apply a removal.
 
 **Grant the permissions before Terraform first runs on the machine.** Azure caches the tokens of a managed identity for about 24 hours and cannot be forced to renew them: a token obtained before the roles applied keeps lacking them for up to a day. After granting the roles, wait about 10 minutes, then check the token from the machine itself. This prints the token's claims, never the token:
 
