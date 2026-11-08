@@ -2,7 +2,7 @@ terraform {
   required_providers {
     msexchangeonline = {
       source  = "workplace-as-code/msexchangeonline"
-      version = "~> 0.1"
+      version = "~> 0.6"
     }
   }
 }

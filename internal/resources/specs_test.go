@@ -3,6 +3,7 @@ package resources
 import (
 	"context"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -143,6 +144,22 @@ func TestFromAPIKeepsTheConfiguredFilter(t *testing.T) {
 		state, _ = r.fromAPI(prior, output, recorded)
 		if got := state.Attributes()["recipient_filter"].(types.String).ValueString(); got != rewritten {
 			t.Errorf("recipient_filter = %q, want Exchange's text", got)
+		}
+	}
+}
+
+// TestAdoptedNameDescription: renaming an adopted object (a mailbox plan)
+// adopts another one; nothing is created.
+func TestAdoptedNameDescription(t *testing.T) {
+	for _, spec := range objectSpecs {
+		if !spec.adopted {
+			continue
+		}
+		var resp resource.SchemaResponse
+		(&objectResource{spec: spec}).Schema(context.Background(), resource.SchemaRequest{}, &resp)
+		desc := resp.Schema.Attributes["name"].GetMarkdownDescription()
+		if strings.Contains(desc, "creates a new object") || !strings.Contains(desc, "adopts another object") {
+			t.Errorf("%s: name description %q", spec.typeName, desc)
 		}
 	}
 }

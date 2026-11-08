@@ -127,7 +127,22 @@ try {
             if ($current.Count -gt 0) {
                 throw "Partner $PartnerTenantId already has Exchange capabilities ($((@($current | ForEach-Object { $_.name }) | Sort-Object) -join ', ')): import it"
             }
-            foreach ($d in $desired) { Invoke-PartnerGraph POST $base (ConvertTo-PartnerBody $d) | Out-Null }
+            try {
+                foreach ($d in $desired) { Invoke-PartnerGraph POST $base (ConvertTo-PartnerBody $d) | Out-Null }
+            } catch {
+                # Remove what this create added, so that the next apply creates
+                # the partner again instead of asking for an import. Every
+                # wanted capability is removed by name: the partner had none,
+                # and a POST that got no answer may have created one.
+                $failure = $_.Exception.Message
+                $left = @(foreach ($d in $desired) {
+                    try { Invoke-PartnerGraph DELETE "$base/$($d.name)" | Out-Null } catch {
+                        if ($_.Exception.Message -notmatch '^Graph 404') { [string]$d.name }
+                    }
+                })
+                if ($left.Count -gt 0) { $failure += " (could not remove $($left -join ', '): import the partner)" }
+                throw $failure
+            }
             Write-PartnerState @(Get-PartnerCapabilities)
         }
         "Update" {

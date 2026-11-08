@@ -31,7 +31,7 @@ function ConvertTo-PolicyJson { param($pol)
     @{
         Identity                      = [string]$pol.Identity
         Name                          = [string]$pol.Name
-        EnabledEmailAddressTemplates  = if ($pol.EnabledEmailAddressTemplates) { [string[]]@($pol.EnabledEmailAddressTemplates | ForEach-Object { $_.ToString() }) } else { @() }
+        EnabledEmailAddressTemplates  = @(if ($pol.EnabledEmailAddressTemplates) { [string[]]@($pol.EnabledEmailAddressTemplates | ForEach-Object { $_.ToString() }) })
         # The default policy always comes last: its priority is "Lowest".
         Priority                      = if ([string]$pol.Priority -eq "Lowest") { 0 } else { [int][string]$pol.Priority }
     } | ConvertTo-Json -Compress

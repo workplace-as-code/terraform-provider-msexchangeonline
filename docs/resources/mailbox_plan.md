@@ -26,7 +26,7 @@ resource "msexchangeonline_mailbox_plan" "enterprise" {
 
 ### Required
 
-- `name` (String) The name. Changing it creates a new object.
+- `name` (String) The name of the existing object. Changing it adopts another object and leaves this one as it is.
 
 ### Optional
 

@@ -1,6 +1,6 @@
 # Terraform Provider for Microsoft Exchange Online
 
-Manage Exchange Online configuration as code with Terraform: mail flow, anti-spam, anti-phishing, anti-malware, Defender for Office 365, client access policies and organization settings.
+Manage Exchange Online configuration as code with Terraform: mail flow, anti-spam, anti-phishing, anti-malware, Defender for Office 365, message encryption, Exchange RBAC, client access policies and organization settings.
 
 [![CI](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/actions/workflows/ci.yml)
 [![Terraform Registry](https://img.shields.io/github/v/release/workplace-as-code/terraform-provider-msexchangeonline?label=registry&logo=terraform&color=7B42BC)](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest)
@@ -27,7 +27,7 @@ terraform {
   required_providers {
     msexchangeonline = {
       source  = "workplace-as-code/msexchangeonline"
-      version = "~> 0.1"
+      version = "~> 0.6"
     }
   }
 }
@@ -73,20 +73,22 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 
 | Area | Resources |
 |---|---|
-| Mail flow | `msexchangeonline_transport_rule`, `msexchangeonline_accepted_domain`, `msexchangeonline_remote_domain`, `msexchangeonline_inbound_connector`, `msexchangeonline_outbound_connector`, `msexchangeonline_transport_config`, `msexchangeonline_dkim_signing_config` |
+| Mail flow | `msexchangeonline_transport_rule`, `msexchangeonline_accepted_domain`, `msexchangeonline_remote_domain`, `msexchangeonline_inbound_connector`, `msexchangeonline_outbound_connector`, `msexchangeonline_transport_config`, `msexchangeonline_dkim_signing_config`, `msexchangeonline_journal_rule` |
 | Anti-spam | `msexchangeonline_hosted_connection_filter_policy`, `msexchangeonline_tenant_allow_block_list_item`, `msexchangeonline_hosted_content_filter_policy`, `msexchangeonline_hosted_content_filter_rule`, `msexchangeonline_outbound_spam_filter_policy`, `msexchangeonline_hosted_outbound_spam_filter_rule`, `msexchangeonline_quarantine_policy` |
 | Anti-malware and anti-phishing | `msexchangeonline_malware_filter_policy`, `msexchangeonline_malware_filter_rule`, `msexchangeonline_anti_phish_policy`, `msexchangeonline_anti_phish_rule`, `msexchangeonline_external_in_outlook` |
 | Defender for Office 365 | `msexchangeonline_safe_links_policy`, `msexchangeonline_safe_links_rule`, `msexchangeonline_safe_attachment_policy`, `msexchangeonline_safe_attachment_rule` |
+| Preset security policies | `msexchangeonline_eop_protection_policy_rule`, `msexchangeonline_atp_protection_policy_rule` |
 | Clients and devices | `msexchangeonline_owa_mailbox_policy`, `msexchangeonline_mobile_device_mailbox_policy`, `msexchangeonline_activesync_organization_settings`, `msexchangeonline_activesync_device_access_rule`, `msexchangeonline_cas_mailbox_plan` |
 | Organization | `msexchangeonline_organization_config`, `msexchangeonline_email_address_policy`, `msexchangeonline_retention_policy`, `msexchangeonline_retention_policy_tag`, `msexchangeonline_application_access_policy`, `msexchangeonline_admin_audit_log_config`, `msexchangeonline_sharing_policy`, `msexchangeonline_organization_relationship`, `msexchangeonline_cross_tenant_partner`, `msexchangeonline_mailbox_plan` |
 | Address book | `msexchangeonline_address_list`, `msexchangeonline_global_address_list`, `msexchangeonline_offline_address_book`, `msexchangeonline_address_book_policy` |
+| Message encryption | `msexchangeonline_irm_configuration`, `msexchangeonline_ome_configuration` |
+| Exchange RBAC | `msexchangeonline_management_scope`, `msexchangeonline_role_group`, `msexchangeonline_management_role`, `msexchangeonline_management_role_assignment`, `msexchangeonline_role_assignment_policy`, `msexchangeonline_service_principal` |
 
-Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Two more read the tenant: `msexchangeonline_accepted_domains` and `msexchangeonline_mailbox`. Full reference in [docs/data-sources](docs/data-sources/).
+Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Four more read the tenant: `msexchangeonline_accepted_domains`, `msexchangeonline_mailbox`, and for hybrid deployments `msexchangeonline_onpremises_organization` and `msexchangeonline_intra_organization_connector`. Full reference in [docs/data-sources](docs/data-sources/).
 
-### Related providers
+### Related provider
 
 - [workplace-as-code/msexchangeserver](https://github.com/workplace-as-code/terraform-provider-msexchangeserver): Exchange Server (on-premises) configuration.
-- [workplace-as-code/msteams](https://github.com/workplace-as-code/terraform-provider-msteams): Microsoft Teams policies and tenant settings, built on the same PowerShell bridge.
 
 ---
 
@@ -96,7 +98,8 @@ Most resources also exist as a data source, to read an object without managing i
 - Terraform >= 1.5
 - PowerShell 7+ (`pwsh`) with the ExchangeOnlineManagement v3 module (3.1.0 or later for OIDC)
 - An Entra ID app registration with the `Exchange.ManageAsApp` permission. [`tools/new_role_group.ps1`](tools/new_role_group.ps1) grants it only the Exchange roles the provider needs (see the [Authentication guide](docs/guides/authentication.md))
-- A way to authenticate as that app: a certificate (`.pfx` file, base64 content or Windows certificate store), or OIDC from GitHub Actions or another platform with a public OIDC issuer, with no stored secret
+- A way to authenticate as that app: a certificate (`.pfx` file, base64 content or Windows certificate store), or OIDC from GitHub Actions or another platform with a public OIDC issuer, with no stored secret. On an Azure VM or an Azure Arc-enabled server, a managed identity replaces the app registration
+- For `msexchangeonline_cross_tenant_partner` only: the Microsoft Graph permission `Policy.ReadWrite.CrossTenantCapability` and the Microsoft Entra role Exchange Administrator
 
 The PowerShell bridge scripts are embedded in the provider binary: nothing else needs to be installed. The provider keeps a few PowerShell processes open during a run, so the Exchange connection is opened once per process instead of once per resource (see [Performance tuning](#performance-tuning)).
 
@@ -115,7 +118,7 @@ The PowerShell bridge scripts are embedded in the provider binary: nothing else 
 ## Documentation
 
 - [Getting Started](docs/guides/getting_started.md)
-- [Authentication](docs/guides/authentication.md): [certificate](docs/guides/auth_client_certificate.md), [OIDC with GitHub Actions](docs/guides/auth_oidc_github.md), [OIDC with any platform](docs/guides/auth_oidc.md)
+- [Authentication](docs/guides/authentication.md): [certificate](docs/guides/auth_client_certificate.md), [OIDC with GitHub Actions](docs/guides/auth_oidc_github.md), [OIDC with any platform](docs/guides/auth_oidc.md), [managed identity](docs/guides/auth_managed_identity.md)
 - [Import an existing tenant](docs/guides/import_existing.md)
 - [Detect drift in CI](docs/guides/drift_detection.md)
 - [Resources and availability](docs/guides/availability.md)

@@ -35,7 +35,7 @@ function ConvertTo-PolicyJson { param($pol)
     @{
         Identity                      = [string]$pol.Identity
         Name                          = [string]$pol.Name
-        RetentionPolicyTagLinks       = if ($pol.RetentionPolicyTagLinks) { [string[]]@($pol.RetentionPolicyTagLinks | ForEach-Object { $_.ToString() }) } else { @() }
+        RetentionPolicyTagLinks       = @(if ($pol.RetentionPolicyTagLinks) { [string[]]@($pol.RetentionPolicyTagLinks | ForEach-Object { $_.ToString() }) })
         IsDefault                     = [bool]$pol.IsDefault
         IsDefaultArbitrationMailbox   = [bool]$pol.IsDefaultArbitrationMailbox
     } | ConvertTo-Json -Compress

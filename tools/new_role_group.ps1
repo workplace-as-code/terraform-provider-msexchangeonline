@@ -397,7 +397,6 @@ $RoleManagementCmdlets = @(
     "Remove-RoleAssignmentPolicy",
     "Remove-RoleGroup",
     "Remove-ServicePrincipal",
-    "Set-ManagementRole",
     "Set-ManagementRoleAssignment",
     "Set-ManagementRoleEntry",
     "Set-ManagementScope",

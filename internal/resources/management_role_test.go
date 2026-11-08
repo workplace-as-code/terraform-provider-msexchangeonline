@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -28,6 +29,15 @@ func TestManagementRoleSchema(t *testing.T) {
 		if !a.Required || len(a.PlanModifiers) == 0 {
 			t.Errorf("%s must be required and replace the role when it changes", name)
 		}
+	}
+	// Exchange has no Set-ManagementRole: a new description replaces the role.
+	description := resp.Schema.Attributes["description"].(schema.StringAttribute)
+	replaces := false
+	for _, m := range description.PlanModifiers {
+		replaces = replaces || strings.Contains(m.Description(context.Background()), "recreate")
+	}
+	if !replaces {
+		t.Error("description must replace the role when it changes: Exchange cannot change it")
 	}
 }
 

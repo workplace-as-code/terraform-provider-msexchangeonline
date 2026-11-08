@@ -81,9 +81,9 @@ function Get-PolicyWithRule {
         EnableFirstContactSafetyTips        = Get-PropSafe $policy 'EnableFirstContactSafetyTips' $false
         Priority                            = if ($rule) { $rule.Priority } else { 0 }
         Enabled                             = if ($rule) { $rule.State -eq "Enabled" } else { $true }
-        RecipientDomainIs                   = if ($rule -and $rule.RecipientDomainIs)         { [string[]]@($rule.RecipientDomainIs         | ForEach-Object { $_.ToString() }) } else { @() }
-        SentToMemberOf                      = if ($rule -and $rule.SentToMemberOf)            { [string[]]@($rule.SentToMemberOf            | ForEach-Object { $_.ToString() }) } else { @() }
-        ExceptIfRecipientDomainIs           = if ($rule -and $rule.ExceptIfRecipientDomainIs) { [string[]]@($rule.ExceptIfRecipientDomainIs | ForEach-Object { $_.ToString() }) } else { @() }
+        RecipientDomainIs                   = @(if ($rule -and $rule.RecipientDomainIs)         { [string[]]@($rule.RecipientDomainIs         | ForEach-Object { $_.ToString() }) })
+        SentToMemberOf                      = @(if ($rule -and $rule.SentToMemberOf)            { [string[]]@($rule.SentToMemberOf            | ForEach-Object { $_.ToString() }) })
+        ExceptIfRecipientDomainIs           = @(if ($rule -and $rule.ExceptIfRecipientDomainIs) { [string[]]@($rule.ExceptIfRecipientDomainIs | ForEach-Object { $_.ToString() }) })
     } | ConvertTo-Json -Compress
 }
 

@@ -28,14 +28,14 @@ list "msexchangeonline_remote_domain" "all" {
 }
 ```
 
-A `list` block takes no arguments: it returns every object of that type, built-in ones included (default policies, built-in retention tags, ...). Tenant-wide settings such as `msexchangeonline_organization_config` return their single object.
+A `list` block takes no arguments: it returns every object of that type, built-in ones included (default policies, built-in retention tags, ...), except the built-in role groups and roles, which are never managed. Tenant-wide settings such as `msexchangeonline_organization_config` return their single object.
 
 ```shell
 terraform init
 terraform query
 ```
 
-`terraform query` prints the objects found. It reads the tenant and changes nothing.
+`terraform query` prints the objects found. It reads the tenant and changes nothing. The list resources need the permissions of their resource; listing `msexchangeonline_cross_tenant_partner` also needs the Microsoft Graph permission `Policy.Read.All`.
 
 ## 2. Generate the configuration
 

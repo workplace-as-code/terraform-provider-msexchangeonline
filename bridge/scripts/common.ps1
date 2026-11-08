@@ -121,8 +121,11 @@ function ConvertTo-BridgeStrings {
 }
 
 # Test-BridgeNotFound reports whether an error means the object does not exist.
+# An unknown or unreachable server is an error, never a missing object: the
+# resource would silently leave the state.
 function Test-BridgeNotFound {
     param([string]$Message)
+    if ($Message -match 'Exchange server .+ was not found|network path was not found') { return $false }
     $Message -match "couldn't be found|could not be found|not found|ObjectNotFound|doesn't exist|does not exist"
 }
 
@@ -420,7 +423,9 @@ function Get-BridgeExchangeCapabilities {
 # Invoke-BridgeGraph calls Microsoft Graph and returns the parsed JSON ($null
 # for 204). Throttling (429) and transient server errors are retried, after
 # Retry-After when Graph sends it; any other error throws
-# "Graph <status> <code>: <message>".
+# "Graph <status> <code>: <message>". A request that gets no answer (lost
+# connection, timeout) is sent again, except a POST: Graph may have processed
+# it, and a second POST would create a second object.
 function Invoke-BridgeGraph {
     param(
         [Parameter(Mandatory)] [ValidateSet("GET", "POST", "PATCH", "DELETE")] [string]$Method,
@@ -428,6 +433,7 @@ function Invoke-BridgeGraph {
         $Body = $null,
         [int]$MaxAttempts = 4
     )
+    $resent = $false
     for ($attempt = 1; ; $attempt++) {
         $request = @{
             Method             = $Method
@@ -437,12 +443,21 @@ function Invoke-BridgeGraph {
             SkipHttpErrorCheck = $true
         }
         if ($null -ne $Body) { $request.Body = ConvertTo-Json -InputObject $Body -Depth 10 -Compress }
-        $response = Invoke-WebRequest @request
+        try {
+            $response = Invoke-WebRequest @request
+        } catch {
+            if ($Method -eq "POST" -or $attempt -ge $MaxAttempts) { throw }
+            $resent = $true
+            Start-Sleep -Seconds (5 * $attempt)
+            continue
+        }
         $status = [int]$response.StatusCode
         if ($status -lt 300) {
             if ("$($response.Content)") { return ($response.Content | ConvertFrom-Json) }
             return $null
         }
+        # A DELETE sent again after a lost answer finds the object already gone.
+        if ($status -eq 404 -and $Method -eq "DELETE" -and $resent) { return $null }
         if ($status -in 429, 500, 502, 503, 504 -and $attempt -lt $MaxAttempts) {
             $wait = 5 * $attempt
             $retryAfter = @($response.Headers["Retry-After"]) | Select-Object -First 1

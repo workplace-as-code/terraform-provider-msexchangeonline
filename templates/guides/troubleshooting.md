@@ -99,7 +99,7 @@ The steps to create the app registration and the role group are in the [Authenti
 **`The term 'New-TransportRule' is not recognized` (or any other Exchange cmdlet).** In Exchange Online, a session only contains the cmdlets its roles allow: a missing role looks like a missing cmdlet. Check, in this order:
 
 1. **Admin consent** is granted for `Exchange.ManageAsApp` (**API permissions**, status column). A managed identity has no API permissions page: check **Enterprise applications → the identity → Permissions**.
-2. The app or managed identity is a member of the provider's role group, or has the Exchange Administrator role. A new assignment can take up to 30 minutes to apply.
+2. The app or managed identity is a member of the provider's role group, or has the Exchange Administrator role. Exchange can take several hours to apply a new assignment.
 3. After upgrading the provider, run `tools/new_role_group.ps1` again: new resources can need roles the group does not have yet.
 4. `terraform apply` does not use the read-only app: an app with View-Only Organization Management can plan, but not change the organization.
 

@@ -165,6 +165,6 @@ Do not set a certificate at the same time: the provider refuses two methods at o
 | `AADSTS700211` | The issuer does not match | Use `https://token.actions.githubusercontent.com`, without a trailing slash |
 | `AADSTS700212` | The audience does not match | Use `api://AzureADTokenExchange` in the federated credential |
 | `AADSTS700016` | No application with this client ID in the tenant | Check `client_id` and `tenant_id` |
-| The connection works, then cmdlets fail with access denied | The app has no Exchange role | Run `tools/new_role_group.ps1` (step 2 of the Authentication guide); roles take up to 30 minutes to apply |
+| The connection works, then cmdlets fail with access denied | The app has no Exchange role | Run `tools/new_role_group.ps1` (step 2 of the Authentication guide); roles can take several hours to apply |
 
 More errors are listed in the [Troubleshooting guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/troubleshooting).

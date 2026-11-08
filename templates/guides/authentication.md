@@ -110,7 +110,7 @@ Simpler, but broader: the app can run every Exchange Online cmdlet, including ma
 1. **Entra admin center → Roles & admins → Exchange Administrator → Add assignments**
 2. Select the app registration and assign
 
-Role assignments can take up to 30 minutes to apply.
+Exchange can take several hours to apply a role assignment, and longer to apply a removal.
 
 ### Microsoft 365 cross-tenant access policy
 
@@ -169,6 +169,8 @@ OIDC and managed identities are only supported in the `global` and `gcc` environ
 |---|---|---|
 | `terraform-msexchangeonline-read` | `terraform plan` on pull requests, scheduled drift detection | `Exchange.ManageAsApp` + the **View-Only Organization Management** role group, assigned like Option A (`New-ServicePrincipal`, then `Add-RoleGroupMember`). The **Global Reader** Entra role also works but reads the whole tenant, not only Exchange. |
 | `terraform-msexchangeonline` | `terraform apply`, only from the protected branch after approval | `Exchange.ManageAsApp` + the least-privilege role group (Option A) |
+
+A read app cannot plan `msexchangeonline_cross_tenant_partner`: Microsoft Graph requires the Exchange Administrator role even to read it.
 
 If the read credential leaks from a CI job, the configuration can be read but not changed. With a certificate, keep the write certificate in a secret scoped to the deployment environment (for example a GitHub Actions environment with required reviewers). With OIDC, make the write app trust only that protected environment.
 

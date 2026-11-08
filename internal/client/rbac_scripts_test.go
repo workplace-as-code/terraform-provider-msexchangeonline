@@ -29,6 +29,14 @@ func expectLines(t *testing.T, out string, want ...string) {
 	}
 }
 
+// TestNotFoundIsAMissingObject guards Test-BridgeNotFound (common.ps1): a
+// missing object makes the resource leave the state, an unknown or unreachable
+// server is an error.
+func TestNotFoundIsAMissingObject(t *testing.T) {
+	out := runStub(t, "not_found.ps1", "common.ps1")
+	expectLines(t, out, "object: True", "graph: True", "server: False", "network: False", "denied: False")
+}
+
 // TestRBACListSkipsBuiltIn guards list.ps1: terraform query lists custom role
 // groups and roles only, so the generated configuration never manages the
 // built-in ones.
