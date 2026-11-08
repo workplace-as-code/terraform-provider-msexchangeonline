@@ -27,7 +27,7 @@ func TestScriptListsAreArrays(t *testing.T) {
 			t.Fatal(err)
 		}
 		for i, line := range strings.Split(string(data), "\n") {
-			if ifElseEmptyRe.MatchString(line) {
+			if !strings.HasPrefix(strings.TrimSpace(line), "#") && ifElseEmptyRe.MatchString(line) {
 				t.Errorf("%s:%d: write Key = @(if (...) { ... }): with else { @() } an empty list is null in JSON",
 					f, i+1)
 			}
