@@ -13,6 +13,7 @@ $partner = "11111111-2222-3333-4444-555555555555"
 $global:Caps = [ordered]@{}
 $global:RoleMissing = $false
 $global:ListHides = $false
+$global:FailPost = ""
 $global:Calls = [System.Collections.Generic.List[string]]::new()
 
 function Cap([string]$Name, [bool]$Allowed, [object[]]$Included, [object[]]$Excluded = @()) {
@@ -41,12 +42,16 @@ function global:Invoke-WebRequest {
         "POST" {
             $c = $Body | ConvertFrom-Json
             $n = $c.'@odata.type' -replace '^#microsoft\.graph\.', ''
+            if ($n -eq $global:FailPost) { return Response 400 @{ error = @{ code = "BadRequest"; message = "Invalid scope for $n." } } }
             $c | Add-Member -NotePropertyName name -NotePropertyValue $n -Force
             $global:Caps[$n] = $c
             return Response 201 $c
         }
         "PATCH" { $c = $Body | ConvertFrom-Json; $c | Add-Member -NotePropertyName name -NotePropertyValue $name -Force; $global:Caps[$name] = $c; return Response 204 }
-        "DELETE" { $global:Caps.Remove($name); return Response 204 }
+        "DELETE" {
+            if (-not $global:Caps.Contains($name)) { return Response 404 @{ error = @{ code = "NotFound"; message = "Capability $name not found." } } }
+            $global:Caps.Remove($name); return Response 204
+        }
     }
 }
 
@@ -92,3 +97,11 @@ Invoke-Step "norole-import" Get
 $global:RoleMissing = $false
 $global:ListHides = $true
 Invoke-Step "hidden" Get $null @("crossTenantMailTipsAll")
+
+# A create that fails on its second capability removes the first one: the next
+# apply can create the partner again.
+$global:ListHides = $false
+$global:Caps.Remove("crossTenantMailTipsAll")
+$global:FailPost = "crossTenantMailTipsLimited"
+Invoke-Step "create-fails" Create @((Desired crossTenantMailTipsAll $true), (Desired crossTenantMailTipsLimited $true))
+"after-failed-create: $($global:Caps.Keys -join ',')"

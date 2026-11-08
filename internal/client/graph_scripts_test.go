@@ -7,8 +7,10 @@ import (
 
 // TestInvokeBridgeGraphRetries guards Invoke-BridgeGraph (common.ps1): Graph
 // throttling (429) is retried after Retry-After, a refusal (403) is not and
-// keeps Graph's message, and 204 returns nothing. Get-BridgeGraphToken returns
-// the token the provider obtained, and refuses clouds without the API.
+// keeps Graph's message, and 204 returns nothing. A request without an answer
+// is sent again, except a POST (it may have created the object), and a DELETE
+// sent again may find the object gone. Get-BridgeGraphToken returns the token
+// the provider obtained, and refuses clouds without the API.
 func TestInvokeBridgeGraphRetries(t *testing.T) {
 	out := runStub(t, "graph_invoke.ps1", "common.ps1")
 	expectLines(t, out,
@@ -17,6 +19,10 @@ func TestInvokeBridgeGraphRetries(t *testing.T) {
 			"GET https://graph.microsoft.com/v1.0/x Bearer gt-1",
 		"403: Graph 403 forbidden: Your administrative role is not allowed calls=1",
 		"204: null=True",
+		"network-get: calls=3 sleep 5",
+		"network-post: An error occurred while sending the request. calls=1",
+		"network-delete: null=True calls=3",
+		"delete-404: Graph 404 NotFound: gone",
 		"gcchigh: Microsoft Graph cross-tenant access policy is only available in the global and gcc environments",
 	)
 }
@@ -53,6 +59,12 @@ func TestCrossTenantPartnerScript(t *testing.T) {
 	)
 	expectLines(t, out, "CrossTenantPartner Get failed: Microsoft Graph listed no Exchange capability for partner "+
 		"11111111-2222-3333-4444-555555555555, but crossTenantMailTipsAll exists: retry later")
+	// A failed create removes what it added, whatever the failing capability.
+	expectLines(t, out,
+		"CrossTenantPartner Create failed: Graph 400 BadRequest: Invalid scope for crossTenantMailTipsLimited.",
+		"; DELETE crossTenantMailTipsAll; DELETE crossTenantMailTipsLimited",
+		"after-failed-create: crossTenantOpenProfileCard\n",
+	)
 	// Both reads without the role (with and without capabilities in the state) fail.
 	if n := strings.Count(out, "CrossTenantPartner Get failed: The app needs the Microsoft Entra role"); n != 2 {
 		t.Errorf("%d role errors, want 2:\n%s", n, out)
