@@ -148,7 +148,7 @@ try {
                 if ($null -ne (Find-BridgeKey $entries $c)) { continue }
                 $k = Find-BridgeKey $parentEntries $c
                 if ($null -eq $k) { throw "$c is not in the parent role $parentName." }
-                Invoke-BridgeRetry { Add-ManagementRoleEntry -Identity "$Identity\$k" | Out-Null }
+                Invoke-BridgeRetry -Create { Add-ManagementRoleEntry -Identity "$Identity\$k" | Out-Null }
             }
             foreach ($c in @($entries.Keys)) {
                 if (@($wanted.Cmdlets | Where-Object { $_ -ieq $c }).Count -eq 0) {

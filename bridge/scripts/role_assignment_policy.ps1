@@ -78,7 +78,7 @@ try {
             $current = Get-BridgePolicyRoles $p
             foreach ($role in @($wanted.Roles)) {
                 if (@($current | Where-Object { $_ -ieq $role }).Count -eq 0) {
-                    Invoke-BridgeRetry { New-ManagementRoleAssignment -Policy $Identity -Role $role | Out-Null }
+                    Invoke-BridgeRetry -Create { New-ManagementRoleAssignment -Policy $Identity -Role $role | Out-Null }
                 }
             }
             foreach ($role in $current) {
