@@ -387,3 +387,41 @@ $env:MSEXCHANGEONLINE_ROLEGROUP_NO_RUN = "1"
 		t.Errorf("got %s", got)
 	}
 }
+
+// TestPreflightReadsTheRoleGroupLists: test/preflight.ps1 checks on the
+// tenant, before the integration tests, every cmdlet of the two lists of the
+// role group script.
+func TestPreflightReadsTheRoleGroupLists(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh is not installed")
+	}
+	cmd := exec.Command("pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File", "../test/preflight.ps1")
+	cmd.Env = append(os.Environ(), "PREFLIGHT_LIST_ONLY=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	data, err := os.ReadFile(roleGroupScript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{}
+	for _, re := range []*regexp.Regexp{listRe, rmListRe} {
+		block := re.FindStringSubmatch(string(data))
+		if block == nil {
+			t.Fatalf("%s: no match for %s", roleGroupScript, re)
+		}
+		for _, m := range quotedRe.FindAllStringSubmatch(block[1], -1) {
+			want[m[1]] = true
+		}
+	}
+	got := strings.Fields(string(out))
+	if len(got) != len(want) {
+		t.Errorf("preflight lists %d cmdlets, the role group script %d", len(got), len(want))
+	}
+	for _, c := range got {
+		if !want[c] {
+			t.Errorf("preflight lists %s, which is in no list of the role group script", c)
+		}
+	}
+}

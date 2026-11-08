@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # run.sh — build the provider and run the full integration test cycle against
 # a real tenant:
-#   build → pre-cleanup → apply → drift check → update → drift check →
+#   build → preflight → pre-cleanup → apply → drift check → update → drift check →
 #   import of every resource → drift check → destroy → deletion check
 #
 # Test objects are named TF-CI-*. The initial accepted domain and the
@@ -150,6 +150,18 @@ step "Building provider binary → $BINARY"
 cd "$ROOT"
 go build -o "$BINARY" .
 pass "Build OK"
+
+# ---------------------------------------------------------------------------
+# 4b. Preflight: every cmdlet of the bridge scripts exists in Exchange Online
+# ---------------------------------------------------------------------------
+step "Preflight: the cmdlets of the bridge scripts"
+if [[ "$AUTH_METHOD" == "client_certificate" && -z "${EXCHANGE_CERTIFICATE_THUMBPRINT:-}" ]]; then
+  pwsh -NoLogo -NoProfile -NonInteractive -File "$ROOT/test/preflight.ps1" ||
+    fail "The provider calls cmdlets that Exchange Online does not have (above)"
+  pass "Preflight OK"
+else
+  info "Skipped: the preflight connects with a certificate file or its base64 content only"
+fi
 
 # ---------------------------------------------------------------------------
 # Objects created by the test, as "<resource address>=<import id>".
