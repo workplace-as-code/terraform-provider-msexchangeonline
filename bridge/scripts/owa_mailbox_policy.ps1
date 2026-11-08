@@ -86,8 +86,8 @@ function ConvertTo-BridgePolicy {
         WacViewingOnPublicComputersEnabled  = $Policy.WacViewingOnPublicComputersEnabled
         WebPartsFrameOptionsType            = [string]$Policy.WebPartsFrameOptionsType
         OutboundCharset                     = [string]$Policy.OutboundCharset
-        BlockedFileTypes                    = if ($Policy.BlockedFileTypes) { [string[]]@($Policy.BlockedFileTypes | ForEach-Object { $_.ToString() -replace '^\.' }) } else { @() }
-        BlockedMimeTypes                    = if ($Policy.BlockedMimeTypes) { [string[]]@($Policy.BlockedMimeTypes | ForEach-Object { $_.ToString() }) } else { @() }
+        BlockedFileTypes                    = @(if ($Policy.BlockedFileTypes) { [string[]]@($Policy.BlockedFileTypes | ForEach-Object { $_.ToString() -replace '^\.' }) })
+        BlockedMimeTypes                    = @(if ($Policy.BlockedMimeTypes) { [string[]]@($Policy.BlockedMimeTypes | ForEach-Object { $_.ToString() }) })
     } | ConvertTo-Json -Compress
 }
 

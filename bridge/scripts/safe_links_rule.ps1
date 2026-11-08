@@ -33,9 +33,9 @@ function ConvertTo-RuleJson { param($rule)
         SafeLinksPolicy           = [string]$rule.SafeLinksPolicy
         Priority                  = [int]$rule.Priority
         Enabled                   = ($rule.State -eq "Enabled")
-        RecipientDomainIs         = if ($rule.RecipientDomainIs)         { [string[]]@($rule.RecipientDomainIs         | ForEach-Object { $_.ToString() }) } else { @() }
-        SentToMemberOf            = if ($rule.SentToMemberOf)            { [string[]]@($rule.SentToMemberOf            | ForEach-Object { $_.ToString() }) } else { @() }
-        ExceptIfRecipientDomainIs = if ($rule.ExceptIfRecipientDomainIs) { [string[]]@($rule.ExceptIfRecipientDomainIs | ForEach-Object { $_.ToString() }) } else { @() }
+        RecipientDomainIs         = @(if ($rule.RecipientDomainIs)         { [string[]]@($rule.RecipientDomainIs         | ForEach-Object { $_.ToString() }) })
+        SentToMemberOf            = @(if ($rule.SentToMemberOf)            { [string[]]@($rule.SentToMemberOf            | ForEach-Object { $_.ToString() }) })
+        ExceptIfRecipientDomainIs = @(if ($rule.ExceptIfRecipientDomainIs) { [string[]]@($rule.ExceptIfRecipientDomainIs | ForEach-Object { $_.ToString() }) })
     } | ConvertTo-Json -Compress
 }
 

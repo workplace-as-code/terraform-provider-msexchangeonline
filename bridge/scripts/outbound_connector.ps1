@@ -61,7 +61,7 @@ function ConvertTo-BridgeConnector {
         ConnectorType                      = [string](Get-PropSafe $Connector 'ConnectorType' 'OnPremises')
         ConnectorSource                    = [string](Get-PropSafe $Connector 'ConnectorSource' 'Default')
         RecipientDomains                   = @(ConvertTo-DomainList $Connector.RecipientDomains)
-        SmartHosts                         = if ($Connector.SmartHosts)       { [string[]]@($Connector.SmartHosts       | ForEach-Object { $_.ToString() }) } else { @() }
+        SmartHosts                         = @(if ($Connector.SmartHosts)       { [string[]]@($Connector.SmartHosts       | ForEach-Object { $_.ToString() }) })
         TlsSettings                        = [string](Get-PropSafe $Connector 'TlsSettings' 'EncryptionOnly')
         RouteAllMessagesViaOnPremises = [bool](Get-PropSafe $Connector 'RouteAllMessagesViaOnPremises' $false)
         UseMxRecord                        = [bool](Get-PropSafe $Connector 'UseMxRecord' $false)

@@ -54,14 +54,14 @@ function Get-PolicyWithRule {
         ActionWhenThresholdReached                   = [string]$policy.ActionWhenThresholdReached
         AutoForwardingMode                           = [string]$policy.AutoForwardingMode
         BccSuspiciousOutboundMail                    = [bool]$policy.BccSuspiciousOutboundMail
-        BccSuspiciousOutboundAdditionalRecipients    = if ($policy.BccSuspiciousOutboundAdditionalRecipients) { [string[]]@($policy.BccSuspiciousOutboundAdditionalRecipients | ForEach-Object { $_.ToString() }) } else { @() }
+        BccSuspiciousOutboundAdditionalRecipients    = @(if ($policy.BccSuspiciousOutboundAdditionalRecipients) { [string[]]@($policy.BccSuspiciousOutboundAdditionalRecipients | ForEach-Object { $_.ToString() }) })
         NotifyOutboundSpam                           = [bool]$policy.NotifyOutboundSpam
-        NotifyOutboundSpamRecipients                 = if ($policy.NotifyOutboundSpamRecipients) { [string[]]@($policy.NotifyOutboundSpamRecipients | ForEach-Object { $_.ToString() }) } else { @() }
+        NotifyOutboundSpamRecipients                 = @(if ($policy.NotifyOutboundSpamRecipients) { [string[]]@($policy.NotifyOutboundSpamRecipients | ForEach-Object { $_.ToString() }) })
         Priority                                     = if ($rule) { [int]$rule.Priority } else { 0 }
         Enabled                                      = if ($rule) { $rule.State -eq "Enabled" } else { $true }
-        SenderDomainIs                               = if ($rule) { @(ConvertTo-BridgeStrings $rule.SenderDomainIs) } else { @() }
-        From                                         = if ($rule) { @(ConvertTo-BridgeStrings $rule.From) } else { @() }
-        FromMemberOf                                 = if ($rule) { @(ConvertTo-BridgeStrings $rule.FromMemberOf) } else { @() }
+        SenderDomainIs                               = @(if ($rule) { @(ConvertTo-BridgeStrings $rule.SenderDomainIs) })
+        From                                         = @(if ($rule) { @(ConvertTo-BridgeStrings $rule.From) })
+        FromMemberOf                                 = @(if ($rule) { @(ConvertTo-BridgeStrings $rule.FromMemberOf) })
     } | ConvertTo-Json -Compress
 }
 

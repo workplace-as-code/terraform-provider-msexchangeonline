@@ -61,7 +61,7 @@ function ConvertTo-BridgeConnector {
         ConnectorType             = [string](Get-PropSafe $Connector 'ConnectorType' 'OnPremises')
         ConnectorSource           = [string](Get-PropSafe $Connector 'ConnectorSource' 'Default')
         SenderDomains             = @(ConvertTo-DomainList $Connector.SenderDomains)
-        SenderIPAddresses         = if ($Connector.SenderIPAddresses) { [string[]]@($Connector.SenderIPAddresses | ForEach-Object { $_.ToString() }) } else { @() }
+        SenderIPAddresses         = @(if ($Connector.SenderIPAddresses) { [string[]]@($Connector.SenderIPAddresses | ForEach-Object { $_.ToString() }) })
         RequireTls                = [bool](Get-PropSafe $Connector 'RequireTls' $false)
         RestrictDomainsToCertificate    = [bool](Get-PropSafe $Connector 'RestrictDomainsToCertificate' $false)
         TlsSenderCertificateName = [string](Get-PropSafe $Connector 'TlsSenderCertificateName' '')

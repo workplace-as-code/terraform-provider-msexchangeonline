@@ -81,11 +81,11 @@ function Get-PolicyWithRule {
         IncreaseScoreWithImageLinks      = [string](Get-PropSafe $policy 'IncreaseScoreWithImageLinks' 'Off')
         Priority                         = if ($rule) { [int]$rule.Priority } else { 0 }
         Enabled                          = if ($rule) { $rule.State -eq "Enabled" } else { $true }
-        RecipientDomainIs                = if ($rule -and $rule.RecipientDomainIs)         { [string[]]@($rule.RecipientDomainIs         | ForEach-Object { $_.ToString() }) } else { @() }
-        SentTo                           = if ($rule -and $rule.SentTo)                    { [string[]]@($rule.SentTo                    | ForEach-Object { $_.ToString() }) } else { @() }
-        SentToMemberOf                   = if ($rule -and $rule.SentToMemberOf)            { [string[]]@($rule.SentToMemberOf            | ForEach-Object { $_.ToString() }) } else { @() }
-        ExceptIfRecipientDomainIs        = if ($rule -and $rule.ExceptIfRecipientDomainIs) { [string[]]@($rule.ExceptIfRecipientDomainIs | ForEach-Object { $_.ToString() }) } else { @() }
-        ExceptIfSentTo                   = if ($rule -and $rule.ExceptIfSentTo)            { [string[]]@($rule.ExceptIfSentTo            | ForEach-Object { $_.ToString() }) } else { @() }
+        RecipientDomainIs                = @(if ($rule -and $rule.RecipientDomainIs)         { [string[]]@($rule.RecipientDomainIs         | ForEach-Object { $_.ToString() }) })
+        SentTo                           = @(if ($rule -and $rule.SentTo)                    { [string[]]@($rule.SentTo                    | ForEach-Object { $_.ToString() }) })
+        SentToMemberOf                   = @(if ($rule -and $rule.SentToMemberOf)            { [string[]]@($rule.SentToMemberOf            | ForEach-Object { $_.ToString() }) })
+        ExceptIfRecipientDomainIs        = @(if ($rule -and $rule.ExceptIfRecipientDomainIs) { [string[]]@($rule.ExceptIfRecipientDomainIs | ForEach-Object { $_.ToString() }) })
+        ExceptIfSentTo                   = @(if ($rule -and $rule.ExceptIfSentTo)            { [string[]]@($rule.ExceptIfSentTo            | ForEach-Object { $_.ToString() }) })
     } | ConvertTo-Json -Compress
 }
 
