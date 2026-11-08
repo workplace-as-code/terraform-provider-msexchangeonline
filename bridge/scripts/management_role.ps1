@@ -141,10 +141,8 @@ try {
             $role = Invoke-BridgeRetry { Get-ManagementRole -Identity $Identity }
             $parentName = Get-BridgeLeafName ([string]$role.Parent)
             $parentEntries = Get-BridgeRoleEntries $parentName
-            if ($null -ne $wanted.PSObject.Properties["Description"] -and
-                [string](Get-BridgeProp $role "Description" "") -ne $wanted.Description) {
-                Invoke-BridgeRetry { Set-ManagementRole -Identity $Identity -Description $wanted.Description }
-            }
+            # The description never changes here: Exchange has no cmdlet for
+            # it, so a new description replaces the role.
             $entries = Get-BridgeRoleEntries $Identity
             foreach ($c in @($wanted.Cmdlets)) {
                 if ($null -ne (Find-BridgeKey $entries $c)) { continue }

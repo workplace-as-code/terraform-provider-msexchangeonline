@@ -90,8 +90,11 @@ func (r *managementRoleResource) Schema(_ context.Context, _ resource.SchemaRequ
 			"description": schema.StringAttribute{
 				Optional:            true,
 				Computed:            true,
-				MarkdownDescription: "Description of the role.",
-				PlanModifiers:       []planmodifier.String{stringplanmodifier.UseStateForUnknown()},
+				MarkdownDescription: "Description of the role. Exchange cannot change it afterwards: changing it creates a new role.",
+				// Exchange has no Set-ManagementRole: the description is only
+				// written by New-ManagementRole.
+				PlanModifiers: []planmodifier.String{stringplanmodifier.UseStateForUnknown(),
+					stringplanmodifier.RequiresReplaceIfConfigured()},
 			},
 			"cmdlets": schema.SetAttribute{
 				ElementType: types.StringType,

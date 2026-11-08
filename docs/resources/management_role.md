@@ -37,7 +37,7 @@ resource "msexchangeonline_management_role" "helpdesk_phone" {
 ### Optional
 
 - `cmdlet_parameters` (Map of Set of String) Parameters kept for some cmdlets, by cmdlet, for example `{ "Set-User" = ["Identity", "Phone"] }`. Include the parameters the cmdlet needs to run, such as `Identity`. The cmdlets of `cmdlets` that are not in the map keep all the parameters of the parent.
-- `description` (String) Description of the role.
+- `description` (String) Description of the role. Exchange cannot change it afterwards: changing it creates a new role.
 
 ### Read-Only
 
@@ -65,7 +65,6 @@ The provider's app registration needs the **Role Management** Exchange managemen
 
 - [`New-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/new-managementrole?view=exchange-ps)
 - [`Get-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-managementrole?view=exchange-ps)
-- [`Set-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-managementrole?view=exchange-ps)
 - [`Remove-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/remove-managementrole?view=exchange-ps)
 - [`Get-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-managementroleentry?view=exchange-ps)
 - [`Add-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/add-managementroleentry?view=exchange-ps)

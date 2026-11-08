@@ -33,7 +33,6 @@ function global:New-ManagementRole {
     $global:Entries[$Name] = [ordered]@{}
     foreach ($c in $EnabledCmdlets) { $global:Entries[$Name][$c] = $global:Entries[$Parent][$c] }
 }
-function global:Set-ManagementRole { param($Identity, $Description) $global:Calls.Add("SetRole $Identity"); $global:Roles[$Identity].Description = $Description }
 function global:Remove-ManagementRole { param($Identity) $global:Calls.Add("RemoveRole $Identity"); $global:Roles.Remove($Identity) }
 function global:Add-ManagementRoleEntry {
     param($Identity)
