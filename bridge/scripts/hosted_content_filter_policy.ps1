@@ -71,7 +71,7 @@ function Get-PolicyWithRule {
         HighConfidencePhishAction        = [string](Get-PropSafe $policy 'HighConfidencePhishAction' 'Quarantine')
         BulkSpamAction                   = [string](Get-PropSafe $policy 'BulkSpamAction'            'MoveToJmf')
         BulkThreshold                    = [int](Get-PropSafe    $policy 'BulkThreshold'             7)
-        QuarantineTag                    = [string](Get-PropSafe $policy 'QuarantineTag'             '')
+        QuarantineTag                    = [string](Get-PropSafe $policy 'SpamQuarantineTag'         '')
         HighConfidenceSpamQuarantineTag  = [string](Get-PropSafe $policy 'HighConfidenceSpamQuarantineTag'  '')
         PhishQuarantineTag               = [string](Get-PropSafe $policy 'PhishQuarantineTag'               '')
         HighConfidencePhishQuarantineTag = [string](Get-PropSafe $policy 'HighConfidencePhishQuarantineTag' '')
@@ -91,6 +91,11 @@ function Get-PolicyWithRule {
 
 # Only the settings set in the Terraform configuration are sent.
 $policySplat = ConvertTo-BridgeSplat $PSBoundParameters -Int BulkThreshold -String SpamAction, HighConfidenceSpamAction, PhishSpamAction, HighConfidencePhishAction, BulkSpamAction, QuarantineTag, HighConfidenceSpamQuarantineTag, PhishQuarantineTag, HighConfidencePhishQuarantineTag, BulkQuarantineTag, MarkAsSpamBulkMail, MarkAsSpamEmptyMessages, IncreaseScoreWithImageLinks
+# The quarantine policy for spam is the SpamQuarantineTag parameter in Exchange.
+if ($policySplat.ContainsKey("QuarantineTag")) {
+    $policySplat["SpamQuarantineTag"] = $policySplat["QuarantineTag"]
+    $policySplat.Remove("QuarantineTag")
+}
 $ruleEnabled = if ($PSBoundParameters.ContainsKey("Enabled")) { $Enabled -eq "true" } else { $null }
 
 # Rule conditions. The rule exists only while an inclusion condition is set

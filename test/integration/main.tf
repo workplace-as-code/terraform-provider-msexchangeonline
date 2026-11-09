@@ -402,6 +402,7 @@ resource "msexchangeonline_hosted_content_filter_policy" "test" {
   name = "TF-CI-SpamFilter"
 
   spam_action    = local.updated ? "Quarantine" : "MoveToJmf"
+  quarantine_tag = local.updated ? "AdminOnlyAccessPolicy" : "DefaultFullAccessPolicy"
   bulk_threshold = local.updated ? 6 : 7
 
   recipient_domain_is = [var.primary_domain]
