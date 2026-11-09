@@ -62,6 +62,12 @@ variable "mailbox_plan_retain_deleted_items_for_days" {
   default     = null
 }
 
+variable "report_third_party" {
+  description = "Set by test/run.sh, with test_mailbox, to test a non-Microsoft reporting tool, then restored. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
 variable "quarantine_notification_frequency" {
   description = "Set by test/run.sh to test a write to the global quarantine settings, then to restore it. null leaves it unmanaged."
   type        = string
@@ -292,6 +298,39 @@ import {
 import {
   to = msexchangeonline_quarantine_global_settings.this
   id = "default"
+}
+
+import {
+  to = msexchangeonline_report_submission_policy.this
+  id = "default"
+}
+
+resource "msexchangeonline_report_submission_policy" "this" {
+  reporting_mailbox                   = local.updated ? var.test_mailbox : ""
+  enable_report_to_microsoft          = !local.updated
+  enable_third_party_address          = var.report_third_party
+  disable_quarantine_reporting_option = local.updated
+  enable_user_email_notification      = local.updated
+  enable_custom_notification_sender   = local.updated && var.test_mailbox != ""
+  notification_sender_address         = local.updated ? var.test_mailbox : ""
+  enable_organization_branding        = local.updated
+  notification_footer_message         = local.comment
+  junk_review_result_message          = local.comment
+  not_junk_review_result_message      = local.comment
+  phishing_review_result_message      = local.comment
+  pre_submit_message_enabled          = !local.updated
+  post_submit_message_enabled         = !local.updated
+  pre_submit_message                  = local.comment
+  pre_submit_message_title            = local.comment
+  post_submit_message                 = local.comment
+  post_submit_message_title           = local.comment
+
+  languages = local.updated ? [
+    { language = "en", pre_submit_junk_title = "TF-CI title" },
+    { language = "fr", pre_submit_junk_message = "Contactez le service d'assistance : détails" },
+    ] : [
+    { language = "en", post_submit_phishing_title = "TF-CI created" },
+  ]
 }
 
 resource "msexchangeonline_quarantine_global_settings" "this" {

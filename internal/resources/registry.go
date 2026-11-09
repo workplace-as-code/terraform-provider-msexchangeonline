@@ -36,6 +36,7 @@ func registrations() []registration {
 		{NewOutboundSpamFilterPolicyResource, listQuery{noun: "HostedOutboundSpamFilterPolicy"}},
 		{NewQuarantinePolicyResource, listQuery{noun: "QuarantinePolicy", property: "Name"}},
 		{NewQuarantineGlobalSettingsResource, listQuery{id: quarantineGlobalSettingsID}},
+		{NewReportSubmissionPolicyResource, listQuery{id: reportSubmissionID}},
 		{NewEmailAddressPolicyResource, listQuery{noun: "EmailAddressPolicy"}},
 		{NewMobileDeviceMailboxPolicyResource, listQuery{noun: "MobileDeviceMailboxPolicy"}},
 		{NewRetentionPolicyResource, listQuery{noun: "RetentionPolicy"}},

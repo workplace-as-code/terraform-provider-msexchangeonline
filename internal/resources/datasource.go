@@ -30,6 +30,7 @@ import (
 // source in internal/datasources.
 var dataSourceResources = []dataSourceResource{
 	{NewQuarantineGlobalSettingsResource, "", ""},
+	{NewReportSubmissionPolicyResource, "", ""},
 	{NewSpoofItemResource, "id", ""},
 	{NewAntiPhishPolicyResource, "name", ""},
 	{NewAntiPhishRuleResource, "name", ""},

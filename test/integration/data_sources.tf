@@ -325,3 +325,14 @@ data "msexchangeonline_quarantine_global_settings" "this" {
     }
   }
 }
+
+data "msexchangeonline_report_submission_policy" "this" {
+  depends_on = [msexchangeonline_report_submission_policy.this]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == "default"
+      error_message = "The data source read another object than the tenant-wide settings."
+    }
+  }
+}

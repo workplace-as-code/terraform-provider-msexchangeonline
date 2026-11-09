@@ -275,6 +275,7 @@ KEEP=(
   "msexchangeonline_hosted_connection_filter_policy.this"
   "msexchangeonline_external_in_outlook.this"
   "msexchangeonline_quarantine_global_settings.this"
+  "msexchangeonline_report_submission_policy.this"
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
   "msexchangeonline_irm_configuration.this"
@@ -287,6 +288,15 @@ KEEP=(
 )
 # The default branding template is adopted: kept like the tenant-wide objects.
 [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && KEEP+=("msexchangeonline_ome_configuration.default[0]")
+
+# reset_report_submission puts the report submission policy and its rule back
+# to the state of a tenant never configured: destroy leaves them in place.
+reset_report_submission() {
+  [[ "$AUTH_METHOD" == "client_certificate" && -z "${EXCHANGE_CERTIFICATE_THUMBPRINT:-}" ]] || return 0
+  pwsh -NoLogo -NoProfile -NonInteractive -File "$ROOT/test/report_submission_reset.ps1" ||
+    fail "The report submission policy could not be reset"
+  pass "Report submission policy reset"
+}
 
 # expect_no_changes <label> [terraform plan args...]
 # Fails unless terraform plan reports no changes.
@@ -389,6 +399,7 @@ pass "Init OK"
 # 6. Pre-cleanup: delete test objects left over by an interrupted run
 # ---------------------------------------------------------------------------
 step "Pre-cleanup: removing any orphaned test objects"
+reset_report_submission
 mapfile -t ORPHANS < <(import_orphans)
 if [[ ${#ORPHANS[@]} -gt 0 ]]; then
   info "${#ORPHANS[@]} orphaned object(s) found, destroying..."
@@ -472,6 +483,10 @@ if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admi
     activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
 else
   info "Skipped ActiveSync settings: the tenant already has admin mail recipients"
+fi
+if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
+  write_and_restore msexchangeonline_report_submission_policy.this enable_third_party_address \
+    report_third_party true false
 fi
 frequency="$(state_value msexchangeonline_quarantine_global_settings.this notification_frequency)"
 write_and_restore msexchangeonline_quarantine_global_settings.this notification_frequency \
@@ -599,6 +614,7 @@ pass "Destroy OK"
 # 12. Verify the test objects are really gone from Exchange
 # ---------------------------------------------------------------------------
 step "Verifying the test objects no longer exist"
+reset_report_submission
 reset_state
 mapfile -t LEFT < <(import_orphans)
 if [[ ${#LEFT[@]} -gt 0 ]]; then
