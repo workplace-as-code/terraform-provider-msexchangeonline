@@ -108,6 +108,7 @@ These data sources have no resource:
 |---|---|
 | [`msexchangeonline_accepted_domains`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/accepted_domains) | Every accepted domain of the tenant |
 | [`msexchangeonline_mailbox`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/mailbox) | One mailbox, read only |
+| [`msexchangeonline_management_role`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/management_role) | One management role, built-in or custom, read only |
 | [`msexchangeonline_onpremises_organization`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/onpremises_organization) | Hybrid: the on-premises organization known to Exchange Online |
 | [`msexchangeonline_intra_organization_connector`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/intra_organization_connector) | Hybrid: the OAuth connector to Exchange Server |
 

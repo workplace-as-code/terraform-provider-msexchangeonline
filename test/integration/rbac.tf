@@ -111,3 +111,28 @@ check "default_role_assignment_policy" {
     error_message = "The Default Role Assignment Policy could not be read, or is not the default."
   }
 }
+
+data "msexchangeonline_management_role" "built_in" {
+  count = local.rbac
+  name  = "Transport Rules"
+
+  lifecycle {
+    postcondition {
+      condition     = self.built_in && contains(self.cmdlets, "Set-TransportRule")
+      error_message = "The data source must read a built-in role and its cmdlets."
+    }
+  }
+}
+
+data "msexchangeonline_management_role" "custom" {
+  count      = local.rbac
+  name       = msexchangeonline_management_role.test[0].name
+  depends_on = [msexchangeonline_management_role.test]
+
+  lifecycle {
+    postcondition {
+      condition     = !self.built_in && self.parent == "Mail Recipients"
+      error_message = "The data source must read a custom role and its parent."
+    }
+  }
+}

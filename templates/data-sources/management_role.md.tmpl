@@ -1,0 +1,25 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Administration"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+## Permissions
+
+The provider's app registration needs a management role that grants `Get-ManagementRole` and `Get-ManagementRoleEntry`, such as the read-only **View-Only Configuration**. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`Get-ManagementRole`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-managementrole?view=exchange-ps)
+- [`Get-ManagementRoleEntry`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-managementroleentry?view=exchange-ps)

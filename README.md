@@ -84,7 +84,7 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 | Message encryption | `msexchangeonline_irm_configuration`, `msexchangeonline_ome_configuration` |
 | Exchange RBAC | `msexchangeonline_management_scope`, `msexchangeonline_role_group`, `msexchangeonline_management_role`, `msexchangeonline_management_role_assignment`, `msexchangeonline_role_assignment_policy`, `msexchangeonline_service_principal` |
 
-Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Four more read the tenant: `msexchangeonline_accepted_domains`, `msexchangeonline_mailbox`, and for hybrid deployments `msexchangeonline_onpremises_organization` and `msexchangeonline_intra_organization_connector`. Full reference in [docs/data-sources](docs/data-sources/).
+Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Five more read the tenant: `msexchangeonline_accepted_domains`, `msexchangeonline_mailbox`, `msexchangeonline_management_role`, and for hybrid deployments `msexchangeonline_onpremises_organization` and `msexchangeonline_intra_organization_connector`. Full reference in [docs/data-sources](docs/data-sources/).
 
 ### Related provider
 

@@ -144,6 +144,7 @@ func (p *exchangeProvider) DataSources(_ context.Context) []func() datasource.Da
 		datasources.NewAcceptedDomainDataSource,
 		datasources.NewAcceptedDomainsDataSource,
 		datasources.NewMailboxDataSource,
+		datasources.NewManagementRoleDataSource,
 		datasources.NewOrganizationConfigDataSource,
 	}
 	return append(sources, resources.DataSources()...)
