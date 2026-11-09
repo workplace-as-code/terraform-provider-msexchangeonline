@@ -67,6 +67,7 @@ When a built-in role grants much more than the provider needs, the script create
 | `terraform-msexchangeonline ActiveSync` | **Organization Client Access** | ActiveSync organization settings and device access rule cmdlets | Change the protocols of each mailbox and trust partner applications |
 | `terraform-msexchangeonline Sharing` | **Federated Sharing** | Sharing policy and organization relationship cmdlets | Change the federation trust and hybrid free/busy settings |
 | `terraform-msexchangeonline Audit Log` | **Audit Logs** | `Get-` and `Set-AdminAuditLogConfig` | Search the whole audit log and exclude a mailbox from it |
+| `terraform-msexchangeonline Mail Tips` | **Mail Tips** | `Get-` and `Set-OrganizationConfig` (`mail_tips_all_tips_enabled`) | Manage availability address spaces and organization relationships |
 
 The names above are the defaults, `<role group> <name>`. For a naming convention, `-RoleGroupName` names the role group, `-CustomRolePrefix` replaces the prefix of the custom roles (`-CustomRolePrefix CR-EXO-TF-` gives `CR-EXO-TF-Retention`), and `-CustomRoleNames` names each custom role (`-CustomRoleNames @{ Retention = "CR-EXO-TF-RET" }`). The provider does not depend on these names. After a rename, `-Apply -RemoveExtraRoles` deletes the old custom roles.
 

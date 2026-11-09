@@ -122,6 +122,8 @@ $ProviderRoles = @(
 #   and OAuth trusts with partner applications.
 # - Federated Sharing: the federation trust and the hybrid free/busy settings.
 # - Audit Logs: reads the whole audit log and can exclude a mailbox from it.
+# - Mail Tips: the only role with MailTipsAllTipsEnabled; also manages
+#   availability address spaces and organization relationships.
 $CustomRoles = @(
     @{ Name = "Retention"; Parent = "Retention Management"; Cmdlets = @(
         "Get-Mailbox",
@@ -161,6 +163,10 @@ $CustomRoles = @(
     @{ Name = "Audit Log"; Parent = "Audit Logs"; Cmdlets = @(
         "Get-AdminAuditLogConfig",
         "Set-AdminAuditLogConfig"
+    ) },
+    @{ Name = "Mail Tips"; Parent = "Mail Tips"; Cmdlets = @(
+        "Get-OrganizationConfig",
+        "Set-OrganizationConfig"
     ) }
 )
 # The name of each custom role in the organization: -CustomRoleNames, then
