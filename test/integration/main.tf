@@ -62,6 +62,12 @@ variable "mailbox_plan_retain_deleted_items_for_days" {
   default     = null
 }
 
+variable "organization_mail_tips_all_tips_enabled" {
+  description = "Set by test/run.sh to test a write to MailTipsAllTipsEnabled, then to restore it. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
 variable "report_third_party" {
   description = "Set by test/run.sh, with test_mailbox, to test a non-Microsoft reporting tool, then restored. null leaves it unmanaged."
   type        = bool
@@ -210,7 +216,9 @@ import {
 }
 
 # No attribute is set: Terraform only records the current values.
-resource "msexchangeonline_organization_config" "this" {}
+resource "msexchangeonline_organization_config" "this" {
+  mail_tips_all_tips_enabled = var.organization_mail_tips_all_tips_enabled
+}
 
 import {
   to = msexchangeonline_hosted_connection_filter_policy.this
