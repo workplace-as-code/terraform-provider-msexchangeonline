@@ -116,9 +116,17 @@ try {
     switch ($Action) {
         "Get" {
             $current = @(Get-PartnerCapabilities)
-            if ($current.Count -eq 0) {
-                Test-PartnerRole $knownNames
-                exit 0   # no Exchange capability: gone
+            $attempt = 0
+            while ($current.Count -eq 0) {
+                try {
+                    Test-PartnerRole $knownNames
+                    exit 0   # no Exchange capability: gone
+                } catch {
+                    # The list can lag behind a write: read it again before failing.
+                    if ($_.Exception.Message -notmatch 'retry later$' -or ++$attempt -ge 6) { throw }
+                }
+                Start-Sleep -Seconds (5 * $attempt)
+                $current = @(Get-PartnerCapabilities)
             }
             Write-PartnerState $current
         }

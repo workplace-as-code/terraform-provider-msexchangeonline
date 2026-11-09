@@ -13,6 +13,7 @@ $partner = "11111111-2222-3333-4444-555555555555"
 $global:Caps = [ordered]@{}
 $global:RoleMissing = $false
 $global:ListHides = $false
+$global:ListHidesFor = 0
 $global:FailPost = ""
 $global:Calls = [System.Collections.Generic.List[string]]::new()
 
@@ -35,7 +36,11 @@ function global:Invoke-WebRequest {
     if ($global:RoleMissing -and ($name -or $Method -ne "GET")) { return Response 403 $denied }
     switch ($Method) {
         "GET" {
-            if (-not $name) { return Response 200 @{ value = @(if (-not $global:RoleMissing -and -not $global:ListHides) { $global:Caps.Values }) } }
+            if (-not $name) {
+                $hide = $global:ListHides -or $global:ListHidesFor -gt 0
+                if ($global:ListHidesFor -gt 0) { $global:ListHidesFor-- }
+                return Response 200 @{ value = @(if (-not $global:RoleMissing -and -not $hide) { $global:Caps.Values }) }
+            }
             if ($global:Caps.Contains($name)) { return Response 200 $global:Caps[$name] }
             return Response 404 @{ error = @{ code = "NotFound"; message = "Capability $name not found." } }
         }
@@ -97,6 +102,12 @@ Invoke-Step "norole-import" Get
 $global:RoleMissing = $false
 $global:ListHides = $true
 Invoke-Step "hidden" Get $null @("crossTenantMailTipsAll")
+
+# The list lags behind a write, then catches up: the read waits for it.
+$global:ListHides = $false
+$global:ListHidesFor = 2
+Invoke-Step "lagging" Get $null @("crossTenantMailTipsAll")
+$global:ListHidesFor = 0
 
 # A create that fails on its second capability removes the first one: the next
 # apply can create the partner again.
