@@ -70,6 +70,25 @@ function Test-PartnerRole([string[]]$Names) {
 }
 
 # The "All" scope uses the resource type Graph stores for the capability.
+# Get-PartnerCapabilitiesSettled reads the list, and waits when it is empty while
+# a capability read by name exists: the list can be late. It returns nothing
+# only when the partner really has no Exchange capability.
+function Get-PartnerCapabilitiesSettled([string[]]$Names) {
+    $current = @(Get-PartnerCapabilities)
+    $attempt = 0
+    while ($current.Count -eq 0) {
+        try {
+            Test-PartnerRole $Names
+            return
+        } catch {
+            if ($_.Exception.Message -notmatch 'retry later$' -or ++$attempt -ge 6) { throw }
+        }
+        Start-Sleep -Seconds (5 * $attempt)
+        $current = @(Get-PartnerCapabilities)
+    }
+    $current
+}
+
 function Get-AllType([string]$Name) { if ($Name -like "crossTenantCalendarSharing*") { "group" } else { "user" } }
 
 function ConvertTo-PartnerBody($Desired) {
@@ -115,19 +134,8 @@ try {
     $desired = @(ConvertFrom-BridgeList $Capabilities)
     switch ($Action) {
         "Get" {
-            $current = @(Get-PartnerCapabilities)
-            $attempt = 0
-            while ($current.Count -eq 0) {
-                try {
-                    Test-PartnerRole $knownNames
-                    exit 0   # no Exchange capability: gone
-                } catch {
-                    # The list can lag behind a write: read it again before failing.
-                    if ($_.Exception.Message -notmatch 'retry later$' -or ++$attempt -ge 6) { throw }
-                }
-                Start-Sleep -Seconds (5 * $attempt)
-                $current = @(Get-PartnerCapabilities)
-            }
+            $current = @(Get-PartnerCapabilitiesSettled $knownNames)
+            if ($current.Count -eq 0) { exit 0 }   # no Exchange capability: gone
             Write-PartnerState $current
         }
         "Create" {
@@ -151,10 +159,10 @@ try {
                 if ($left.Count -gt 0) { $failure += " (could not remove $($left -join ', '): import the partner)" }
                 throw $failure
             }
-            Write-PartnerState @(Get-PartnerCapabilities)
+            Write-PartnerState @(Get-PartnerCapabilitiesSettled @($desired | ForEach-Object { [string]$_.name }))
         }
         "Update" {
-            $current = @(Get-PartnerCapabilities)
+            $current = @(Get-PartnerCapabilitiesSettled $knownNames)
             $byName = @{}
             foreach ($c in $current) { $byName[[string]$c.name] = $c }
             foreach ($c in $current) {
@@ -169,11 +177,10 @@ try {
                     Invoke-PartnerGraph PATCH "$base/$($d.name)" $body | Out-Null
                 }
             }
-            Write-PartnerState @(Get-PartnerCapabilities)
+            Write-PartnerState @(Get-PartnerCapabilitiesSettled @($desired | ForEach-Object { [string]$_.name }))
         }
         "Delete" {
-            $current = @(Get-PartnerCapabilities)
-            if ($current.Count -eq 0) { Test-PartnerRole $knownNames }
+            $current = @(Get-PartnerCapabilitiesSettled $knownNames)
             foreach ($c in $current) { Invoke-PartnerGraph DELETE "$base/$($c.name)" | Out-Null }
             "{}"
         }

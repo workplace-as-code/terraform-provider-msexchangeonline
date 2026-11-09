@@ -59,6 +59,7 @@ func TestCrossTenantPartnerScript(t *testing.T) {
 	)
 	// A list lagging behind a write catches up: the read waits instead of failing.
 	expectLines(t, out, "lagging calls: GET list; GET crossTenantMailTipsAll; GET list; GET crossTenantMailTipsAll; GET list")
+	expectLines(t, out, "lagging-delete calls: GET list; GET crossTenantMailTipsAll; GET list; GET crossTenantMailTipsAll; GET list; DELETE crossTenantMailTipsAll")
 	expectLines(t, out, "CrossTenantPartner Get failed: Microsoft Graph listed no Exchange capability for partner "+
 		"11111111-2222-3333-4444-555555555555, but crossTenantMailTipsAll exists: retry later")
 	// A failed create removes what it added, whatever the failing capability.

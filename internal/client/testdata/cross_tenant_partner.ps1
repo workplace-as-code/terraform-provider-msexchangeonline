@@ -108,6 +108,9 @@ $global:ListHides = $false
 $global:ListHidesFor = 2
 Invoke-Step "lagging" Get $null @("crossTenantMailTipsAll")
 $global:ListHidesFor = 0
+$global:ListHidesFor = 2
+Invoke-Step "lagging-delete" Delete $null @("crossTenantMailTipsAll")
+$global:ListHidesFor = 0
 
 # A create that fails on its second capability removes the first one: the next
 # apply can create the partner again.
