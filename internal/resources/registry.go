@@ -35,6 +35,7 @@ func registrations() []registration {
 		{NewDkimSigningConfigResource, listQuery{noun: "DkimSigningConfig"}},
 		{NewOutboundSpamFilterPolicyResource, listQuery{noun: "HostedOutboundSpamFilterPolicy"}},
 		{NewQuarantinePolicyResource, listQuery{noun: "QuarantinePolicy", property: "Name"}},
+		{NewQuarantineGlobalSettingsResource, listQuery{id: quarantineGlobalSettingsID}},
 		{NewEmailAddressPolicyResource, listQuery{noun: "EmailAddressPolicy"}},
 		{NewMobileDeviceMailboxPolicyResource, listQuery{noun: "MobileDeviceMailboxPolicy"}},
 		{NewRetentionPolicyResource, listQuery{noun: "RetentionPolicy"}},

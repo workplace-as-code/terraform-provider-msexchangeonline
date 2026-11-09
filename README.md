@@ -74,7 +74,7 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 | Area | Resources |
 |---|---|
 | Mail flow | `msexchangeonline_transport_rule`, `msexchangeonline_accepted_domain`, `msexchangeonline_remote_domain`, `msexchangeonline_inbound_connector`, `msexchangeonline_outbound_connector`, `msexchangeonline_transport_config`, `msexchangeonline_dkim_signing_config`, `msexchangeonline_journal_rule` |
-| Anti-spam | `msexchangeonline_hosted_connection_filter_policy`, `msexchangeonline_tenant_allow_block_list_item`, `msexchangeonline_hosted_content_filter_policy`, `msexchangeonline_hosted_content_filter_rule`, `msexchangeonline_outbound_spam_filter_policy`, `msexchangeonline_hosted_outbound_spam_filter_rule`, `msexchangeonline_quarantine_policy` |
+| Anti-spam | `msexchangeonline_hosted_connection_filter_policy`, `msexchangeonline_tenant_allow_block_list_item`, `msexchangeonline_hosted_content_filter_policy`, `msexchangeonline_hosted_content_filter_rule`, `msexchangeonline_outbound_spam_filter_policy`, `msexchangeonline_hosted_outbound_spam_filter_rule`, `msexchangeonline_quarantine_policy`, `msexchangeonline_quarantine_global_settings` |
 | Anti-malware and anti-phishing | `msexchangeonline_malware_filter_policy`, `msexchangeonline_malware_filter_rule`, `msexchangeonline_anti_phish_policy`, `msexchangeonline_anti_phish_rule`, `msexchangeonline_external_in_outlook` |
 | Defender for Office 365 | `msexchangeonline_safe_links_policy`, `msexchangeonline_safe_links_rule`, `msexchangeonline_safe_attachment_policy`, `msexchangeonline_safe_attachment_rule` |
 | Preset security policies | `msexchangeonline_eop_protection_policy_rule`, `msexchangeonline_atp_protection_policy_rule` |

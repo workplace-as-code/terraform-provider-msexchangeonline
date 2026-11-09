@@ -39,6 +39,7 @@ See the [Authentication guide](https://registry.terraform.io/providers/workplace
 | [`msexchangeonline_anti_phish_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_policy) | Impersonation settings need Defender for Office 365 |
 | [`msexchangeonline_anti_phish_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_rule) |  |
 | [`msexchangeonline_quarantine_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/quarantine_policy) |  |
+| [`msexchangeonline_quarantine_global_settings`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/quarantine_global_settings) | Singleton |
 | [`msexchangeonline_external_in_outlook`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/external_in_outlook) | Singleton: the External tag in Outlook |
 | [`msexchangeonline_eop_protection_policy_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/eop_protection_policy_rule) | Adopted: who the Exchange Online Protection part of the Standard or Strict preset security policy protects |
 
@@ -114,7 +115,7 @@ These data sources have no resource:
 
 ## Singletons
 
-Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`, `irm_configuration`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
+Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`, `irm_configuration`, `quarantine_global_settings`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
 
 ```terraform
 import {

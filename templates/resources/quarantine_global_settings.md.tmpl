@@ -1,0 +1,42 @@
+---
+page_title: "{{.Name}} ({{.Type}}) - {{.ProviderName}}"
+subcategory: "Anti-spam"
+description: |-
+{{ .Description | plainmarkdown | trimspace | prefixlines "  " }}
+---
+
+# {{.Name}} ({{.Type}})
+
+{{ .Description | trimspace }}
+
+## Example Usage
+
+{{ tffile .ExampleFile }}
+
+{{ .SchemaMarkdown | trimspace }}
+
+The logo used by `organization_branding_enabled` comes from the organization theme in the Microsoft 365 admin center: this provider does not manage it.
+
+## Permissions
+
+The provider's app registration needs the **Transport Hygiene** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+
+## Microsoft documentation
+
+- [`Get-QuarantinePolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/get-quarantinepolicy?view=exchange-ps)
+- [`Set-QuarantinePolicy`](https://learn.microsoft.com/powershell/module/exchangepowershell/set-quarantinepolicy?view=exchange-ps)
+- [Global quarantine notification settings](https://learn.microsoft.com/defender-office-365/quarantine-policies#configure-global-quarantine-notification-settings-in-the-microsoft-defender-portal)
+
+## Import
+
+Import using `default`:
+
+{{ tffile .ImportIDConfigFile }}
+
+Or by identity (Terraform 1.12 and later):
+
+{{ tffile .ImportIdentityConfigFile }}
+
+Or with the CLI:
+
+{{ codefile "shell" .ImportFile }}

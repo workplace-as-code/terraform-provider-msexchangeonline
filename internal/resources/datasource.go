@@ -23,11 +23,13 @@ import (
 // the resource appears in both.
 
 // dataSourceResources are the resources that also exist as a data source,
-// and the argument that names the object to read. Tenant-wide settings and
-// objects without a name (allow/block list items, application access
-// policies) have none; accepted domains and the organization config have
-// their own data source in internal/datasources.
+// and the argument that names the object to read ("" for a tenant-wide setting
+// with no argument, read as "default"). Other tenant-wide settings and objects
+// without a name (allow/block list items, application access policies) have
+// none; accepted domains and the organization config have their own data
+// source in internal/datasources.
 var dataSourceResources = []dataSourceResource{
+	{NewQuarantineGlobalSettingsResource, "", ""},
 	{NewAntiPhishPolicyResource, "name", ""},
 	{NewAntiPhishRuleResource, "name", ""},
 	{NewCrossTenantPartnerResource, "partner_tenant_id", ""},
@@ -127,7 +129,11 @@ func (d *resourceDataSource) Schema(ctx context.Context, req datasource.SchemaRe
 		}
 		attrs[name] = converted
 	}
-	desc := fmt.Sprintf("Reads an existing object by `%[3]s`, with the attributes of the "+
+	format := "Reads an existing object by `%[3]s`, with the attributes of the "
+	if d.key == "" {
+		format = "Reads the tenant-wide settings, with the attributes of the "
+	}
+	desc := fmt.Sprintf(format+
 		"[`%[1]s`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/%[2]s) resource. "+
 		"Use it to reference an object that this configuration does not manage, such as a default policy.",
 		meta.TypeName, meta.TypeName[len("msexchangeonline_"):], d.key)
@@ -177,6 +183,15 @@ func dataSourceAttribute(key bool, a schema.Attribute) (dsschema.Attribute, erro
 	return nil, fmt.Errorf("%T has no data source equivalent", a)
 }
 
+// dataSourceImportID is the value of the key, or "default" for a tenant-wide
+// setting, whose data source has no key.
+func dataSourceImportID(key string, name types.String) string {
+	if key == "" {
+		return "default"
+	}
+	return name.ValueString()
+}
+
 func (d *resourceDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
 	configurable, ok := d.resource.(resource.ResourceWithConfigure)
 	if !ok {
@@ -188,10 +203,12 @@ func (d *resourceDataSource) Configure(ctx context.Context, req datasource.Confi
 }
 
 func (d *resourceDataSource) Read(ctx context.Context, req datasource.ReadRequest, resp *datasource.ReadResponse) {
-	var name types.String
-	resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(d.key), &name)...)
-	if resp.Diagnostics.HasError() {
-		return
+	name := types.StringNull()
+	if d.key != "" {
+		resp.Diagnostics.Append(req.Config.GetAttribute(ctx, path.Root(d.key), &name)...)
+		if resp.Diagnostics.HasError() {
+			return
+		}
 	}
 	importer, ok := d.resource.(resource.ResourceWithImportState)
 	if !ok {
@@ -203,7 +220,7 @@ func (d *resourceDataSource) Read(ctx context.Context, req datasource.ReadReques
 	rs := d.resourceSchema(ctx)
 	empty := tfsdk.State{Schema: rs, Raw: tftypes.NewValue(rs.Type().TerraformType(ctx), nil)}
 	imported := resource.ImportStateResponse{State: empty}
-	importer.ImportState(ctx, resource.ImportStateRequest{ID: name.ValueString()}, &imported)
+	importer.ImportState(ctx, resource.ImportStateRequest{ID: dataSourceImportID(d.key, name)}, &imported)
 	resp.Diagnostics.Append(imported.Diagnostics...)
 	if resp.Diagnostics.HasError() {
 		return

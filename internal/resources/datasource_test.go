@@ -7,6 +7,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	dsschema "github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
+	"github.com/hashicorp/terraform-plugin-framework/types"
 )
 
 // TestDataSourcesMirrorTheirResource checks every data source built from a
@@ -32,7 +33,7 @@ func TestDataSourcesMirrorTheirResource(t *testing.T) {
 					t.Errorf("%s: required=%v computed=%v", name, a.IsRequired(), a.IsComputed())
 				}
 			}
-			if _, ok := resp.Schema.Attributes[d.key].(dsschema.StringAttribute); !ok {
+			if _, ok := resp.Schema.Attributes[d.key].(dsschema.StringAttribute); d.key != "" && !ok {
 				t.Errorf("no %s attribute", d.key)
 			}
 			want := d.resourceSchema(ctx).Type().TerraformType(ctx)
@@ -66,5 +67,27 @@ func TestReadOnlySpecsAreDataSourcesOnly(t *testing.T) {
 		if resources[name] {
 			t.Errorf("%s must not be a resource", name)
 		}
+	}
+}
+
+// TestDataSourceWithoutKey: a tenant-wide setting has one object, so its data
+// source takes no argument.
+func TestDataSourceWithoutKey(t *testing.T) {
+	d := &resourceDataSource{resource: NewQuarantineGlobalSettingsResource(), key: ""}
+	var resp datasource.SchemaResponse
+	d.Schema(context.Background(), datasource.SchemaRequest{}, &resp)
+	if resp.Diagnostics.HasError() {
+		t.Fatal(resp.Diagnostics)
+	}
+	for name, a := range resp.Schema.Attributes {
+		if a.IsRequired() || !a.IsComputed() {
+			t.Errorf("%s: required=%v computed=%v", name, a.IsRequired(), a.IsComputed())
+		}
+	}
+	if got := dataSourceImportID(d.key, types.StringNull()); got != "default" {
+		t.Errorf("import ID = %q, want default", got)
+	}
+	if got := dataSourceImportID("name", types.StringValue("TF-CI")); got != "TF-CI" {
+		t.Errorf("import ID = %q, want TF-CI", got)
 	}
 }

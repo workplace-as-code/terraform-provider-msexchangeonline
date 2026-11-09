@@ -273,6 +273,7 @@ KEEP=(
   "msexchangeonline_organization_config.this"
   "msexchangeonline_hosted_connection_filter_policy.this"
   "msexchangeonline_external_in_outlook.this"
+  "msexchangeonline_quarantine_global_settings.this"
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
   "msexchangeonline_irm_configuration.this"
@@ -471,6 +472,23 @@ if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admi
 else
   info "Skipped ActiveSync settings: the tenant already has admin mail recipients"
 fi
+frequency="$(state_value msexchangeonline_quarantine_global_settings.this notification_frequency)"
+write_and_restore msexchangeonline_quarantine_global_settings.this notification_frequency \
+  quarantine_notification_frequency "$([[ "$frequency" == 04:00:00 ]] && echo 1.00:00:00 || echo 04:00:00)" "$frequency"
+branding="$(state_value msexchangeonline_quarantine_global_settings.this organization_branding_enabled)"
+write_and_restore msexchangeonline_quarantine_global_settings.this organization_branding_enabled \
+  quarantine_organization_branding_enabled "$([[ "$branding" == true ]] && echo false || echo true)" "$branding"
+if [[ -n "${TF_VAR_test_mailbox:-}" && -z "$(state_string msexchangeonline_quarantine_global_settings.this sender_address)" ]]; then
+  write_and_restore msexchangeonline_quarantine_global_settings.this sender_address \
+    quarantine_sender_address "$TF_VAR_test_mailbox" ""
+fi
+# Only touch empty lists, so the restore puts back exactly what was there.
+if [[ "$(state_value msexchangeonline_quarantine_global_settings.this languages)" != *'"'* ]]; then
+  write_and_restore msexchangeonline_quarantine_global_settings.this languages quarantine_languages \
+    '[{language="English",sender_name="TF-CI sender",subject="TF-CI subject"},{language="French",sender_name="TF-CI expéditeur",disclaimer="Contactez le service d'"'"'assistance"}]' '[]'
+else
+  info "Skipped quarantine languages: the tenant already has customized notifications"
+fi
 expect_no_changes "Drift check after restore" -var phase=update
 
 # ---------------------------------------------------------------------------
@@ -614,7 +632,7 @@ echo "  Resources created, updated, imported and destroyed: ${#CREATED[@]}"
 echo "  Imported read-only: organization_config"
 echo "  Adopted on create, forgotten on destroy: accepted_domain"
 echo "  Adopted with a minimal configuration, no change planned: remote_domain, hosted_content_filter_policy and mobile_device_mailbox_policy Default"
-echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings, mailbox plans"
+echo "  Written and restored: quarantine_global_settings, transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings, mailbox plans"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"

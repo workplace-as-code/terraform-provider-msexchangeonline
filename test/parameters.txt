@@ -301,6 +301,7 @@ New-OwaMailboxPolicy Name
 New-QuarantinePolicy ESNEnabled
 New-QuarantinePolicy EndUserQuarantinePermissionsValue
 New-QuarantinePolicy Name
+New-QuarantinePolicy QuarantinePolicyType
 New-QuarantinePolicy QuarantineRetentionDays
 New-RemoteDomain DomainName
 New-RemoteDomain Name
@@ -502,7 +503,14 @@ Set-OwaMailboxPolicy WacViewingOnPublicComputersEnabled
 Set-OwaMailboxPolicy WebPartsFrameOptionsType
 Set-QuarantinePolicy ESNEnabled
 Set-QuarantinePolicy EndUserQuarantinePermissionsValue
+Set-QuarantinePolicy EndUserSpamNotificationCustomFromAddress
+Set-QuarantinePolicy EndUserSpamNotificationFrequency
+Set-QuarantinePolicy EsnCustomSubject
 Set-QuarantinePolicy Identity
+Set-QuarantinePolicy MultiLanguageCustomDisclaimer
+Set-QuarantinePolicy MultiLanguageSenderName
+Set-QuarantinePolicy MultiLanguageSetting
+Set-QuarantinePolicy OrganizationBrandingEnabled
 Set-QuarantinePolicy QuarantineRetentionDays
 Set-RemoteDomain AllowedOofType
 Set-RemoteDomain AutoForwardEnabled

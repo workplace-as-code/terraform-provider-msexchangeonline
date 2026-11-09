@@ -62,6 +62,35 @@ variable "mailbox_plan_retain_deleted_items_for_days" {
   default     = null
 }
 
+variable "quarantine_notification_frequency" {
+  description = "Set by test/run.sh to test a write to the global quarantine settings, then to restore it. null leaves it unmanaged."
+  type        = string
+  default     = null
+}
+
+variable "quarantine_sender_address" {
+  description = "Set by test/run.sh, with test_mailbox, then restored. null leaves it unmanaged."
+  type        = string
+  default     = null
+}
+
+variable "quarantine_organization_branding_enabled" {
+  description = "Set by test/run.sh, then restored. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
+variable "quarantine_languages" {
+  description = "Set by test/run.sh to add customized notifications, then to remove them. null leaves them unmanaged."
+  type = list(object({
+    language    = string
+    sender_name = optional(string)
+    subject     = optional(string)
+    disclaimer  = optional(string)
+  }))
+  default = null
+}
+
 variable "reply_all_storm_block_duration_hours" {
   description = "Set by test/run.sh to test a write to the transport config, then to restore it. null leaves it unmanaged."
   type        = number
@@ -258,6 +287,18 @@ resource "msexchangeonline_cas_mailbox_plan" "enterprise" {
 import {
   to = msexchangeonline_transport_config.this
   id = "default"
+}
+
+import {
+  to = msexchangeonline_quarantine_global_settings.this
+  id = "default"
+}
+
+resource "msexchangeonline_quarantine_global_settings" "this" {
+  notification_frequency        = var.quarantine_notification_frequency
+  sender_address                = var.quarantine_sender_address
+  organization_branding_enabled = var.quarantine_organization_branding_enabled
+  languages                     = var.quarantine_languages == null ? null : toset(var.quarantine_languages)
 }
 
 resource "msexchangeonline_transport_config" "this" {
