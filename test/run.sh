@@ -411,6 +411,9 @@ if [[ ${#ORPHANS[@]} -gt 0 ]]; then
   info "${#ORPHANS[@]} orphaned object(s) found, destroying..."
   terraform destroy -auto-approve -no-color "${ORPHANS[@]}" | tail -1
   pass "Orphans destroyed"
+  # Exchange refuses the same names for a while after they are deleted.
+  info "Waiting 5 minutes for the deletions to reach every Exchange server"
+  sleep 300
 else
   pass "No orphaned objects found"
 fi
