@@ -425,3 +425,31 @@ func TestPreflightReadsTheRoleGroupLists(t *testing.T) {
 		}
 	}
 }
+
+// TestPreflightParameterCheck guards test/preflight_parameters.ps1: a parameter
+// in no role of the organization fails the run, one the app cannot use is a
+// warning, and a cmdlet the app cannot see is left to the cmdlet check.
+func TestPreflightParameterCheck(t *testing.T) {
+	if _, err := exec.LookPath("pwsh"); err != nil {
+		t.Skip("pwsh is not installed")
+	}
+	out, err := exec.Command("pwsh", "-NoLogo", "-NoProfile", "-NonInteractive", "-File",
+		"testdata/preflight_parameters.ps1", "-Script", "../test/preflight_parameters.ps1").CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	for _, want := range []string{
+		"ok: 1",
+		"! Set-Foo Hidden is not available to the app (roles: Role A)",
+		"x Set-Foo Gone is in no role of the organization",
+		"errors: 1",
+		"optional errors: 0",
+	} {
+		if !strings.Contains(string(out), want) {
+			t.Errorf("missing %q in:\n%s", want, out)
+		}
+	}
+	if strings.Contains(string(out), "Set-Missing") {
+		t.Errorf("a cmdlet the app cannot see must be left to the cmdlet check:\n%s", out)
+	}
+}

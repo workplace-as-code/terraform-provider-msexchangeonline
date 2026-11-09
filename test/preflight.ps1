@@ -89,6 +89,10 @@ foreach ($cmdlet in $missing) {
         $errors++
     }
 }
+# The parameter of every attribute, without writing anything.
+. "$PSScriptRoot/preflight_parameters.ps1"
+$errors += Test-PreflightParameters -Path "$PSScriptRoot/parameters.txt" -IsOptional { param($Cmdlet) Test-Optional $Cmdlet }
+
 Disconnect-ExchangeOnline -Confirm:$false -ErrorAction SilentlyContinue | Out-Null
 if ($errors -gt 0) { exit 1 }
 Write-Host "  $($cmdlets.Count - $missing.Count) of the $($cmdlets.Count) cmdlets of the bridge scripts are available to the app"
