@@ -30,6 +30,7 @@ See the [Authentication guide](https://registry.terraform.io/providers/workplace
 |---|---|
 | [`msexchangeonline_hosted_connection_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_connection_filter_policy) | Singleton: IP allow and block lists |
 | [`msexchangeonline_tenant_allow_block_list_item`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/tenant_allow_block_list_item) | Blocked or allowed senders, URLs, file hashes, IP addresses |
+| [`msexchangeonline_tenant_allow_block_list_spoof_item`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/tenant_allow_block_list_spoof_item) | Spoofed senders. |
 | [`msexchangeonline_hosted_content_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_content_filter_policy) | Inbound spam filter |
 | [`msexchangeonline_hosted_content_filter_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_content_filter_rule) |  |
 | [`msexchangeonline_outbound_spam_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/outbound_spam_filter_policy) | Sending limits and automatic forwarding |
@@ -39,6 +40,8 @@ See the [Authentication guide](https://registry.terraform.io/providers/workplace
 | [`msexchangeonline_anti_phish_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_policy) | Impersonation settings need Defender for Office 365 |
 | [`msexchangeonline_anti_phish_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/anti_phish_rule) |  |
 | [`msexchangeonline_quarantine_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/quarantine_policy) |  |
+| [`msexchangeonline_quarantine_global_settings`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/quarantine_global_settings) | Singleton |
+| [`msexchangeonline_report_submission_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/report_submission_policy) | Singleton |
 | [`msexchangeonline_external_in_outlook`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/external_in_outlook) | Singleton: the External tag in Outlook |
 | [`msexchangeonline_eop_protection_policy_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/eop_protection_policy_rule) | Adopted: who the Exchange Online Protection part of the Standard or Strict preset security policy protects |
 
@@ -108,12 +111,13 @@ These data sources have no resource:
 |---|---|
 | [`msexchangeonline_accepted_domains`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/accepted_domains) | Every accepted domain of the tenant |
 | [`msexchangeonline_mailbox`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/mailbox) | One mailbox, read only |
+| [`msexchangeonline_management_role`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/management_role) | One management role, built-in or custom, read only |
 | [`msexchangeonline_onpremises_organization`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/onpremises_organization) | Hybrid: the on-premises organization known to Exchange Online |
 | [`msexchangeonline_intra_organization_connector`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/data-sources/intra_organization_connector) | Hybrid: the OAuth connector to Exchange Server |
 
 ## Singletons
 
-Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`, `irm_configuration`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
+Tenant-wide settings (`organization_config`, `transport_config`, `hosted_connection_filter_policy`, `external_in_outlook`, `admin_audit_log_config`, `activesync_organization_settings`, `irm_configuration`, `quarantine_global_settings`, `report_submission_policy`) always exist. Creating the resource adopts the current settings, and destroying it only removes it from Terraform state. Only the attributes set in the configuration are managed: the others keep their current value. Use an `import` block to start from the current settings:
 
 ```terraform
 import {

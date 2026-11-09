@@ -74,7 +74,7 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 | Area | Resources |
 |---|---|
 | Mail flow | `msexchangeonline_transport_rule`, `msexchangeonline_accepted_domain`, `msexchangeonline_remote_domain`, `msexchangeonline_inbound_connector`, `msexchangeonline_outbound_connector`, `msexchangeonline_transport_config`, `msexchangeonline_dkim_signing_config`, `msexchangeonline_journal_rule` |
-| Anti-spam | `msexchangeonline_hosted_connection_filter_policy`, `msexchangeonline_tenant_allow_block_list_item`, `msexchangeonline_hosted_content_filter_policy`, `msexchangeonline_hosted_content_filter_rule`, `msexchangeonline_outbound_spam_filter_policy`, `msexchangeonline_hosted_outbound_spam_filter_rule`, `msexchangeonline_quarantine_policy` |
+| Anti-spam | `msexchangeonline_hosted_connection_filter_policy`, `msexchangeonline_tenant_allow_block_list_item`, `msexchangeonline_tenant_allow_block_list_spoof_item`, `msexchangeonline_hosted_content_filter_policy`, `msexchangeonline_hosted_content_filter_rule`, `msexchangeonline_outbound_spam_filter_policy`, `msexchangeonline_hosted_outbound_spam_filter_rule`, `msexchangeonline_quarantine_policy`, `msexchangeonline_quarantine_global_settings`, `msexchangeonline_report_submission_policy` |
 | Anti-malware and anti-phishing | `msexchangeonline_malware_filter_policy`, `msexchangeonline_malware_filter_rule`, `msexchangeonline_anti_phish_policy`, `msexchangeonline_anti_phish_rule`, `msexchangeonline_external_in_outlook` |
 | Defender for Office 365 | `msexchangeonline_safe_links_policy`, `msexchangeonline_safe_links_rule`, `msexchangeonline_safe_attachment_policy`, `msexchangeonline_safe_attachment_rule` |
 | Preset security policies | `msexchangeonline_eop_protection_policy_rule`, `msexchangeonline_atp_protection_policy_rule` |
@@ -84,7 +84,7 @@ Full reference in [docs/resources](docs/resources/). The [Resources and availabi
 | Message encryption | `msexchangeonline_irm_configuration`, `msexchangeonline_ome_configuration` |
 | Exchange RBAC | `msexchangeonline_management_scope`, `msexchangeonline_role_group`, `msexchangeonline_management_role`, `msexchangeonline_management_role_assignment`, `msexchangeonline_role_assignment_policy`, `msexchangeonline_service_principal` |
 
-Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Four more read the tenant: `msexchangeonline_accepted_domains`, `msexchangeonline_mailbox`, and for hybrid deployments `msexchangeonline_onpremises_organization` and `msexchangeonline_intra_organization_connector`. Full reference in [docs/data-sources](docs/data-sources/).
+Most resources also exist as a data source, to read an object without managing it: `data "msexchangeonline_remote_domain" "default" { name = "Default" }`. Five more read the tenant: `msexchangeonline_accepted_domains`, `msexchangeonline_mailbox`, `msexchangeonline_management_role`, and for hybrid deployments `msexchangeonline_onpremises_organization` and `msexchangeonline_intra_organization_connector`. Full reference in [docs/data-sources](docs/data-sources/).
 
 ### Related provider
 

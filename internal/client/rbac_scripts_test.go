@@ -131,3 +131,14 @@ func TestOmeConfigurationScript(t *testing.T) {
 		"calls: Set OME Configuration DisclaimerText=String; New TF-CI-OME ExternalMailExpiryInDays=Int32,Image=Byte[]; Remove TF-CI-OME",
 	)
 }
+
+// TestManagementRoleInfoScript guards management_role_info.ps1: built-in roles
+// are read like custom ones, and a missing role is empty output.
+func TestManagementRoleInfoScript(t *testing.T) {
+	out := runStub(t, "management_role_info.ps1", "management_role_info.ps1")
+	expectLines(t, out,
+		`builtin: {"Name":"Transport Rules","Description":"Built in","Parent":"","BuiltIn":true,"Cmdlets":["Get-Mailbox","Set-User"]}`,
+		`custom: {"Name":"TF-CI-Role","Description":"","Parent":"Mail Recipients","BuiltIn":false,"Cmdlets":["Get-Mailbox","Set-User"]}`,
+		"missing: []",
+	)
+}

@@ -35,6 +35,12 @@ try {
                     if ($value) { "${listType}:$value" }
                 }
             }
+        } elseif ($Noun -eq "TenantAllowBlockListSpoofItems") {
+            # Get- lists the entries only without -Identity. An entry is imported
+            # as "<spoof_type>:<spoofed_user>:<sending_infrastructure>".
+            foreach ($item in @(Invoke-BridgeRetry { @(Get-TenantAllowBlockListSpoofItems) })) {
+                "$($item.SpoofType):$($item.SpoofedUser):$($item.SendingInfrastructure)"
+            }
         } elseif ($Noun -eq "CrossTenantPartner") {
             # Microsoft Graph: the partners of the cross-tenant access policy
             # that have at least one Exchange capability.

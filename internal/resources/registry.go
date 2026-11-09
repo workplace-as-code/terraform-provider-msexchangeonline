@@ -35,11 +35,15 @@ func registrations() []registration {
 		{NewDkimSigningConfigResource, listQuery{noun: "DkimSigningConfig"}},
 		{NewOutboundSpamFilterPolicyResource, listQuery{noun: "HostedOutboundSpamFilterPolicy"}},
 		{NewQuarantinePolicyResource, listQuery{noun: "QuarantinePolicy", property: "Name"}},
+		{NewQuarantineGlobalSettingsResource, listQuery{id: quarantineGlobalSettingsID}},
+		{NewReportSubmissionPolicyResource, listQuery{id: reportSubmissionID}},
 		{NewEmailAddressPolicyResource, listQuery{noun: "EmailAddressPolicy"}},
 		{NewMobileDeviceMailboxPolicyResource, listQuery{noun: "MobileDeviceMailboxPolicy"}},
 		{NewRetentionPolicyResource, listQuery{noun: "RetentionPolicy"}},
 		// list.ps1 lists the four lists and returns "<list_type>:<value>".
 		{NewTenantAllowBlockListItemResource, listQuery{noun: "TenantAllowBlockListItems"}},
+		// list.ps1 returns "<spoof_type>:<spoofed_user>:<sending_infrastructure>".
+		{NewSpoofItemResource, listQuery{noun: "TenantAllowBlockListSpoofItems"}},
 		{NewApplicationAccessPolicyResource, listQuery{noun: "ApplicationAccessPolicy"}},
 		{NewCrossTenantPartnerResource, listQuery{noun: "CrossTenantPartner"}},
 		// Exchange names a rule "<query string> (<characteristic>)": the import ID.

@@ -62,6 +62,41 @@ variable "mailbox_plan_retain_deleted_items_for_days" {
   default     = null
 }
 
+variable "report_third_party" {
+  description = "Set by test/run.sh, with test_mailbox, to test a non-Microsoft reporting tool, then restored. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
+variable "quarantine_notification_frequency" {
+  description = "Set by test/run.sh to test a write to the global quarantine settings, then to restore it. null leaves it unmanaged."
+  type        = string
+  default     = null
+}
+
+variable "quarantine_sender_address" {
+  description = "Set by test/run.sh, with test_mailbox, then restored. null leaves it unmanaged."
+  type        = string
+  default     = null
+}
+
+variable "quarantine_organization_branding_enabled" {
+  description = "Set by test/run.sh, then restored. null leaves it unmanaged."
+  type        = bool
+  default     = null
+}
+
+variable "quarantine_languages" {
+  description = "Set by test/run.sh to add customized notifications, then to remove them. null leaves them unmanaged."
+  type = list(object({
+    language    = string
+    sender_name = optional(string)
+    subject     = optional(string)
+    disclaimer  = optional(string)
+  }))
+  default = null
+}
+
 variable "reply_all_storm_block_duration_hours" {
   description = "Set by test/run.sh to test a write to the transport config, then to restore it. null leaves it unmanaged."
   type        = number
@@ -260,6 +295,51 @@ import {
   id = "default"
 }
 
+import {
+  to = msexchangeonline_quarantine_global_settings.this
+  id = "default"
+}
+
+import {
+  to = msexchangeonline_report_submission_policy.this
+  id = "default"
+}
+
+resource "msexchangeonline_report_submission_policy" "this" {
+  reporting_mailbox                   = local.updated ? var.test_mailbox : ""
+  enable_report_to_microsoft          = !local.updated
+  enable_third_party_address          = var.report_third_party
+  disable_quarantine_reporting_option = local.updated
+  enable_user_email_notification      = local.updated
+  enable_custom_notification_sender   = local.updated && var.test_mailbox != ""
+  notification_sender_address         = local.updated ? var.test_mailbox : ""
+  enable_organization_branding        = local.updated
+  notification_footer_message         = local.comment
+  junk_review_result_message          = local.comment
+  not_junk_review_result_message      = local.comment
+  phishing_review_result_message      = local.comment
+  pre_submit_message_enabled          = !local.updated
+  post_submit_message_enabled         = !local.updated
+  pre_submit_message                  = local.comment
+  pre_submit_message_title            = local.comment
+  post_submit_message                 = local.comment
+  post_submit_message_title           = local.comment
+
+  languages = local.updated ? [
+    { language = "en", pre_submit_junk_title = "TF-CI title" },
+    { language = "fr", pre_submit_junk_message = "Contactez le service d'assistance : détails" },
+    ] : [
+    { language = "en", post_submit_phishing_title = "TF-CI created" },
+  ]
+}
+
+resource "msexchangeonline_quarantine_global_settings" "this" {
+  notification_frequency        = var.quarantine_notification_frequency
+  sender_address                = var.quarantine_sender_address
+  organization_branding_enabled = var.quarantine_organization_branding_enabled
+  languages                     = var.quarantine_languages == null ? null : toset(var.quarantine_languages)
+}
+
 resource "msexchangeonline_transport_config" "this" {
   reply_all_storm_block_duration_hours = var.reply_all_storm_block_duration_hours
 }
@@ -402,6 +482,7 @@ resource "msexchangeonline_hosted_content_filter_policy" "test" {
   name = "TF-CI-SpamFilter"
 
   spam_action    = local.updated ? "Quarantine" : "MoveToJmf"
+  quarantine_tag = local.updated ? "AdminOnlyAccessPolicy" : "DefaultFullAccessPolicy"
   bulk_threshold = local.updated ? 6 : 7
 
   recipient_domain_is = [var.primary_domain]
@@ -475,6 +556,20 @@ resource "msexchangeonline_tenant_allow_block_list_item" "sender" {
   entry     = "tf-ci-blocked@tf-ci-test.example"
   action    = "Block"
   notes     = local.comment
+}
+
+resource "msexchangeonline_tenant_allow_block_list_spoof_item" "test" {
+  spoofed_user           = "tf-ci-spoof.example.com"
+  sending_infrastructure = "tf-ci-infra.example.net"
+  spoof_type             = "External"
+  action                 = local.updated ? "Block" : "Allow"
+}
+
+resource "msexchangeonline_tenant_allow_block_list_spoof_item" "ip" {
+  spoofed_user           = "tf-ci-spoof-ip.example.com"
+  sending_infrastructure = "192.0.2.1/24"
+  spoof_type             = "External"
+  action                 = "Allow"
 }
 
 resource "msexchangeonline_tenant_allow_block_list_item" "url" {

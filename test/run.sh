@@ -196,6 +196,8 @@ CREATED=(
   "msexchangeonline_journal_rule.test=TF-CI-Journal"
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
+  "msexchangeonline_tenant_allow_block_list_spoof_item.test=External:tf-ci-spoof.example.com:tf-ci-infra.example.net"
+  "msexchangeonline_tenant_allow_block_list_spoof_item.ip=External:tf-ci-spoof-ip.example.com:192.0.2.1/24"
   "msexchangeonline_address_book_policy.test=TF-CI-ABP"
   "msexchangeonline_offline_address_book.test=TF-CI-OAB"
   "msexchangeonline_global_address_list.test=TF-CI-GAL"
@@ -273,6 +275,8 @@ KEEP=(
   "msexchangeonline_organization_config.this"
   "msexchangeonline_hosted_connection_filter_policy.this"
   "msexchangeonline_external_in_outlook.this"
+  "msexchangeonline_quarantine_global_settings.this"
+  "msexchangeonline_report_submission_policy.this"
   "msexchangeonline_transport_config.this"
   "msexchangeonline_admin_audit_log_config.this"
   "msexchangeonline_irm_configuration.this"
@@ -285,6 +289,15 @@ KEEP=(
 )
 # The default branding template is adopted: kept like the tenant-wide objects.
 [[ -n "${EXCHANGE_TEST_ENCRYPTION:-}" ]] && KEEP+=("msexchangeonline_ome_configuration.default[0]")
+
+# reset_report_submission puts the report submission policy and its rule back
+# to the state of a tenant never configured: destroy leaves them in place.
+reset_report_submission() {
+  [[ "$AUTH_METHOD" == "client_certificate" && -z "${EXCHANGE_CERTIFICATE_THUMBPRINT:-}" ]] || return 0
+  pwsh -NoLogo -NoProfile -NonInteractive -File "$ROOT/test/report_submission_reset.ps1" ||
+    fail "The report submission policy could not be reset"
+  pass "Report submission policy reset"
+}
 
 # expect_no_changes <label> [terraform plan args...]
 # Fails unless terraform plan reports no changes.
@@ -362,10 +375,15 @@ state_string() {
 # then writes the original value back.
 write_and_restore() {
   local addr="$1" attr="$2" var="$3" value="$4" original="$5"
+  local current
   terraform apply -auto-approve -no-color -var phase=update -var "$var=$value" | tail -1
-  [[ "$(state_value "$addr" "$attr")" != "$original" ]] || fail "$addr.$attr was not changed"
+  current="$(state_value "$addr" "$attr")"
+  current="${current#\"}"; current="${current%\"}"
+  [[ "$current" != "$original" ]] || fail "$addr.$attr was not changed"
   terraform apply -auto-approve -no-color -var phase=update -var "$var=$original" | tail -1
-  [[ "$(state_value "$addr" "$attr")" == "$original" ]] || fail "$addr.$attr was not restored"
+  current="$(state_value "$addr" "$attr")"
+  current="${current#\"}"; current="${current%\"}"
+  [[ "$current" == "$original" ]] || fail "$addr.$attr was not restored"
   pass "$addr.$attr changed and restored"
 }
 
@@ -387,11 +405,15 @@ pass "Init OK"
 # 6. Pre-cleanup: delete test objects left over by an interrupted run
 # ---------------------------------------------------------------------------
 step "Pre-cleanup: removing any orphaned test objects"
+reset_report_submission
 mapfile -t ORPHANS < <(import_orphans)
 if [[ ${#ORPHANS[@]} -gt 0 ]]; then
   info "${#ORPHANS[@]} orphaned object(s) found, destroying..."
   terraform destroy -auto-approve -no-color "${ORPHANS[@]}" | tail -1
   pass "Orphans destroyed"
+  # Exchange refuses the same names for a while after they are deleted.
+  info "Waiting 5 minutes for the deletions to reach every Exchange server"
+  sleep 300
 else
   pass "No orphaned objects found"
 fi
@@ -470,6 +492,27 @@ if [[ "$(state_value msexchangeonline_activesync_organization_settings.this admi
     activesync_admin_mail_recipients '["tf-ci-test@tf-ci-test.example"]' '[]'
 else
   info "Skipped ActiveSync settings: the tenant already has admin mail recipients"
+fi
+if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
+  write_and_restore msexchangeonline_report_submission_policy.this enable_third_party_address \
+    report_third_party true false
+fi
+frequency="$(state_string msexchangeonline_quarantine_global_settings.this notification_frequency)"
+write_and_restore msexchangeonline_quarantine_global_settings.this notification_frequency \
+  quarantine_notification_frequency "$([[ "$frequency" == 04:00:00 ]] && echo 1.00:00:00 || echo 04:00:00)" "$frequency"
+branding="$(state_value msexchangeonline_quarantine_global_settings.this organization_branding_enabled)"
+write_and_restore msexchangeonline_quarantine_global_settings.this organization_branding_enabled \
+  quarantine_organization_branding_enabled "$([[ "$branding" == true ]] && echo false || echo true)" "$branding"
+if [[ -n "${TF_VAR_test_mailbox:-}" && -z "$(state_string msexchangeonline_quarantine_global_settings.this sender_address)" ]]; then
+  write_and_restore msexchangeonline_quarantine_global_settings.this sender_address \
+    quarantine_sender_address "$TF_VAR_test_mailbox" ""
+fi
+# Only touch empty lists, so the restore puts back exactly what was there.
+if [[ "$(state_value msexchangeonline_quarantine_global_settings.this languages)" != *'"'* ]]; then
+  write_and_restore msexchangeonline_quarantine_global_settings.this languages quarantine_languages \
+    '[{language="English",sender_name="TF-CI sender",subject="TF-CI subject"},{language="French",sender_name="TF-CI expéditeur",disclaimer="Contactez le service d'"'"'assistance"}]' '[]'
+else
+  info "Skipped quarantine languages: the tenant already has customized notifications"
 fi
 expect_no_changes "Drift check after restore" -var phase=update
 
@@ -580,6 +623,7 @@ pass "Destroy OK"
 # 12. Verify the test objects are really gone from Exchange
 # ---------------------------------------------------------------------------
 step "Verifying the test objects no longer exist"
+reset_report_submission
 reset_state
 mapfile -t LEFT < <(import_orphans)
 if [[ ${#LEFT[@]} -gt 0 ]]; then
@@ -614,7 +658,7 @@ echo "  Resources created, updated, imported and destroyed: ${#CREATED[@]}"
 echo "  Imported read-only: organization_config"
 echo "  Adopted on create, forgotten on destroy: accepted_domain"
 echo "  Adopted with a minimal configuration, no change planned: remote_domain, hosted_content_filter_policy and mobile_device_mailbox_policy Default"
-echo "  Written and restored: transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings, mailbox plans"
+echo "  Written and restored: quarantine_global_settings, transport_config, hosted_connection_filter_policy, external_in_outlook, activesync_organization_settings, mailbox plans"
 [[ -z "${APP_POLICY:-}" ]] && echo "  Skipped:          application_access_policy (set TF_VAR_test_mail_enabled_group and TF_VAR_test_app_id)"
 if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   echo "  Data sources:     accepted_domain, accepted_domains, organization_config, mailbox, and the policies"
