@@ -198,10 +198,13 @@ func (r *reportSubmissionPolicyResource) ValidateConfig(ctx context.Context, req
 	for _, l := range reportSubmissionLanguages {
 		allowed[l] = true
 	}
-	for _, e := range languages.Elements() {
-		if l := e.(types.Object).Attributes()["language"].(types.String); !l.IsUnknown() && !l.IsNull() && !allowed[strings.ToLower(l.ValueString())] {
-			resp.Diagnostics.AddAttributeError(at, "Unknown language", fmt.Sprintf("%q is not a language code Exchange Online accepts, such as en or fr.", l.ValueString()))
+	for _, a := range knownLanguages(languages) {
+		if l := a["language"].(types.String); !l.IsUnknown() && !l.IsNull() && !allowed[l.ValueString()] {
+			resp.Diagnostics.AddAttributeError(at, "Unknown language", fmt.Sprintf("%q is not a language code Exchange Online accepts: lowercase, such as en or fr.", l.ValueString()))
 		}
+	}
+	if name := emptyLanguageText(languages); name != "" {
+		resp.Diagnostics.AddAttributeError(at, "Empty text", fmt.Sprintf("%s is empty: leave it out instead.", name))
 	}
 }
 
@@ -212,7 +215,7 @@ func (r *reportSubmissionPolicyResource) Configure(_ context.Context, req resour
 }
 
 // reportSubmissionParams sends the attributes set in the configuration.
-func reportSubmissionParams(cfg types.Object) map[string]string {
+func reportSubmissionParams(cfg types.Object, stateMailbox types.String) map[string]string {
 	a := cfg.Attributes()
 	values := map[string]any{}
 	for _, f := range reportSubmissionFields {
@@ -228,13 +231,16 @@ func reportSubmissionParams(cfg types.Object) map[string]string {
 	p := map[string]string{"Action": "Update", "Values": encodeJSON(values)}
 	if mailbox := a["reporting_mailbox"].(types.String); known(mailbox) {
 		p["ReportingMailbox"] = mailbox.ValueString()
+	} else if known(stateMailbox) {
+		// Not managed by the configuration: the result stays what the state holds.
+		p["ExpectedMailbox"] = stateMailbox.ValueString()
 	}
 	if languages := a["languages"].(types.Set); known(languages) {
 		texts := reportSubmissionLanguageTexts()
 		out := make([]map[string]string, 0, len(languages.Elements()))
 		for _, e := range languages.Elements() {
 			attrs := e.(types.Object).Attributes()
-			language := map[string]string{"Language": strings.ToLower(attrs["language"].(types.String).ValueString())}
+			language := map[string]string{"Language": attrs["language"].(types.String).ValueString()}
 			for _, t := range texts {
 				language[t.param] = attrs[t.name].(types.String).ValueString()
 			}
@@ -249,20 +255,21 @@ func (r *reportSubmissionPolicyResource) Create(ctx context.Context, req resourc
 	var cfg types.Object
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
 	if !resp.Diagnostics.HasError() {
-		r.write(ctx, cfg, &resp.State, &resp.Diagnostics)
+		r.write(ctx, cfg, types.StringNull(), &resp.State, &resp.Diagnostics)
 	}
 }
 
 func (r *reportSubmissionPolicyResource) Update(ctx context.Context, req resource.UpdateRequest, resp *resource.UpdateResponse) {
-	var cfg types.Object
+	var cfg, prior types.Object
 	resp.Diagnostics.Append(req.Config.Get(ctx, &cfg)...)
+	resp.Diagnostics.Append(req.State.Get(ctx, &prior)...)
 	if !resp.Diagnostics.HasError() {
-		r.write(ctx, cfg, &resp.State, &resp.Diagnostics)
+		r.write(ctx, cfg, prior.Attributes()["reporting_mailbox"].(types.String), &resp.State, &resp.Diagnostics)
 	}
 }
 
-func (r *reportSubmissionPolicyResource) write(ctx context.Context, cfg types.Object, state stateSetter, diags diagAppender) {
-	output, err := r.client.RunScript(ctx, reportSubmissionScript, reportSubmissionParams(cfg))
+func (r *reportSubmissionPolicyResource) write(ctx context.Context, cfg types.Object, stateMailbox types.String, state stateSetter, diags diagAppender) {
+	output, err := r.client.RunScript(ctx, reportSubmissionScript, reportSubmissionParams(cfg, stateMailbox))
 	if err != nil {
 		diags.AddError("Failed to write the report submission policy", err.Error())
 		return
@@ -345,6 +352,11 @@ func reportSubmissionFromAPI(output []byte) (types.Object, error) {
 		}
 		elems = append(elems, types.ObjectValueMust(languageType.AttrTypes, values))
 	}
-	attributes["languages"] = types.SetValueMust(languageType, elems)
+	// Null, not empty: the configuration terraform query generates must not hold
+	// the empty set that validation refuses.
+	attributes["languages"] = types.SetNull(languageType)
+	if len(elems) > 0 {
+		attributes["languages"] = types.SetValueMust(languageType, elems)
+	}
 	return types.ObjectValueMust(reportSubmissionAttrTypes(), attributes), nil
 }

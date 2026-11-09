@@ -30,6 +30,7 @@ func TestReportSubmissionScript(t *testing.T) {
 		"alias mailbox: [alias@contoso.com]",
 		"rulehand mailbox: [c@contoso.com]",
 		"import mailbox: [a@contoso.com]",
+		"unmanaged mailbox: [alias@contoso.com]",
 		`"Language":"en"`, `"MultiLanguagePreSubmitMessageForJunk":"Détails"`,
 	)
 	for _, line := range strings.Split(out, "\n") {

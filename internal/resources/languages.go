@@ -10,6 +10,31 @@ import (
 // Helpers for the languages attribute of tenant-wide settings: a set of
 // objects keyed by their language attribute.
 
+// knownLanguages returns the attributes of the elements of the set whose value
+// is known: an element built from a computed value is not, at validation.
+func knownLanguages(languages types.Set) []map[string]attr.Value {
+	var out []map[string]attr.Value
+	for _, e := range languages.Elements() {
+		if object, ok := e.(types.Object); ok && !object.IsUnknown() && !object.IsNull() {
+			out = append(out, object.Attributes())
+		}
+	}
+	return out
+}
+
+// emptyLanguageText returns an attribute set to "" in the set, "" if none. An
+// empty text is stored as unset: the plan and the state would not match.
+func emptyLanguageText(languages types.Set) string {
+	for _, attributes := range knownLanguages(languages) {
+		for name, v := range attributes {
+			if text, ok := v.(types.String); ok && !text.IsNull() && !text.IsUnknown() && text.ValueString() == "" {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
 // duplicateLanguage returns a language found twice in the set, "" if none.
 func duplicateLanguage(languages types.Set) string {
 	seen := map[string]bool{}

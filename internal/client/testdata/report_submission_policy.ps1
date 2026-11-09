@@ -75,6 +75,11 @@ Read "alias" (Rule "primary@contoso.com") @("alias@contoso.com") "alias@contoso.
 Read "rulehand" (Rule "c@contoso.com") @("a@contoso.com") "a@contoso.com"
 Read "import" (Rule "a@contoso.com") @("a@contoso.com") ""
 
+# A mailbox the configuration no longer manages stays compared with the state.
+$global:Policy = New-Policy $Real; $global:Rule = Rule "primary@contoso.com"
+foreach ($l in "ReportJunkAddresses", "ReportNotJunkAddresses", "ReportPhishAddresses") { $global:Policy.$l = @("alias@contoso.com") }
+"unmanaged mailbox: [" + (& $Script -Action Update -Values (ConvertTo-B64 $notify) -ExpectedMailbox "alias@contoso.com" | ConvertFrom-Json).ReportingMailbox + "]"
+
 $global:Policy = New-Policy $Real; $global:Rule = $null
 $global:Policy.MultiLanguageSetting = @("en", "fr")
 foreach ($n in $LangNames) { $global:Policy.$n = @("", "") }

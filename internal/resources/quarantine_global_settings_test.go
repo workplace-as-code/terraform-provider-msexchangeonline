@@ -41,6 +41,8 @@ func TestQuarantineGlobalSettingsValidate(t *testing.T) {
 		{"duplicate language", [][2]string{{"French", "a"}, {"french", "b"}}, "more than once"},
 		{"long disclaimer", [][2]string{{"French", long}}, "200 characters"},
 		{"unknown language", [][2]string{{"Klingon", "a"}}, "Klingon"},
+		{"language in another case", [][2]string{{"english", "a"}}, "english"},
+		{"empty text", [][2]string{{"French", ""}}, "leave it out"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -92,5 +94,19 @@ func TestQuarantineGlobalSettingsFromAPI(t *testing.T) {
 	if a["sender_name"].(types.String).ValueString() != "Détails" || !a["subject"].(types.String).IsNull() ||
 		a["disclaimer"].(types.String).ValueString() != "d'assistance" {
 		t.Errorf("unexpected language: %v", a)
+	}
+}
+
+// A set element entirely unknown at validation (built from another resource's
+// computed value) must not crash the provider.
+func TestQuarantineGlobalSettingsValidateUnknownElement(t *testing.T) {
+	languages := quarantineLanguagesValue([2]string{"French", "a"})
+	var elements []tftypes.Value
+	if err := languages.As(&elements); err != nil {
+		t.Fatal(err)
+	}
+	value := tftypes.NewValue(languages.Type(), []tftypes.Value{tftypes.NewValue(elements[0].Type(), tftypes.UnknownValue)})
+	if diags := validateResource(t, &quarantineGlobalSettingsResource{}, map[string]tftypes.Value{"languages": value}); diags.HasError() {
+		t.Fatalf("unexpected error: %v", diags)
 	}
 }

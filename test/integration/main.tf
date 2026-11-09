@@ -565,6 +565,13 @@ resource "msexchangeonline_tenant_allow_block_list_spoof_item" "test" {
   action                 = local.updated ? "Block" : "Allow"
 }
 
+resource "msexchangeonline_tenant_allow_block_list_spoof_item" "ip" {
+  spoofed_user           = "tf-ci-spoof-ip.example.com"
+  sending_infrastructure = "192.0.2.1/24"
+  spoof_type             = "External"
+  action                 = "Allow"
+}
+
 resource "msexchangeonline_tenant_allow_block_list_item" "url" {
   list_type       = "Url"
   entry           = "tf-ci-test.example/blocked"

@@ -197,6 +197,7 @@ CREATED=(
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
   "msexchangeonline_tenant_allow_block_list_spoof_item.test=External:tf-ci-spoof.example.com:tf-ci-infra.example.net"
+  "msexchangeonline_tenant_allow_block_list_spoof_item.ip=External:tf-ci-spoof-ip.example.com:192.0.2.1/24"
   "msexchangeonline_address_book_policy.test=TF-CI-ABP"
   "msexchangeonline_offline_address_book.test=TF-CI-OAB"
   "msexchangeonline_global_address_list.test=TF-CI-GAL"
@@ -374,10 +375,15 @@ state_string() {
 # then writes the original value back.
 write_and_restore() {
   local addr="$1" attr="$2" var="$3" value="$4" original="$5"
+  local current
   terraform apply -auto-approve -no-color -var phase=update -var "$var=$value" | tail -1
-  [[ "$(state_value "$addr" "$attr")" != "$original" ]] || fail "$addr.$attr was not changed"
+  current="$(state_value "$addr" "$attr")"
+  current="${current#\"}"; current="${current%\"}"
+  [[ "$current" != "$original" ]] || fail "$addr.$attr was not changed"
   terraform apply -auto-approve -no-color -var phase=update -var "$var=$original" | tail -1
-  [[ "$(state_value "$addr" "$attr")" == "$original" ]] || fail "$addr.$attr was not restored"
+  current="$(state_value "$addr" "$attr")"
+  current="${current#\"}"; current="${current%\"}"
+  [[ "$current" == "$original" ]] || fail "$addr.$attr was not restored"
   pass "$addr.$attr changed and restored"
 }
 
@@ -488,7 +494,7 @@ if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   write_and_restore msexchangeonline_report_submission_policy.this enable_third_party_address \
     report_third_party true false
 fi
-frequency="$(state_value msexchangeonline_quarantine_global_settings.this notification_frequency)"
+frequency="$(state_string msexchangeonline_quarantine_global_settings.this notification_frequency)"
 write_and_restore msexchangeonline_quarantine_global_settings.this notification_frequency \
   quarantine_notification_frequency "$([[ "$frequency" == 04:00:00 ]] && echo 1.00:00:00 || echo 04:00:00)" "$frequency"
 branding="$(state_value msexchangeonline_quarantine_global_settings.this organization_branding_enabled)"

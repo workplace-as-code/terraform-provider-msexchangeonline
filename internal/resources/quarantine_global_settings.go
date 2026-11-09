@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/hashicorp/terraform-plugin-framework-validators/stringvalidator"
 	"github.com/hashicorp/terraform-plugin-framework/attr"
@@ -107,7 +106,7 @@ func (r *quarantineGlobalSettingsResource) Schema(_ context.Context, _ resource.
 					"language": schema.StringAttribute{
 						Required:            true,
 						MarkdownDescription: "Language of the notification, for example `English`, `French` or `Default`, as in `Set-QuarantinePolicy -MultiLanguageSetting`.",
-						Validators:          []validator.String{stringvalidator.OneOfCaseInsensitive(quarantineLanguages...)},
+						Validators:          []validator.String{stringvalidator.OneOf(quarantineLanguages...)},
 					},
 					"sender_name": schema.StringAttribute{Optional: true, MarkdownDescription: "Display name of the sender."},
 					"subject":     schema.StringAttribute{Optional: true, MarkdownDescription: "Subject of the notification."},
@@ -131,14 +130,16 @@ func (r *quarantineGlobalSettingsResource) ValidateConfig(ctx context.Context, r
 	if d := duplicateLanguage(cfg.Languages); d != "" {
 		resp.Diagnostics.AddAttributeError(languages, "Duplicate language", fmt.Sprintf("The language %q is set more than once.", d))
 	}
+	if name := emptyLanguageText(cfg.Languages); name != "" {
+		resp.Diagnostics.AddAttributeError(languages, "Empty text", fmt.Sprintf("%s is empty: leave it out instead.", name))
+	}
 	allowed := map[string]bool{}
 	for _, l := range quarantineLanguages {
-		allowed[strings.ToLower(l)] = true
+		allowed[l] = true
 	}
-	for _, e := range cfg.Languages.Elements() {
-		a := e.(types.Object).Attributes()
-		if language := a["language"].(types.String); !language.IsUnknown() && !language.IsNull() && !allowed[strings.ToLower(language.ValueString())] {
-			resp.Diagnostics.AddAttributeError(languages, "Unknown language", fmt.Sprintf("%q is not a language of Set-QuarantinePolicy -MultiLanguageSetting.", language.ValueString()))
+	for _, a := range knownLanguages(cfg.Languages) {
+		if language := a["language"].(types.String); !language.IsUnknown() && !language.IsNull() && !allowed[language.ValueString()] {
+			resp.Diagnostics.AddAttributeError(languages, "Unknown language", fmt.Sprintf("%q is not a value of Set-QuarantinePolicy -MultiLanguageSetting, with this exact case, such as English or French.", language.ValueString()))
 		}
 		if d := a["disclaimer"].(types.String); len([]rune(d.ValueString())) > quarantineMaxDisclaimerLength {
 			resp.Diagnostics.AddAttributeError(languages, "Disclaimer too long", fmt.Sprintf("A disclaimer has at most %d characters.", quarantineMaxDisclaimerLength))

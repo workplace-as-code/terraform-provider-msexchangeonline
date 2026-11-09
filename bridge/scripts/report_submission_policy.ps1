@@ -4,7 +4,7 @@
 #   -Values            base64 JSON object: cmdlet parameter -> value
 #   -ReportingMailbox  absent = unmanaged, "" = no mailbox
 #   -Languages         base64 JSON array of objects: Language and MultiLanguage* lists
-#   -ExpectedMailbox   the mailbox in the state, for reads
+#   -ExpectedMailbox   the mailbox in the state, when it is not being written
 
 param(
     [string]$TenantId              = "",

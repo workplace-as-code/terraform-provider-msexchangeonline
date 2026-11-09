@@ -453,3 +453,44 @@ func TestPreflightParameterCheck(t *testing.T) {
 		t.Errorf("a cmdlet the app cannot see must be left to the cmdlet check:\n%s", out)
 	}
 }
+
+// TestWriteAndRestoreOfStrings guards write_and_restore in test/run.sh: state
+// show prints a string with its quotes, which the comparisons must ignore.
+func TestWriteAndRestoreOfStrings(t *testing.T) {
+	script, err := os.ReadFile("../test/run.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var helpers []string
+	for _, name := range []string{"state_value", "write_and_restore"} {
+		m := regexp.MustCompile(`(?ms)^` + name + `\(\) \{.*?^\}`).Find(script)
+		if m == nil {
+			t.Fatalf("%s not found in run.sh", name)
+		}
+		helpers = append(helpers, string(m))
+	}
+	harness := strings.Join(helpers, "\n") + `
+set -euo pipefail
+pass() { echo "PASS $*"; }
+fail() { echo "FAIL $*"; exit 1; }
+terraform() {
+  case "$1" in
+    apply) for a in "$@"; do case "$a" in v=*) echo "\"${a#v=}\"" > "$store" ;; esac; done; echo applied ;;
+    state) echo "    attr = $(cat "$store")" ;;
+  esac
+}
+store="$(mktemp)"
+echo '"1.00:00:00"' > "$store"
+write_and_restore addr attr v 04:00:00 1.00:00:00
+echo '""' > "$store"
+write_and_restore addr attr v user@contoso.com ""
+rm -f "$store"
+`
+	out, err := exec.Command("bash", "-c", harness).CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	if n := strings.Count(string(out), "PASS addr.attr changed and restored"); n != 2 {
+		t.Errorf("want 2 passes, got %d:\n%s", n, out)
+	}
+}

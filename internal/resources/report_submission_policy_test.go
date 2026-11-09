@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-go/tftypes"
@@ -29,6 +30,21 @@ func reportLanguagesValue(languages ...string) tftypes.Value {
 		elems = append(elems, tftypes.NewValue(object, values))
 	}
 	return tftypes.NewValue(tftypes.Set{ElementType: object}, elems)
+}
+
+// reportLanguagesEmptyText builds one language with an empty text.
+func reportLanguagesEmptyText(language string) tftypes.Value {
+	set := reportLanguagesValue(language)
+	var elements []tftypes.Value
+	if err := set.As(&elements); err != nil {
+		panic(err)
+	}
+	var values map[string]tftypes.Value
+	if err := elements[0].As(&values); err != nil {
+		panic(err)
+	}
+	values["pre_submit_junk_title"] = tftypes.NewValue(tftypes.String, "")
+	return tftypes.NewValue(set.Type(), []tftypes.Value{tftypes.NewValue(elements[0].Type(), values)})
 }
 
 func TestReportSubmissionValidate(t *testing.T) {
@@ -56,6 +72,8 @@ func TestReportSubmissionValidate(t *testing.T) {
 		{"unknown language code", map[string]tftypes.Value{"languages": reportLanguagesValue("en-US")}, "en-US"},
 		{"duplicate language", map[string]tftypes.Value{"languages": reportLanguagesValue("en", "EN")}, "more than once"},
 		{"no language", map[string]tftypes.Value{"languages": reportLanguagesValue()}, "last language"},
+		{"language in another case", map[string]tftypes.Value{"languages": reportLanguagesValue("EN")}, "EN"},
+		{"empty text", map[string]tftypes.Value{"languages": reportLanguagesEmptyText("en")}, "leave it out"},
 		{"two languages", map[string]tftypes.Value{"languages": reportLanguagesValue("en", "fr")}, ""},
 	}
 	for _, c := range cases {
@@ -160,5 +178,60 @@ func TestReportSubmissionExcludedParameters(t *testing.T) {
 		if _, ok := resp.Schema.Attributes[f.name]; !ok {
 			t.Errorf("%s is not in the schema", f.name)
 		}
+	}
+}
+
+// A set element entirely unknown at validation must not crash the provider.
+func TestReportSubmissionValidateUnknownElement(t *testing.T) {
+	set := reportLanguagesValue("en")
+	var elements []tftypes.Value
+	if err := set.As(&elements); err != nil {
+		t.Fatal(err)
+	}
+	value := tftypes.NewValue(set.Type(), []tftypes.Value{tftypes.NewValue(elements[0].Type(), tftypes.UnknownValue)})
+	if diags := validateResource(t, &reportSubmissionPolicyResource{}, map[string]tftypes.Value{"languages": value}); diags.HasError() {
+		t.Fatalf("unexpected error: %v", diags)
+	}
+}
+
+// With no language in Exchange the state is null: the configuration terraform
+// query generates must not hold the empty set that validation refuses.
+func TestReportSubmissionNoLanguageIsNull(t *testing.T) {
+	obj, err := reportSubmissionFromAPI([]byte(`{"ReportingMailbox":"","Languages":[]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if languages := obj.Attributes()["languages"].(types.Set); !languages.IsNull() {
+		t.Errorf("want a null set, got %v", languages)
+	}
+}
+
+// An unmanaged mailbox is still compared with the one in the state on Update.
+func TestReportSubmissionParamsExpectedMailbox(t *testing.T) {
+	values := map[string]attr.Value{}
+	for name, typ := range reportSubmissionAttrTypes() {
+		switch at := typ.(type) {
+		case types.SetType:
+			values[name] = types.SetNull(at.ElemType)
+		default:
+			if typ == types.BoolType {
+				values[name] = types.BoolNull()
+			} else {
+				values[name] = types.StringNull()
+			}
+		}
+	}
+	cfg := types.ObjectValueMust(reportSubmissionAttrTypes(), values)
+	p := reportSubmissionParams(cfg, types.StringValue("alias@contoso.com"))
+	if p["ExpectedMailbox"] != "alias@contoso.com" {
+		t.Errorf("ExpectedMailbox = %q", p["ExpectedMailbox"])
+	}
+	if _, ok := p["ReportingMailbox"]; ok {
+		t.Error("an unmanaged mailbox must not be sent")
+	}
+	values["reporting_mailbox"] = types.StringValue("a@contoso.com")
+	p = reportSubmissionParams(types.ObjectValueMust(reportSubmissionAttrTypes(), values), types.StringValue("alias@contoso.com"))
+	if p["ReportingMailbox"] != "a@contoso.com" {
+		t.Errorf("ReportingMailbox = %q", p["ReportingMailbox"])
 	}
 }
