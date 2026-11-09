@@ -196,6 +196,7 @@ CREATED=(
   "msexchangeonline_journal_rule.test=TF-CI-Journal"
   "msexchangeonline_tenant_allow_block_list_item.sender=Sender:tf-ci-blocked@tf-ci-test.example"
   "msexchangeonline_tenant_allow_block_list_item.url=Url:tf-ci-test.example/blocked"
+  "msexchangeonline_tenant_allow_block_list_spoof_item.test=External:tf-ci-spoof.example.com:tf-ci-infra.example.net"
   "msexchangeonline_address_book_policy.test=TF-CI-ABP"
   "msexchangeonline_offline_address_book.test=TF-CI-OAB"
   "msexchangeonline_global_address_list.test=TF-CI-GAL"

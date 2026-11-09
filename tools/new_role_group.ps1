@@ -251,6 +251,7 @@ $ProviderCmdlets = @(
     "Get-SafeLinksRule",
     "Get-SharingPolicy",
     "Get-TenantAllowBlockListItems",
+    "Get-TenantAllowBlockListSpoofItems",
     "Get-TransportConfig",
     "Get-TransportRule",
     "New-ATPProtectionPolicyRule",
@@ -288,6 +289,7 @@ $ProviderCmdlets = @(
     "New-SafeLinksRule",
     "New-SharingPolicy",
     "New-TenantAllowBlockListItems",
+    "New-TenantAllowBlockListSpoofItems",
     "New-TransportRule",
     "Remove-ATPProtectionPolicyRule",
     "Remove-ActiveSyncDeviceAccessRule",
@@ -323,6 +325,7 @@ $ProviderCmdlets = @(
     "Remove-SafeLinksRule",
     "Remove-SharingPolicy",
     "Remove-TenantAllowBlockListItems",
+    "Remove-TenantAllowBlockListSpoofItems",
     "Remove-TransportRule",
     "Set-ATPProtectionPolicyRule",
     "Set-AcceptedDomain",
@@ -368,6 +371,7 @@ $ProviderCmdlets = @(
     "Set-SafeLinksRule",
     "Set-SharingPolicy",
     "Set-TenantAllowBlockListItems",
+    "Set-TenantAllowBlockListSpoofItems",
     "Set-TransportConfig",
     "Set-TransportRule"
 )

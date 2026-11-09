@@ -519,6 +519,13 @@ resource "msexchangeonline_tenant_allow_block_list_item" "sender" {
   notes     = local.comment
 }
 
+resource "msexchangeonline_tenant_allow_block_list_spoof_item" "test" {
+  spoofed_user           = "tf-ci-spoof.example.com"
+  sending_infrastructure = "tf-ci-infra.example.net"
+  spoof_type             = "External"
+  action                 = local.updated ? "Block" : "Allow"
+}
+
 resource "msexchangeonline_tenant_allow_block_list_item" "url" {
   list_type       = "Url"
   entry           = "tf-ci-test.example/blocked"

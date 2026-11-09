@@ -302,3 +302,26 @@ check "hybrid_objects" {
     error_message = "The hybrid test objects could not be read."
   }
 }
+
+data "msexchangeonline_tenant_allow_block_list_spoof_item" "test" {
+  id         = msexchangeonline_tenant_allow_block_list_spoof_item.test.id
+  depends_on = [msexchangeonline_tenant_allow_block_list_spoof_item.test]
+
+  lifecycle {
+    postcondition {
+      condition     = self.spoofed_user == "tf-ci-spoof.example.com"
+      error_message = "The data source read another object than the test one."
+    }
+  }
+}
+
+data "msexchangeonline_quarantine_global_settings" "this" {
+  depends_on = [msexchangeonline_quarantine_global_settings.this]
+
+  lifecycle {
+    postcondition {
+      condition     = self.id == "default"
+      error_message = "The data source read another object than the tenant-wide settings."
+    }
+  }
+}

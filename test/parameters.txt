@@ -342,6 +342,10 @@ New-ServicePrincipal ObjectId
 New-TenantAllowBlockListItems Entries
 New-TenantAllowBlockListItems ListType
 New-TenantAllowBlockListItems Notes
+New-TenantAllowBlockListSpoofItems Action
+New-TenantAllowBlockListSpoofItems SendingInfrastructure
+New-TenantAllowBlockListSpoofItems SpoofType
+New-TenantAllowBlockListSpoofItems SpoofedUser
 New-TransportRule ApplyRightsProtectionCustomizationTemplate
 New-TransportRule ApplyRightsProtectionTemplate
 New-TransportRule AttachmentHasExecutableContent
@@ -559,6 +563,8 @@ Set-ServicePrincipal Identity
 Set-TenantAllowBlockListItems Entries
 Set-TenantAllowBlockListItems ListType
 Set-TenantAllowBlockListItems Notes
+Set-TenantAllowBlockListSpoofItems Action
+Set-TenantAllowBlockListSpoofItems Ids
 Set-TransportRule ApplyRightsProtectionCustomizationTemplate
 Set-TransportRule ApplyRightsProtectionTemplate
 Set-TransportRule AttachmentHasExecutableContent

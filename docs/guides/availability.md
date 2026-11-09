@@ -30,6 +30,7 @@ See the [Authentication guide](https://registry.terraform.io/providers/workplace
 |---|---|
 | [`msexchangeonline_hosted_connection_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_connection_filter_policy) | Singleton: IP allow and block lists |
 | [`msexchangeonline_tenant_allow_block_list_item`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/tenant_allow_block_list_item) | Blocked or allowed senders, URLs, file hashes, IP addresses |
+| [`msexchangeonline_tenant_allow_block_list_spoof_item`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/tenant_allow_block_list_spoof_item) | Spoofed senders. |
 | [`msexchangeonline_hosted_content_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_content_filter_policy) | Inbound spam filter |
 | [`msexchangeonline_hosted_content_filter_rule`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/hosted_content_filter_rule) |  |
 | [`msexchangeonline_outbound_spam_filter_policy`](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/resources/outbound_spam_filter_policy) | Sending limits and automatic forwarding |
