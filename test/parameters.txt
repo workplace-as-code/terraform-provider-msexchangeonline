@@ -570,7 +570,6 @@ Set-ReportSubmissionPolicy ReportNotJunkAddresses
 Set-ReportSubmissionPolicy ReportNotJunkToCustomizedAddress
 Set-ReportSubmissionPolicy ReportPhishAddresses
 Set-ReportSubmissionPolicy ReportPhishToCustomizedAddress
-Set-ReportSubmissionPolicy Stop
 Set-ReportSubmissionPolicy ThirdPartyReportAddresses
 Set-ReportSubmissionRule SentTo
 Set-RetentionPolicy Identity
