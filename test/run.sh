@@ -497,6 +497,9 @@ if [[ -n "${TF_VAR_test_mailbox:-}" ]]; then
   write_and_restore msexchangeonline_report_submission_policy.this enable_third_party_address \
     report_third_party true false
 fi
+mail_tips="$(state_value msexchangeonline_organization_config.this mail_tips_all_tips_enabled)"
+write_and_restore msexchangeonline_organization_config.this mail_tips_all_tips_enabled \
+  organization_mail_tips_all_tips_enabled "$([[ "$mail_tips" == true ]] && echo false || echo true)" "$mail_tips"
 frequency="$(state_string msexchangeonline_quarantine_global_settings.this notification_frequency)"
 write_and_restore msexchangeonline_quarantine_global_settings.this notification_frequency \
   quarantine_notification_frequency "$([[ "$frequency" == 04:00:00 ]] && echo 1.00:00:00 || echo 04:00:00)" "$frequency"

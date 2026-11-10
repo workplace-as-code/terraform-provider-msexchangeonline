@@ -44,7 +44,7 @@ resource "msexchangeonline_organization_config" "org" {
 
 ## Permissions
 
-The provider's app registration needs the **Organization Configuration** Exchange management role. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
+The provider's app registration needs the **Organization Configuration** Exchange management role. Setting `mail_tips_all_tips_enabled` also needs a role with that parameter, which only **Mail Tips** has. The role group created by [`tools/new_role_group.ps1`](https://github.com/workplace-as-code/terraform-provider-msexchangeonline/blob/main/tools/new_role_group.ps1) includes it. See the [Authentication guide](https://registry.terraform.io/providers/workplace-as-code/msexchangeonline/latest/docs/guides/authentication).
 
 ## Microsoft documentation
 

@@ -494,3 +494,25 @@ rm -f "$store"
 		t.Errorf("want 2 passes, got %d:\n%s", n, out)
 	}
 }
+
+// TestMailTipsRoleIsCustom: the built-in Mail Tips role, the only one granting
+// MailTipsAllTipsEnabled, also manages availability address spaces and
+// organization relationships. The role group gets a child that keeps only the
+// organization configuration cmdlets.
+func TestMailTipsRoleIsCustom(t *testing.T) {
+	script, err := os.ReadFile(roleGroupScript)
+	if err != nil {
+		t.Fatal(err)
+	}
+	custom := regexp.MustCompile(`(?s)@\{ Name = "Mail Tips"; Parent = "Mail Tips"; Cmdlets = @\(\s*"Get-OrganizationConfig",\s*"Set-OrganizationConfig"\s*\) \}`)
+	if !custom.Match(script) {
+		t.Error("$CustomRoles must hold a Mail Tips role that keeps the organization configuration cmdlets only")
+	}
+	guide, err := os.ReadFile(filepath.Join("..", "templates", "guides", "authentication.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(guide), "| `terraform-msexchangeonline Mail Tips` | **Mail Tips** |") {
+		t.Error("the authentication guide must list the Mail Tips custom role")
+	}
+}
