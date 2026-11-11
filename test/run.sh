@@ -370,6 +370,14 @@ state_string() {
   jq -r --arg a "$1" --arg k "$2" '.values.root_module.resources[] | select(.address == $a) | .values[$k]' <<< "$state"
 }
 
+# state_length <address> <attribute> prints the number of elements of a list or
+# set attribute (0 when null). state show spreads a list over several lines.
+state_length() {
+  local state
+  state="$(terraform show -json)"
+  jq -r --arg a "$1" --arg k "$2" '.values.root_module.resources[] | select(.address == $a) | .values[$k] | length' <<< "$state"
+}
+
 # write_and_restore <address> <attribute> <variable> <test value> <original value>
 # Writes a test value to a tenant-wide setting through a variable, checks it,
 # then writes the original value back.
@@ -511,7 +519,7 @@ if [[ -n "${TF_VAR_test_mailbox:-}" && -z "$(state_string msexchangeonline_quara
     quarantine_sender_address "$TF_VAR_test_mailbox" ""
 fi
 # Only touch empty lists, so the restore puts back exactly what was there.
-if [[ "$(state_value msexchangeonline_quarantine_global_settings.this languages)" != *'"'* ]]; then
+if [[ "$(state_length msexchangeonline_quarantine_global_settings.this languages)" == 0 ]]; then
   write_and_restore msexchangeonline_quarantine_global_settings.this languages quarantine_languages \
     '[{language="English",sender_name="TF-CI sender",subject="TF-CI subject"},{language="French",sender_name="TF-CI expéditeur",disclaimer="Contactez le service d'"'"'assistance"}]' '[]'
 else
