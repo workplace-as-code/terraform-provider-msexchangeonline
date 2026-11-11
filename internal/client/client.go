@@ -181,10 +181,11 @@ var (
 // request that did not get through ("Error sending HTTP request").
 var transientError = regexp.MustCompile(`(?i)server side error|try again|throttl|\b429\b|\b503\b|timed out|temporarily unavailable|task was canceled|error sending http request`)
 
-// isRead reports whether a script call only reads: a Get action, or the
-// listing of the existing objects for terraform query.
+// isRead reports whether a script call only reads: a Get or List action (the
+// accepted_domains data source), or the listing of the existing objects for
+// terraform query.
 func isRead(script string, params map[string]string) bool {
-	return params["Action"] == "Get" || script == "list.ps1"
+	return params["Action"] == "Get" || params["Action"] == "List" || script == "list.ps1"
 }
 
 // RunScript executes a PowerShell bridge script and returns its stdout (JSON).
