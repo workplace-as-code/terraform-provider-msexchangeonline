@@ -104,7 +104,7 @@ Before each release, the integration tests create, update, import and destroy ev
 
 | Provider | Terraform | PowerShell | ExchangeOnlineManagement module | Operating system |
 |---|---|---|---|---|
-| 0.6.1 | 1.17.0 | 7.6.8 | 3.10.1 | Linux (Debian 13) |
+| 0.7.2 | 1.17.1 | 7.7.0 | 3.10.1 | Linux (Debian 13) |
 
 The run includes the optional tests: Defender for Office 365 (Plan 1 license), message encryption (Microsoft 365 E5), Exchange RBAC, the hybrid data sources and the cross-tenant partner.
 
