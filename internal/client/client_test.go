@@ -249,13 +249,18 @@ func runs(t *testing.T, counter string) string {
 }
 
 func TestRunScriptRetriesATransientRead(t *testing.T) {
-	counter := flakyPwsh(t)
-	out, err := newTestClient(time.Minute).RunScript(context.Background(), "x.ps1", map[string]string{"Action": "Get"})
-	if err != nil || !strings.Contains(string(out), "ok") {
-		t.Fatalf("read was not retried: %v", err)
-	}
-	if got := runs(t, counter); got != "2" {
-		t.Errorf("runs = %s, want 2", got)
+	// List: the accepted_domains data source reads every domain at once.
+	for _, action := range []string{"Get", "List"} {
+		t.Run(action, func(t *testing.T) {
+			counter := flakyPwsh(t)
+			out, err := newTestClient(time.Minute).RunScript(context.Background(), "x.ps1", map[string]string{"Action": action})
+			if err != nil || !strings.Contains(string(out), "ok") {
+				t.Fatalf("read was not retried: %v", err)
+			}
+			if got := runs(t, counter); got != "2" {
+				t.Errorf("runs = %s, want 2", got)
+			}
+		})
 	}
 }
 
