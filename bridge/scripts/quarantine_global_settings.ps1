@@ -39,7 +39,9 @@ function Get-BridgeListItem {
 
 function Write-BridgeGlobalPolicy {
     param($Policy)
-    $names = @($Policy.MultiLanguageSetting | ForEach-Object { [string]$_ })
+    # Piping $null runs ForEach-Object once: a policy without languages would
+    # read back as one language with an empty name.
+    $names = @(if ($null -ne $Policy.MultiLanguageSetting) { $Policy.MultiLanguageSetting | ForEach-Object { [string]$_ } })
     $languages = [object[]]@(for ($i = 0; $i -lt $names.Count; $i++) {
         [ordered]@{
             Language   = $names[$i]
