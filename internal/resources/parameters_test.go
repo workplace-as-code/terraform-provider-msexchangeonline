@@ -76,8 +76,29 @@ func splitParametersFile(data string) (generated, handWritten []string, err erro
 	return generated, handWritten, nil
 }
 
+// PowerShell comments: <# ... #> blocks, whole-line comments and comments
+// after code (a # preceded by a space).
+var (
+	psBlockComment = regexp.MustCompile(`(?s)<#.*?#>`)
+	psLineComment  = regexp.MustCompile(`(?m)(^|\s)#.*$`)
+)
+
+// stripComments removes the comments of a PowerShell script, so a parameter
+// named only in a comment does not count as used.
+func stripComments(script string) string {
+	return psLineComment.ReplaceAllString(psBlockComment.ReplaceAllString(script, ""), "")
+}
+
+// paramPattern matches a parameter the way a script passes it: -Param on a
+// command line, "Param" or 'Param' as a splat key or in a list of names, or
+// Param = as a hashtable key.
+func paramPattern(param string) *regexp.Regexp {
+	p := regexp.QuoteMeta(param)
+	return regexp.MustCompile(`(?i)-` + p + `\b|["']` + p + `["']|\b` + p + `\s*=`)
+}
+
 // checkHandWritten reports the lines whose cmdlet is in no bridge script, or
-// whose parameter is not in the script that calls the cmdlet.
+// whose parameter is not passed by the script that calls the cmdlet.
 func checkHandWritten(lines []string, scriptsDir string) ([]string, error) {
 	files, err := filepath.Glob(filepath.Join(scriptsDir, "*.ps1"))
 	if err != nil || len(files) == 0 {
@@ -89,7 +110,7 @@ func checkHandWritten(lines []string, scriptsDir string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		scripts = append(scripts, string(data))
+		scripts = append(scripts, stripComments(string(data)))
 	}
 	var problems []string
 	for _, line := range lines {
@@ -99,7 +120,7 @@ func checkHandWritten(lines []string, scriptsDir string) ([]string, error) {
 			continue
 		}
 		cmdletRe := regexp.MustCompile(`\b` + regexp.QuoteMeta(cmdlet) + `\b`)
-		paramRe := regexp.MustCompile(`(?i)\b` + regexp.QuoteMeta(param) + `\b`)
+		paramRe := paramPattern(param)
 		found, hasParam := false, false
 		for _, s := range scripts {
 			if cmdletRe.MatchString(s) {
@@ -176,5 +197,36 @@ func TestParametersFileHandWritten(t *testing.T) {
 	}
 	if len(problems) != 1 || !strings.Contains(problems[0], "Set-ManagementRole Bogus") {
 		t.Errorf("a parameter no script uses must be reported, got %v", problems)
+	}
+}
+
+// TestCheckHandWrittenForms checks which forms count as passing a parameter.
+func TestCheckHandWrittenForms(t *testing.T) {
+	dir := t.TempDir()
+	script := `<#
+  -Hidden in a block comment
+#>
+# -Commented on a whole line
+Set-Thing -Dash $true  # -Trailing after code
+$splat["Quoted"] = 1
+$splat = @{ Key = 1 }
+$names = 'Single', "Double"
+$text = "Word in a sentence"
+`
+	if err := os.WriteFile(filepath.Join(dir, "thing.ps1"), []byte(script), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]bool{
+		"Dash": true, "Quoted": true, "Key": true, "Single": true, "Double": true,
+		"Hidden": false, "Commented": false, "Trailing": false, "Word": false,
+	}
+	for param, used := range cases {
+		problems, err := checkHandWritten([]string{"Set-Thing " + param}, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got := len(problems) == 0; got != used {
+			t.Errorf("%s: used = %v, want %v (problems %v)", param, got, used, problems)
+		}
 	}
 }
