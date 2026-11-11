@@ -60,9 +60,14 @@ function Get-BridgeStrings {
 function Test-BridgeSameMailbox {
     param([string]$Value, [string]$Expected)
     if ($Value -eq $Expected) { return $true }
-    # The rule reads back as the primary address of the mailbox.
-    try { return [string](Get-Recipient -Identity $Expected -ErrorAction Stop).PrimarySmtpAddress -eq $Value }
-    catch { return $false }
+    # The rule reads back as the primary address of the mailbox. Only a missing
+    # mailbox means a different one: another error would show a false change.
+    try { $recipient = Invoke-BridgeRetry { Get-Recipient -Identity $Expected } }
+    catch {
+        if (Test-BridgeNotFound $_.Exception.Message) { return $false }
+        throw
+    }
+    [string]$recipient.PrimarySmtpAddress -eq $Value
 }
 
 # Get-BridgeReportingMailbox returns the mailbox for the state: the expected one
