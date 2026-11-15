@@ -23,7 +23,7 @@ Open an issue using the [new resource template](.github/ISSUE_TEMPLATE/new_resou
 ## Development Setup
 
 ### Requirements
-- Go 1.25+ (see `go.mod`)
+- Go 1.27+ (see `go.mod`)
 - PowerShell 7+ (`pwsh`)
 - ExchangeOnlineManagement PowerShell module
 - A Microsoft 365 developer tenant (for acceptance tests)
