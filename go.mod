@@ -1,6 +1,6 @@
 module github.com/workplace-as-code/terraform-provider-msexchangeonline
 
-go 1.25.8
+go 1.27
 
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.23.3
